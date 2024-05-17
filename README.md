@@ -66,6 +66,10 @@ For example, one can increase the speaking rate by 20 % and decrease the volume 
 python3 synthesize.py --text "YOUR_DESIRED_TEXT" --restore_step 900000 --mode single -p config/LJSpeech/preprocess.yaml -m config/LJSpeech/model.yaml -t config/LJSpeech/train.yaml --duration_control 0.8 --energy_control 0.8
 ```
 
+```
+python3 synthesize.py --text "Hi my name is Ditto and this is my voice" --restore_step 900000 --mode single -p config/LJSpeech/preprocess.yaml -m config/LJSpeech/model.yaml -t config/LJSpeech/train.yaml --duration_control .8 --energy_control .8
+```
+
 # Training
 
 ## Datasets

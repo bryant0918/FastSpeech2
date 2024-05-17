@@ -7,6 +7,9 @@ from tqdm import tqdm
 
 from text import _clean_text
 
+from soundfile import LibsndfileError
+from audioread.exceptions import NoBackendError
+
 
 def prepare_align(config):
     in_dir = config["path"]["corpus_path"]
@@ -25,7 +28,11 @@ def prepare_align(config):
             wav_path = os.path.join(in_dir, "wavs", "{}.wav".format(base_name))
             if os.path.exists(wav_path):
                 os.makedirs(os.path.join(out_dir, speaker), exist_ok=True)
-                wav, _ = librosa.load(wav_path, sampling_rate)
+                try:
+                    wav, _ = librosa.load(wav_path, sr=sampling_rate)
+                except:
+                    print("Skipped: ", wav_path)
+                    continue
                 wav = wav / max(abs(wav)) * max_wav_value
                 wavfile.write(
                     os.path.join(out_dir, speaker, "{}.wav".format(base_name)),

@@ -15,7 +15,7 @@ from dataset import TextDataset
 from text import text_to_sequence
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
+print("Device:", device)
 
 def read_lexicon(lex_path):
     lexicon = {}
@@ -185,6 +185,7 @@ if __name__ == "__main__":
     configs = (preprocess_config, model_config, train_config)
 
     # Get model
+    print("Device:", device)
     model = get_model(args, configs, device, train=False)
 
     # Load vocoder

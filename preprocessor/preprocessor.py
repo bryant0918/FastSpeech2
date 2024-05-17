@@ -81,6 +81,9 @@ class Preprocessor:
                     else:
                         info, pitch, energy, n = ret
                     out.append(info)
+                else:
+                    print("TextGrid not found: {}".format(tg_path))
+                    continue
 
                 if len(pitch) > 0:
                     pitch_scaler.partial_fit(pitch.reshape((-1, 1)))
@@ -92,6 +95,8 @@ class Preprocessor:
         print("Computing statistic quantities ...")
         # Perform normalization if necessary
         if self.pitch_normalization:
+            print("Pitch_scaler", pitch_scaler)
+            print(pitch_scaler.mean_)
             pitch_mean = pitch_scaler.mean_[0]
             pitch_std = pitch_scaler.scale_[0]
         else:

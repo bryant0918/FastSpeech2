@@ -93,10 +93,11 @@ class Encoder(nn.Module):
             ].expand(batch_size, -1, -1)
             print("ELSE Enc_output: ", enc_output.shape)
 
+        print("Mask: ", mask.shape)
+        print("Slf_attn_mask: ", slf_attn_mask.shape)
+        print("Self.layer_stack: ", self.layer_stack)
         for enc_layer in self.layer_stack:
             print("Enc_layer: ", enc_layer)
-            print("Mask: ", mask.shape)
-            print("Slf_attn_mask: ", slf_attn_mask.shape)
             enc_output, enc_slf_attn = enc_layer(
                 enc_output, mask=mask, slf_attn_mask=slf_attn_mask
             )

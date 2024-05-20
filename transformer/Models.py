@@ -1,5 +1,6 @@
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 import numpy as np
 
 import transformer.Constants as Constants
@@ -173,3 +174,71 @@ class Decoder(nn.Module):
                 dec_slf_attn_list += [dec_slf_attn]
 
         return dec_output, mask
+
+
+class ProsodyExtractor(nn.Module):
+    def __init__(self):
+        super(ProsodyExtractor, self).__init__()
+        # First Conv2d layer
+        self.conv1 = nn.Conv2d(in_channels=1, out_channels=8, kernel_size=3, padding=1)
+        self.bn1 = nn.BatchNorm2d(8)
+        # Second Conv2d layer
+        self.conv2 = nn.Conv2d(in_channels=8, out_channels=8, kernel_size=3, padding=1)
+        self.bn2 = nn.BatchNorm2d(8)
+        # Bi-GRU layer
+        self.gru = nn.GRU(input_size=8 * 8, hidden_size=32, num_layers=1, bidirectional=True, batch_first=True)
+        # Linear layer to output parameters of a single Gaussian
+        self.linear = nn.Linear(64, 2)  # For mean and log-variance
+
+    def forward(self, x):
+        # Apply first Conv2d, BatchNorm, and ReLU
+        x = F.relu(self.bn1(self.conv1(x)))
+        # Apply second Conv2d, BatchNorm, and ReLU
+        x = F.relu(self.bn2(self.conv2(x)))
+        # Reshape for GRU layer (batch_size, sequence_length, feature_size)
+        x = x.permute(0, 2, 3, 1).contiguous()
+        batch_size, height, width, channels = x.size()
+        x = x.view(batch_size, height, width * channels)
+        # Apply Bi-GRU layer
+        x, _ = self.gru(x)
+        # Apply linear projection to get Gaussian parameters
+        x = self.linear(x)
+        return x
+
+
+class ProsodyPredictor(nn.Module):
+    def __init__(self):
+        super(ProsodyPredictor, self).__init__()
+        # First Conv2d layer
+        self.conv1 = nn.Conv2d(in_channels=1, out_channels=8, kernel_size=3, padding=1)
+        self.bn1 = nn.BatchNorm2d(8)
+        # Second Conv2d layer
+        self.conv2 = nn.Conv2d(in_channels=8, out_channels=8, kernel_size=3, padding=1)
+        self.bn2 = nn.BatchNorm2d(8)
+        # Bi-GRU layer
+        self.gru = nn.GRU(input_size=8 * 8, hidden_size=32, num_layers=1, bidirectional=True, batch_first=True)
+        # Linear layer to output speaker independent means and log-variances
+        self.linear = nn.Linear(64, 2)  # For mean and log-variance
+
+    def forward(self, x):
+        # Apply first Conv2d, BatchNorm, and ReLU
+        x = F.relu(self.bn1(self.conv1(x)))
+        # Apply second Conv2d, BatchNorm, and ReLU
+        x = F.relu(self.bn2(self.conv2(x)))
+        # Reshape for GRU layer (batch_size, sequence_length, feature_size)
+        x = x.permute(0, 2, 3, 1).contiguous()
+        batch_size, height, width, channels = x.size()
+        x = x.view(batch_size, height, width * channels)
+        # Apply Bi-GRU layer
+        x, _ = self.gru(x)
+        # Apply linear projection to get Gaussian parameters
+        x = self.linear(x)
+        return x
+
+if __name__ == "__main__":
+
+    # Create the model
+    model = ProsodyExtractor()
+
+    # Print the model summary
+    print(model)

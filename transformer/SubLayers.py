@@ -83,11 +83,15 @@ class PositionwiseFeedForward(nn.Module):
         self.dropout = nn.Dropout(dropout)
 
     def forward(self, x):
+        print("In PositionwiseFeedForward forward method.")
         residual = x
         output = x.transpose(1, 2)
+        print("Output: ", output.shape)
         output = self.w_2(F.relu(self.w_1(output)))
+        print("Output after w_2: ", output.shape)
         output = output.transpose(1, 2)
         output = self.dropout(output)
+        print("Output after dropout: ", output.shape)
         output = self.layer_norm(output + residual)
 
         return output

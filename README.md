@@ -103,8 +103,13 @@ Alignments of the supported datasets are provided [here](https://drive.google.co
 ```
 wget --no-check-certificate 'https://drive.google.com/uc?export=download&id=1ukb8o-SnqhXCxq7drI3zye3tZdrGvQDA' -O preprocessed_data/LJSpeech/LJSpeech.zip
 ```
+or copy the file to the server by
+```
+scp /Users/bryantmcarthur/Downloads/LJSpeech.zip ditto@136.36.160.77:/home/ditto/Documents/ProsodyCloning/FastSpeech2/preprocessed_data/LJSpeech
+```
 You have to unzip the files in ``preprocessed_data/LJSpeech/TextGrid/``.
-```unzip preprocessed_data/LJSpeech/LJSpeech.zip -d preprocessed_data/LJSpeech/TextGrid/```
+
+```unzip preprocessed_data/LJSpeech/LJSpeech.zip -d preprocessed_data/LJSpeech/```
 
 After that, run the preprocessing script by
 ```

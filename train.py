@@ -52,6 +52,7 @@ def main(args, configs):
 
     # Load vocoder
     vocoder = get_vocoder(model_config, device)
+    print("Got vocoder")
 
     # Init logger
     for p in train_config["path"].values():

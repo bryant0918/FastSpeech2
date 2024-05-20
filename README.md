@@ -81,6 +81,9 @@ python3 synthesize.py --text "Hi my name is Ditto and this is my voice" --restor
 The supported datasets are
 
 - [LJSpeech](https://keithito.com/LJ-Speech-Dataset/): a single-speaker English dataset consists of 13100 short audio clips of a female speaker reading passages from 7 non-fiction books, approximately 24 hours in total.
+
+```wget https://data.keithito.com/data/speech/LJSpeech-1.1.tar.bz2```
+
 - [AISHELL-3](http://www.aishelltech.com/aishell_3): a Mandarin TTS dataset with 218 male and female speakers, roughly 85 hours in total.
 - [LibriTTS](https://research.google/tools/datasets/libri-tts/): a multi-speaker English dataset containing 585 hours of speech by 2456 speakers.
 

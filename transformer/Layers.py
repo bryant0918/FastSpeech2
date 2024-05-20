@@ -19,12 +19,15 @@ class FFTBlock(torch.nn.Module):
         )
 
     def forward(self, enc_input, mask=None, slf_attn_mask=None):
+        print("In FFTBlock forward method.")
         enc_output, enc_slf_attn = self.slf_attn(
             enc_input, enc_input, enc_input, mask=slf_attn_mask
         )
+        print("Enc_output: ", enc_output.shape)
         enc_output = enc_output.masked_fill(mask.unsqueeze(-1), 0)
-
+        print("Enc_output after mask: ", enc_output.shape)
         enc_output = self.pos_ffn(enc_output)
+        print("Enc_output after pos_ffn: ", enc_output.shape)
         enc_output = enc_output.masked_fill(mask.unsqueeze(-1), 0)
 
         return enc_output, enc_slf_attn

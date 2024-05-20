@@ -87,6 +87,7 @@ class PositionwiseFeedForward(nn.Module):
         residual = x
         output = x.transpose(1, 2)
         print("Output: ", output.shape)
+        print("w_1:", self.w_1)
         print("w_1", self.w_1(output))
         print("F", F.relu(self.w_1(output)))
         output = self.w_2(F.relu(self.w_1(output)))

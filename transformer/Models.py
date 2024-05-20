@@ -71,6 +71,7 @@ class Encoder(nn.Module):
         )
 
     def forward(self, src_seq, mask, return_attns=False):
+        print("In forward method of Encoder model.")
 
         enc_slf_attn_list = []
         batch_size, max_len = src_seq.shape[0], src_seq.shape[1]

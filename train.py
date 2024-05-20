@@ -88,6 +88,7 @@ def main(args, configs):
                 batch = to_device(batch, device)
                 print("Start Training")
                 # Forward
+                print("Batch: ", batch[2:])
                 output = model(*(batch[2:]))
                 print("Forward")
 

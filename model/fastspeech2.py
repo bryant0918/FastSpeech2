@@ -56,6 +56,7 @@ class FastSpeech2(nn.Module):
         e_control=1.0,
         d_control=1.0,
     ):
+        print("In forward method of FastSpeech2 model.")
         src_masks = get_mask_from_lengths(src_lens, max_src_len)
         mel_masks = (
             get_mask_from_lengths(mel_lens, max_mel_len)

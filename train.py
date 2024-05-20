@@ -79,6 +79,7 @@ def main(args, configs):
     outer_bar.n = args.restore_step
     outer_bar.update()
 
+    print("Start Training")
     while True:
         inner_bar = tqdm(total=len(loader), desc="Epoch {}".format(epoch), position=1)
         for batchs in loader:

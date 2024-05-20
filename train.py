@@ -89,7 +89,6 @@ def main(args, configs):
                 # Forward
                 output = model(*(batch[2:]))
 
-
                 # Cal Loss
                 losses = Loss(batch, output)
                 total_loss = losses[0]

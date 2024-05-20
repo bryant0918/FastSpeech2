@@ -51,6 +51,12 @@ python3 synthesize.py --text "YOUR_DESIRED_TEXT"  --speaker_id SPEAKER_ID --rest
 
 The generated utterances will be put in ``output/result/``.
 
+To copy from remote server back to local machine:
+```commandline
+scp "ditto@136.36.160.77:/home/ditto/Documents/ProsodyCloning/FastSpeech2/output/result/LJSpeech/<name of file>" /Users/bryantmcarthur/Downloads/
+scp "ditto@136.36.160.77:/home/ditto/Documents/ProsodyCloning/FastSpeech2/output/result/LJSpeech/Hi my name is ditto and this is what I sound like.wav" /Users/bryantmcarthur/Downloads/
+```
+
 Here is an example of synthesized mel-spectrogram of the sentence "Printing, in the only sense with which we are at present concerned, differs from most if not from all the arts and crafts represented in the Exhibition", with the English single-speaker TTS model.  
 ![](./img/synthesized_melspectrogram.png)
 
@@ -142,12 +148,23 @@ The model takes less than 10k steps (less than 1 hour on my GTX1080Ti GPU) of tr
 
 # TensorBoard
 
-Use
+To transfer to local port when you ssh
+```
+ssh -L 6006:127.0.0.1:6006 ditto@136.36.160.77
+```
+
+Use to view locally
 ```
 tensorboard --logdir output/log/LJSpeech
 ```
 
-to serve TensorBoard on your localhost.
+or to transfer from the server
+```commandline
+tensorboard --logdir=output/log/LJSpeech --bind_all
+```
+Then on local machine go to http://127.0.0.1:6006.
+
+
 The loss curves, synthesized mel-spectrograms, and audios are shown.
 
 ![](./img/tensorboard_loss.png)
@@ -155,6 +172,8 @@ The loss curves, synthesized mel-spectrograms, and audios are shown.
 ![](./img/tensorboard_audio.png)
 
 # Implementation Issues
+
+If you get a `segmentation fault` then in your command line first `export LD_LIBRARY_PATH=""`
 
 - Following [xcmyz's implementation](https://github.com/xcmyz/FastSpeech), I use an additional Tacotron-2-styled Post-Net after the decoder, which is not used in the original FastSpeech 2.
 - Gradient clipping is used in the training.

@@ -79,23 +79,27 @@ def main(args, configs):
     outer_bar.n = args.restore_step
     outer_bar.update()
 
-    print("Start Training")
+
     while True:
         inner_bar = tqdm(total=len(loader), desc="Epoch {}".format(epoch), position=1)
         for batchs in loader:
             for batch in batchs:
-                batch = to_device(batch, device)
 
+                batch = to_device(batch, device)
+                print("Start Training")
                 # Forward
                 output = model(*(batch[2:]))
+                print("Forward")
 
                 # Cal Loss
                 losses = Loss(batch, output)
                 total_loss = losses[0]
+                print("Loss")
 
                 # Backward
                 total_loss = total_loss / grad_acc_step
                 total_loss.backward()
+                print("Backward")
                 if step % grad_acc_step == 0:
                     # Clipping gradients to avoid gradient explosion
                     nn.utils.clip_grad_norm_(model.parameters(), grad_clip_thresh)

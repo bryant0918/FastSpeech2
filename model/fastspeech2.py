@@ -100,7 +100,7 @@ class FastSpeech2(nn.Module):
 
         postnet_output = self.postnet(output) + output
         print("Postnet output: ", postnet_output.shape)
-
+        raise Exception("Stop here.")
         return (
             output,
             postnet_output,

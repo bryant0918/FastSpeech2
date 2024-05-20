@@ -86,15 +86,18 @@ class Encoder(nn.Module):
             )[: src_seq.shape[1], :].unsqueeze(0).expand(batch_size, -1, -1).to(
                 src_seq.device
             )
+            print("IF Enc_output: ", enc_output.shape)
         else:
             enc_output = self.src_word_emb(src_seq) + self.position_enc[
                 :, :max_len, :
             ].expand(batch_size, -1, -1)
+            print("ELSE Enc_output: ", enc_output.shape)
 
         for enc_layer in self.layer_stack:
             enc_output, enc_slf_attn = enc_layer(
                 enc_output, mask=mask, slf_attn_mask=slf_attn_mask
             )
+            print("Enc_output: ", enc_output.shape)
             if return_attns:
                 enc_slf_attn_list += [enc_slf_attn]
 

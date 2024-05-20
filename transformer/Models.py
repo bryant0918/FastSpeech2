@@ -96,6 +96,11 @@ class Encoder(nn.Module):
         print("Mask: ", mask.shape)
         print("Slf_attn_mask: ", slf_attn_mask.shape)
         print("Self.layer_stack: ", self.layer_stack)
+
+        for enc_layer in self.layer_stack:
+            print("Enc_layer: ", enc_layer)
+            print()
+
         for enc_layer in self.layer_stack:
             print("Enc_layer: ", enc_layer)
             enc_output, enc_slf_attn = enc_layer(

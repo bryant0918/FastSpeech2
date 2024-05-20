@@ -17,7 +17,6 @@ def get_model(args, configs, device, train=False):
             train_config["path"]["ckpt_path"],
             "{}.pth.tar".format(args.restore_step),
         )
-        print("Device", device)
         ckpt = torch.load(ckpt_path, map_location=device)
         model.load_state_dict(ckpt["model"])
 

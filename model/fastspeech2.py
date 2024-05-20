@@ -56,7 +56,7 @@ class FastSpeech2(nn.Module):
         e_control=1.0,
         d_control=1.0,
     ):
-        print("In forward method of FastSpeech2 model.")
+
         src_masks = get_mask_from_lengths(src_lens, max_src_len)
         mel_masks = (
             get_mask_from_lengths(mel_lens, max_mel_len)
@@ -65,12 +65,12 @@ class FastSpeech2(nn.Module):
         )
 
         output = self.encoder(texts, src_masks)
-        print("Output from encoder: ", output.shape)
+
         if self.speaker_emb is not None:
             output = output + self.speaker_emb(speakers).unsqueeze(1).expand(
                 -1, max_src_len, -1
             )
-        print("Output after adding speaker embedding: ", output.shape)
+
 
         (
             output,
@@ -92,15 +92,14 @@ class FastSpeech2(nn.Module):
             e_control,
             d_control,
         )
-        print("Output after variance adaptor: ", output.shape)
+
         output, mel_masks = self.decoder(output, mel_masks)
-        print("Output after decoder: ", output.shape)
+
         output = self.mel_linear(output)
-        print("Output after mel linear: ", output.shape)
+
 
         postnet_output = self.postnet(output) + output
-        print("Postnet output: ", postnet_output.shape)
-        raise Exception("Stop here.")
+
         return (
             output,
             postnet_output,

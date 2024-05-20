@@ -85,10 +85,10 @@ def main(args, configs):
             for batch in batchs:
 
                 batch = to_device(batch, device)
-                print("Start Training")
+
                 # Forward
                 output = model(*(batch[2:]))
-                print("Forward")
+
 
                 # Cal Loss
                 losses = Loss(batch, output)

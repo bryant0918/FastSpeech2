@@ -25,6 +25,10 @@ You can install the Python dependencies with
 ```
 pip3 install -r requirements.txt
 ```
+then
+```commandline
+conda install conda-forge::pyworld
+```
 
 ## Inference
 

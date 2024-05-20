@@ -54,7 +54,7 @@ def main(args, configs):
     vocoder = get_vocoder(model_config, device)
     print("Got vocoder")
 
-    # Init logger
+    # Init loggerc
     for p in train_config["path"].values():
         os.makedirs(p, exist_ok=True)
     train_log_path = os.path.join(train_config["path"]["log_path"], "train")

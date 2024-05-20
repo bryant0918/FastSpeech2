@@ -52,7 +52,6 @@ def main(args, configs):
 
     # Load vocoder
     vocoder = get_vocoder(model_config, device)
-    print("Got vocoder")
 
     # Init loggerc
     for p in train_config["path"].values():
@@ -88,19 +87,17 @@ def main(args, configs):
                 batch = to_device(batch, device)
                 print("Start Training")
                 # Forward
-                print("Batch: ", batch[2:])
                 output = model(*(batch[2:]))
                 print("Forward")
 
                 # Cal Loss
                 losses = Loss(batch, output)
                 total_loss = losses[0]
-                print("Loss")
 
                 # Backward
                 total_loss = total_loss / grad_acc_step
                 total_loss.backward()
-                print("Backward")
+
                 if step % grad_acc_step == 0:
                     # Clipping gradients to avoid gradient explosion
                     nn.utils.clip_grad_norm_(model.parameters(), grad_clip_thresh)

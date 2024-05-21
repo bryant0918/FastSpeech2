@@ -3,9 +3,9 @@ import torch.nn as nn
 import torch.nn.functional as F
 import numpy as np
 
-import transformer.Constants as Constants
-from .Layers import FFTBlock
-from text.symbols import symbols
+# import transformer.Constants as Constants
+# from .Layers import FFTBlock
+# from text.symbols import symbols
 
 
 def get_sinusoid_encoding_table(n_position, d_hid, padding_idx=None):
@@ -177,38 +177,72 @@ class Decoder(nn.Module):
 
 
 class ProsodyExtractor(nn.Module):
-    def __init__(self):
+    def __init__(self, dim_in, dim_out, n_components, hidden_dim):
         super(ProsodyExtractor, self).__init__()
-        # First Conv2d layer
-        self.conv1 = nn.Conv2d(in_channels=1, out_channels=8, kernel_size=3, padding=1)
-        self.bn1 = nn.BatchNorm2d(8)
-        # Second Conv2d layer
-        self.conv2 = nn.Conv2d(in_channels=8, out_channels=8, kernel_size=3, padding=1)
-        self.bn2 = nn.BatchNorm2d(8)
+        num_sigma_channels = dim_out * n_components
+        num_weights_channels = n_components
         # Bi-GRU layer
         self.gru = nn.GRU(input_size=8 * 8, hidden_size=32, num_layers=1, bidirectional=True, batch_first=True)
-        # Linear layer to output parameters of a single Gaussian
-        self.linear = nn.Linear(64, 2)  # For mean and log-variance
+        # Linear layer to output parameters of Gaussians
+        self.normal_linear = nn.Linear(64, dim_out*n_components+num_sigma_channels)
 
-    def forward(self, x):
-        # Apply first Conv2d, BatchNorm, and ReLU
-        x = F.relu(self.bn1(self.conv1(x)))
-        # Apply second Conv2d, BatchNorm, and ReLU
-        x = F.relu(self.bn2(self.conv2(x)))
+        self.pi_network = nn.Sequential(
+            nn.Conv2d(in_channels=1, out_channels=8, kernel_size=3, padding=1),
+            nn.BatchNorm2d(8),
+            nn.ReLU(),
+            nn.Conv2d(in_channels=8, out_channels=8, kernel_size=3, padding=1),
+            nn.BatchNorm2d(8),
+            nn.ReLU(),
+            nn.Linear(8, n_components), # Do Gru here?
+        )
+        self.normal_network = nn.Sequential(
+            nn.Conv2d(in_channels=1, out_channels=8, kernel_size=3, padding=1),
+            nn.BatchNorm2d(8),
+            nn.ReLU(),
+            nn.Conv2d(in_channels=8, out_channels=8, kernel_size=3, padding=1),
+            nn.BatchNorm2d(8),
+            nn.ReLU(),
+        )
+
+    def forward(self, x, eps=1e-6):
+        """"
+        Returns
+        -------
+        log_pi: (bsz, n_components)
+        mu: (bsz, n_components, dim_out)
+        sigma: (bsz, n_components, dim_out)
+        """
+        # Apply first for weights (w_i)
+        log_pi = torch.log_softmax(self.pi_network(x), dim=-1)
+
+        # Apply first normal network
+        normal_params = self.normal_network(x)
+
         # Reshape for GRU layer (batch_size, sequence_length, feature_size)
-        x = x.permute(0, 2, 3, 1).contiguous()
-        batch_size, height, width, channels = x.size()
-        x = x.view(batch_size, height, width * channels)
+        normal_params = normal_params.permute(0, 2, 3, 1).contiguous()
+        batch_size, height, width, channels = normal_params.size()
+        normal_params = normal_params.view(batch_size, height, width * channels)
         # Apply Bi-GRU layer
-        x, _ = self.gru(x)
+        normal_params, hn = self.gru(normal_params)
         # Apply linear projection to get Gaussian parameters
-        x = self.linear(x)
-        return x
+        normal_params = self.normal_linear(normal_params)
+        mu = normal_params[..., :self.dim_out * self.n_components]
+        sigma = normal_params[..., self.dim_out * self.n_components:]
+
+        # Add Noise (Don't know if necessary, can set eps=0)
+        sigma = torch.exp(sigma + eps)
+
+        mu = mu.reshape(-1, self.n_components, self.dim_out)
+        sigma = sigma.reshape(-1, self.n_components, self.dim_out)
+
+        return log_pi, mu, sigma
 
 
 class ProsodyPredictor(nn.Module):
-    def __init__(self):
+    def __init__(self,dim_in, dim_out, n_components, hidden_dim):
         super(ProsodyPredictor, self).__init__()
+        self.num_sigma_channels = dim_out * n_components
+        num_weights_channels = n_components
         # First Conv2d layer
         self.conv1 = nn.Conv2d(in_channels=1, out_channels=8, kernel_size=3, padding=1)
         self.bn1 = nn.BatchNorm2d(8)
@@ -216,29 +250,68 @@ class ProsodyPredictor(nn.Module):
         self.conv2 = nn.Conv2d(in_channels=8, out_channels=8, kernel_size=3, padding=1)
         self.bn2 = nn.BatchNorm2d(8)
         # Bi-GRU layer
-        self.gru = nn.GRU(input_size=8 * 8, hidden_size=32, num_layers=1, bidirectional=True, batch_first=True)
+        self.gru = nn.GRU(input_size=8 * 8, hidden_size=32, num_layers=1, bidirectional=False, batch_first=True)
         # Linear layer to output speaker independent means and log-variances
-        self.linear = nn.Linear(64, 2)  # For mean and log-variance
+        self.normal_linear = nn.Linear(64, dim_out*n_components+self.num_sigma_channels + num_weights_channels)
 
-    def forward(self, x):
-        # Apply first Conv2d, BatchNorm, and ReLU
-        x = F.relu(self.bn1(self.conv1(x)))
-        # Apply second Conv2d, BatchNorm, and ReLU
-        x = F.relu(self.bn2(self.conv2(x)))
-        # Reshape for GRU layer (batch_size, sequence_length, feature_size)
-        x = x.permute(0, 2, 3, 1).contiguous()
-        batch_size, height, width, channels = x.size()
-        x = x.view(batch_size, height, width * channels)
-        # Apply Bi-GRU layer
-        x, _ = self.gru(x)
-        # Apply linear projection to get Gaussian parameters
-        x = self.linear(x)
-        return x
+        self.base_network = nn.Sequential(
+            nn.Conv1d(in_channels=1, out_channels=8, kernel_size=3, padding=1),
+            nn.ReLU(),
+            nn.LayerNorm(8),
+            nn.Dropout(0.1),
+            nn.Conv1d(in_channels=8, out_channels=8, kernel_size=3, padding=1),
+            nn.ReLU(),
+            nn.LayerNorm(8),
+            nn.Dropout(0.1),
+        )
+
+    def forward(self, x, prev_e, eps=1e-6):
+        x = self.base_network(x)
+
+        out = torch.concatenate(x, prev_e)
+
+        out = self.gru(out) # Should this output be out, hn?
+
+        out = self.Linear(out)
+
+        mu = out[..., :self.dim_out * self.n_components]
+        sigma = out[..., self.dim_out * self.n_components:self.dim_out*self.n_components+self.num_sigma_channels]
+        pi = out[..., self.dim_out*self.n_components+self.num_sigma_channels:]
+
+        mu = mu.reshape(-1, self.n_components, self.dim_out)
+        sigma = sigma.reshape(-1, self.n_components, self.dim_out)
+
+        # Add Noise (Don't know if necessary, can set eps=0)
+        sigma = torch.exp(sigma + eps)
+
+        log_pi = torch.log_softmax(pi, dim=-1)
+
+        return log_pi, mu, sigma
+
+
+        # # Apply first Conv2d, BatchNorm, and ReLU
+        # x = F.relu(self.bn1(self.conv1(x)))
+        # # Apply second Conv2d, BatchNorm, and ReLU
+        # x = F.relu(self.bn2(self.conv2(x)))
+        # # Reshape for GRU layer (batch_size, sequence_length, feature_size)
+        # x = x.permute(0, 2, 3, 1).contiguous()
+        # batch_size, height, width, channels = x.size()
+        # x = x.view(batch_size, height, width * channels)
+        # # Apply Bi-GRU layer
+        # x, _ = self.gru(x)
+        # # Apply linear projection to get Gaussian parameters
+        # x = self.linear(x)
+
+        # return out
+
 
 if __name__ == "__main__":
 
     # Create the model
-    model = ProsodyExtractor()
-
+    model = ProsodyExtractor(1,1,4,8)
+    # Print the model summary
+    print(model)
+    # Create the model
+    model = ProsodyPredictor(1,1,4,8)
     # Print the model summary
     print(model)

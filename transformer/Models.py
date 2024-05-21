@@ -239,8 +239,88 @@ class ProsodyExtractor(nn.Module):
 
 
 class ProsodyPredictor(nn.Module):
-    def __init__(self,dim_in, dim_out, n_components, hidden_dim):
+    def __init__(self, dim_in, dim_out, n_components, hidden_dim):
         super(ProsodyPredictor, self).__init__()
+        self.num_sigma_channels = dim_out * n_components
+        num_weights_channels = n_components
+
+        self.base_network = nn.Sequential(
+            nn.Conv1d(in_channels=1, out_channels=8, kernel_size=3, padding=1),
+            nn.ReLU(),
+            nn.LayerNorm(8),
+            nn.Dropout(0.1),
+            nn.Conv1d(in_channels=8, out_channels=8, kernel_size=3, padding=1),
+            nn.ReLU(),
+            nn.LayerNorm(8),
+            nn.Dropout(0.1),
+        )
+        # GRU layer
+        self.gru = nn.GRU(input_size=8 * 8, hidden_size=32, num_layers=1, bidirectional=False, batch_first=True)
+        # Linear layer to output parameters for non-Linear Transform
+        self.linear = nn.Linear(64, dim_out * n_components * 5)
+
+        # Bi-GRU layer
+        self.BiGru = nn.GRU(input_size=8 * 8, hidden_size=32, num_layers=1, bidirectional=True, batch_first=True)
+        # Linear layer for just means and log variances
+        self.normal_linear = nn.Linear(64, dim_out * n_components + self.num_sigma_channels)
+
+        self.linear2 = nn.Linear(dim_out * n_components * 2, dim_out * n_components)
+        self.linear3 = nn.Linear(dim_out * n_components * 2, dim_out * n_components)
+
+    def forward(self, h_sd, h_si, prev_e, eps=1e-6):
+        # First predict the Speaker Independent means and log-variances
+        h_si, _ = self.BiGru(h_si)   # Should we concat h_si and h_n?
+        h_si = self.normal_linear(h_si)
+
+        # Separate mus and log-variances
+        mu = h_si[..., :self.dim_out * self.n_components]
+        v = h_si[..., self.dim_out * self.n_components:]
+
+        # Run Speaker Dependent features through the base network
+        x = self.base_network(h_sd)
+        out = torch.concatenate(x, prev_e)
+
+        out = self.gru(out) # Should this output be out, hn?
+
+        out = self.linear(out)
+
+        alphas = out[..., :self.dim_out * self.n_components]
+        a = out[..., self.dim_out * self.n_components:self.dim_out * self.n_components * 2]
+        b = out[..., self.dim_out * self.n_components * 2:self.dim_out * self.n_components * 3]
+        c = out[..., self.dim_out * self.n_components * 3:self.dim_out * self.n_components * 4]
+        d = out[..., self.dim_out * self.n_components * 4:]
+
+        A = torch.diag(a)
+        C = torch.diag(c)
+
+        # Perform non-Linear Transformation
+        mu = self.linear2(torch.tanh(A @ mu + b))
+        v = self.linear3(torch.tanh(C @ v + d))
+
+        mu = mu.reshape(-1, self.n_components, self.dim_out)
+        sigma = sigma.reshape(-1, self.n_components, self.dim_out)
+
+        # Add Noise (Don't know if necessary, can set eps=0)
+        sigma = torch.exp(sigma + eps)
+
+        log_pi = torch.log_softmax(alphas, dim=-1)
+
+        return log_pi, mu, sigma
+
+    def phone_loss(self, x, y):
+        log_pi, mu, sigma = self.forward(x)
+        z_score = (y.unsqueeze(1) - mu) / sigma
+        normal_loglik = (
+                -0.5 * torch.einsum("bij,bij->bi", z_score, z_score)
+                - torch.sum(torch.log(sigma), dim=-1)
+        )
+        loglik = torch.logsumexp(log_pi + normal_loglik, dim=-1)
+        return -loglik    # Sum over all phones for total loss (L_pp)
+
+
+class BaseProsodyPredictor(nn.Module):
+    def __init__(self,dim_in, dim_out, n_components, hidden_dim):
+        super(BaseProsodyPredictor, self).__init__()
         self.num_sigma_channels = dim_out * n_components
         num_weights_channels = n_components
         # First Conv2d layer
@@ -322,6 +402,10 @@ if __name__ == "__main__":
     # Print the model summary
     print(model)
     # Create the model
-    model = ProsodyPredictor(1,1,4,8)
+    model = BaseProsodyPredictor(1,1,4,8)
+    # Print the model summary
+    print(model)
+    # Create the model
+    model = ProsodyPredictor(1, 1, 4, 8)
     # Print the model summary
     print(model)

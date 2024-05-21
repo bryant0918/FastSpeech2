@@ -248,9 +248,10 @@ class ProsodyPredictor(nn.Module):
         self.dim_out = dim_out
         self.n_components = n_components
 
+        # GRU layer (SD)
         self.gru = nn.GRU(input_size=8, hidden_size=512, num_layers=1, bidirectional=False, batch_first=True)
-        # Linear layer to output speaker independent means and log-variances
-        self.normal_linear = nn.Linear(512, dim_out * n_components + self.num_sigma_channels + num_weights_channels)
+        # Linear layer to output nonlinear transformation parameters
+        self.normal_linear = nn.Linear(512, self.dim_out * self.n_components * 5)
 
         self.conv1 = nn.Conv1d(in_channels=dim_in, out_channels=8, kernel_size=3, padding=1)
         self.relu = nn.ReLU()
@@ -258,61 +259,59 @@ class ProsodyPredictor(nn.Module):
         self.dropout = nn.Dropout(0.1)
         self.conv2 = nn.Conv1d(in_channels=8, out_channels=8, kernel_size=3, padding=1)
 
-        # Bi-GRU layer
-        self.BiGru = nn.GRU(input_size=8 * 8, hidden_size=32, num_layers=1, bidirectional=True, batch_first=True)
+        # Bi-GRU layer (SI)
+        self.BiGru = nn.GRU(input_size=256, hidden_size=32, num_layers=1, bidirectional=True, batch_first=True)
         # Linear layer for just means and log variances
-        self.normal_linear2 = nn.Linear(32, dim_out * n_components + self.num_sigma_channels)
+        self.normal_linear2 = nn.Linear(64, dim_out * n_components + self.num_sigma_channels)
 
-        self.linear2 = nn.Linear(dim_out * n_components * 2, dim_out * n_components)
-        self.linear3 = nn.Linear(dim_out * n_components * 2, dim_out * n_components)
+        self.linear2 = nn.Linear(dim_out * n_components, dim_out * n_components)
+        self.linear3 = nn.Linear(dim_out * n_components, dim_out * n_components)
 
     def forward(self, h_sd, h_si, prev_e=None, eps=1e-6):
         # First predict the Speaker Independent means and log-variances
         h_si, _ = self.BiGru(h_si)   # Should we concat h_si and h_n?
-        h_si = self.normal_linear(h_si)
+        print("h_si.size:", h_si.size())
+        h_si = self.normal_linear2(h_si)
 
         # Separate mus and log-variances
         mu = h_si[..., :self.dim_out * self.n_components]
         v = h_si[..., self.dim_out * self.n_components:]
 
         # Run Speaker Dependent features through the base network
-        print("x.size:", x.size())
+        print("h_sd.size:", h_sd.size())
         # Permute the input tensor batch, sentence_length, embedding_dim = 20, 19, 10
-        x = x.permute(0, 2, 1)  # Changes shape to (Batch_size, 256, Sequence_length) for conv layer
-        x = self.relu(self.conv1(x))
-        x = x.permute(0, 2, 1)  # Changes shape back to (Batch_size, sequence_length, channels) for layernorm
-        x = self.dropout(self.layernorm(x))
-        x = x.permute(0, 2, 1)  # Changes shape back to (Batch_size, channels, sequence_length) for conv layer
-        x = self.relu(self.conv2(x))
-        x = x.permute(0, 2, 1)  # Changes shape back to (Batch_size, sequence_length, channels) for layernorm
-        x = self.dropout(self.layernorm(x))
+        h_sd = h_sd.permute(0, 2, 1)  # Changes shape to (Batch_size, 256, Sequence_length) for conv layer
+        h_sd = self.relu(self.conv1(h_sd))
+        h_sd = h_sd.permute(0, 2, 1)  # Changes shape back to (Batch_size, sequence_length, channels) for layernorm
+        h_sd = self.dropout(self.layernorm(h_sd))
+        h_sd = h_sd.permute(0, 2, 1)  # Changes shape back to (Batch_size, channels, sequence_length) for conv layer
+        h_sd = self.relu(self.conv2(h_sd))
+        h_sd = h_sd.permute(0, 2, 1)  # Changes shape back to (Batch_size, sequence_length, channels) for layernorm
+        h_sd = self.dropout(self.layernorm(h_sd))
 
         if prev_e:
-            x, _ = self.gru(x, prev_e)
+            h_sd, _ = self.gru(h_sd, prev_e)
         else:
-            x, _ = self.gru(x)
-        x = self.normal_linear(x)
+            h_sd, _ = self.gru(h_sd)
+        h_sd = self.normal_linear(h_sd)
 
         # Separate Transformation Parameters
-        alphas = out[..., :self.dim_out * self.n_components]
-        a = out[..., self.dim_out * self.n_components:self.dim_out * self.n_components * 2]
-        b = out[..., self.dim_out * self.n_components * 2:self.dim_out * self.n_components * 3]
-        c = out[..., self.dim_out * self.n_components * 3:self.dim_out * self.n_components * 4]
-        d = out[..., self.dim_out * self.n_components * 4:]
-
-        A = torch.diag(a)
-        C = torch.diag(c)
+        alphas = h_sd[..., :self.dim_out * self.n_components]
+        a = h_sd[..., self.dim_out * self.n_components:self.dim_out * self.n_components * 2]
+        b = h_sd[..., self.dim_out * self.n_components * 2:self.dim_out * self.n_components * 3]
+        c = h_sd[..., self.dim_out * self.n_components * 3:self.dim_out * self.n_components * 4]
+        d = h_sd[..., self.dim_out * self.n_components * 4:]
 
         # Perform non-Linear Transformation
-        mu = self.linear2(torch.tanh(A @ mu + b))
-        v = self.linear3(torch.tanh(C @ v + d))
+        mu = self.linear2(torch.tanh(torch.multiply(a, mu) + b))
+        v = self.linear3(torch.tanh(torch.multiply(c, v) + d))
 
         # This puts batch_size in the last dimension
         # mu = mu.reshape(-1, self.n_components, self.dim_out)
         # sigma = v.reshape(-1, self.n_components, self.dim_out)
 
         # Add Noise (Don't know if necessary, can set eps=0)
-        sigma = torch.exp(sigma + eps)
+        sigma = torch.exp(v + eps)
 
         log_pi = torch.log_softmax(alphas, dim=-1)
 

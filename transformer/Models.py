@@ -3,9 +3,9 @@ import torch.nn as nn
 import torch.nn.functional as F
 import numpy as np
 
-# import transformer.Constants as Constants
-# from .Layers import FFTBlock
-# from text.symbols import symbols
+import transformer.Constants as Constants
+from .Layers import FFTBlock
+from text.symbols import symbols
 
 
 def get_sinusoid_encoding_table(n_position, d_hid, padding_idx=None):
@@ -298,7 +298,7 @@ class ProsodyPredictor(nn.Module):
         v = self.linear3(torch.tanh(C @ v + d))
 
         mu = mu.reshape(-1, self.n_components, self.dim_out)
-        sigma = sigma.reshape(-1, self.n_components, self.dim_out)
+        sigma = v.reshape(-1, self.n_components, self.dim_out)
 
         # Add Noise (Don't know if necessary, can set eps=0)
         sigma = torch.exp(sigma + eps)
@@ -317,27 +317,41 @@ class ProsodyPredictor(nn.Module):
         loglik = torch.logsumexp(log_pi + normal_loglik, dim=-1)
         return -loglik    # Sum over all phones for total loss (L_pp)
 
+    def sample(self, x):
+        log_pi, mu, sigma = self.forward(x)
+        cum_pi = torch.cumsum(torch.exp(log_pi), dim=-1)
+        rvs = torch.rand(len(x), 1).to(x)
+        rand_pi = torch.searchsorted(cum_pi, rvs)
+        rand_normal = torch.randn_like(mu) * sigma + mu
+        samples = torch.take_along_dim(rand_normal, indices=rand_pi.unsqueeze(-1), dim=1).squeeze(dim=1)
+        return samples
+
 
 class BaseProsodyPredictor(nn.Module):
-    def __init__(self,dim_in, dim_out, n_components, hidden_dim):
+    def __init__(self, dim_in, dim_out, n_components, hidden_dim):
         super(BaseProsodyPredictor, self).__init__()
         self.num_sigma_channels = dim_out * n_components
         num_weights_channels = n_components
+
+        self.dim_in = dim_in
+        self.dim_out = dim_out
+        self.n_components = n_components
+
         # First Conv2d layer
-        self.conv1 = nn.Conv2d(in_channels=1, out_channels=8, kernel_size=3, padding=1)
-        self.bn1 = nn.BatchNorm2d(8)
-        # Second Conv2d layer
-        self.conv2 = nn.Conv2d(in_channels=8, out_channels=8, kernel_size=3, padding=1)
-        self.bn2 = nn.BatchNorm2d(8)
-        # Bi-GRU layer
-        self.gru = nn.GRU(input_size=8 * 8, hidden_size=32, num_layers=1, bidirectional=False, batch_first=True)
+        # self.conv1 = nn.Conv2d(in_channels=1, out_channels=8, kernel_size=3, padding=1)
+        # self.bn1 = nn.BatchNorm2d(8)
+        # # Second Conv2d layer
+        # self.conv2 = nn.Conv2d(in_channels=8, out_channels=8, kernel_size=3, padding=1)
+        # self.bn2 = nn.BatchNorm2d(8)
+        # GRU layer
+        self.gru = nn.GRU(input_size=8, hidden_size=512, num_layers=1, bidirectional=False, batch_first=True)
         # Linear layer to output speaker independent means and log-variances
-        self.normal_linear = nn.Linear(64, dim_out*n_components+self.num_sigma_channels + num_weights_channels)
+        self.normal_linear = nn.Linear(512, dim_out*n_components+self.num_sigma_channels + num_weights_channels)
 
         self.base_network = nn.Sequential(
-            nn.Conv1d(in_channels=1, out_channels=8, kernel_size=3, padding=1),
+            nn.Conv1d(in_channels=dim_in, out_channels=8, kernel_size=3, padding=1),
             nn.ReLU(),
-            nn.LayerNorm(8),
+            nn.LayerNorm([8, 19]),
             nn.Dropout(0.1),
             nn.Conv1d(in_channels=8, out_channels=8, kernel_size=3, padding=1),
             nn.ReLU(),
@@ -345,21 +359,48 @@ class BaseProsodyPredictor(nn.Module):
             nn.Dropout(0.1),
         )
 
-    def forward(self, x, prev_e, eps=1e-6):
-        x = self.base_network(x)
+        self.conv1 = nn.Conv1d(in_channels=dim_in, out_channels=8, kernel_size=3, padding=1)
+        self.relu = nn.ReLU()
+        self.layernorm = nn.LayerNorm(8)
+        self.dropout = nn.Dropout(0.1)
+        self.conv2 = nn.Conv1d(in_channels=8, out_channels=8, kernel_size=3, padding=1)
 
-        out = torch.concatenate(x, prev_e)
 
-        out = self.gru(out) # Should this output be out, hn?
+    def forward(self, x, prev_e=None, eps=1e-6):
+        print("x.size:", x.size())
+        # Permute the input tensor batch, sentence_length, embedding_dim = 20, 19, 10
+        x = x.permute(0, 2, 1)  # Changes shape to (Batch_size, 256, Sequence_length) for conv layer
+        x = self.relu(self.conv1(x))
+        x = x.permute(0, 2, 1)  # Changes shape back to (Batch_size, sequence_length, channels) for layernorm
+        x = self.dropout(self.layernorm(x))
+        x = x.permute(0, 2, 1)  # Changes shape back to (Batch_size, channels, sequence_length) for conv layer
+        x = self.relu(self.conv2(x))
+        x = x.permute(0, 2, 1)  # Changes shape back to (Batch_size, sequence_length, channels) for layernorm
+        x = self.dropout(self.layernorm(x))
 
-        out = self.Linear(out)
+        print("x.size:", x.size())
 
-        mu = out[..., :self.dim_out * self.n_components]
-        sigma = out[..., self.dim_out * self.n_components:self.dim_out*self.n_components+self.num_sigma_channels]
-        pi = out[..., self.dim_out*self.n_components+self.num_sigma_channels:]
+        # # Debugging
+        # for layer in self.base_network:
+        #     x = layer(x)
+        #     print("x.size:", x.size())
+        #
+        # x = self.base_network(x)
 
-        mu = mu.reshape(-1, self.n_components, self.dim_out)
-        sigma = sigma.reshape(-1, self.n_components, self.dim_out)
+        if prev_e:
+            x, _ = self.gru(x, prev_e) # Should this output be out, hn?
+        else:
+            x, _ = self.gru(x)
+
+        x = self.normal_linear(x)
+
+        mu = x[..., :self.dim_out * self.n_components]
+        sigma = x[..., self.dim_out * self.n_components:self.dim_out*self.n_components+self.num_sigma_channels]
+        pi = x[..., self.dim_out*self.n_components+self.num_sigma_channels:]
+
+        # This puts batch_size in the last dimension
+        # mu = mu.reshape(-1, self.n_components, self.dim_out)
+        # sigma = sigma.reshape(-1, self.n_components, self.dim_out)
 
         # Add Noise (Don't know if necessary, can set eps=0)
         sigma = torch.exp(sigma + eps)
@@ -384,8 +425,8 @@ class BaseProsodyPredictor(nn.Module):
 
         # return out
 
-    def phone_loss(self, x, y):
-        log_pi, mu, sigma = self.forward(x)
+    def phone_loss(self, e, y):
+        log_pi, mu, sigma = e
         z_score = (y.unsqueeze(1) - mu) / sigma
         normal_loglik = (
                 -0.5 * torch.einsum("bij,bij->bi", z_score, z_score)
@@ -394,18 +435,26 @@ class BaseProsodyPredictor(nn.Module):
         loglik = torch.logsumexp(log_pi + normal_loglik, dim=-1)
         return -loglik    # Sum over all phones for total loss (L_pp)
 
+    def sample(self, x):
+        log_pi, mu, sigma = self.forward(x)
+        cum_pi = torch.cumsum(torch.exp(log_pi), dim=-1)
+        rvs = torch.rand(len(x), 1).to(x)
+        rand_pi = torch.searchsorted(cum_pi, rvs)
+        rand_normal = torch.randn_like(mu) * sigma + mu
+        samples = torch.take_along_dim(rand_normal, indices=rand_pi.unsqueeze(-1), dim=1).squeeze(dim=1)
+        return samples
+
 
 if __name__ == "__main__":
 
-    # Create the model
-    model = ProsodyExtractor(1,1,4,8)
-    # Print the model summary
-    print(model)
-    # Create the model
-    model = BaseProsodyPredictor(1,1,4,8)
-    # Print the model summary
-    print(model)
-    # Create the model
-    model = ProsodyPredictor(1, 1, 4, 8)
-    # Print the model summary
-    print(model)
+    # # Create the model
+    # model = BaseProsodyPredictor(1,1,4,8)
+    # # Print the model summary
+    # print(model)
+
+    # model = ProsodyPredictor(1, 1, 4, 8
+    # print(model)
+
+    # model = ProsodyExtractor(1, 1, 4, 8)
+    # print(model)
+    pass

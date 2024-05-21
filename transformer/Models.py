@@ -183,59 +183,34 @@ class ProsodyExtractor(nn.Module):
         num_weights_channels = n_components
         # Bi-GRU layer
         self.gru = nn.GRU(input_size=8 * 8, hidden_size=32, num_layers=1, bidirectional=True, batch_first=True)
-        # Linear layer to output parameters of Gaussians
-        self.normal_linear = nn.Linear(64, dim_out*n_components+num_sigma_channels)
 
-        self.pi_network = nn.Sequential(
+        self.network = nn.Sequential(
             nn.Conv2d(in_channels=1, out_channels=8, kernel_size=3, padding=1),
             nn.BatchNorm2d(8),
             nn.ReLU(),
             nn.Conv2d(in_channels=8, out_channels=8, kernel_size=3, padding=1),
             nn.BatchNorm2d(8),
             nn.ReLU(),
-            nn.Linear(8, n_components), # Do Gru here?
-        )
-        self.normal_network = nn.Sequential(
-            nn.Conv2d(in_channels=1, out_channels=8, kernel_size=3, padding=1),
-            nn.BatchNorm2d(8),
-            nn.ReLU(),
-            nn.Conv2d(in_channels=8, out_channels=8, kernel_size=3, padding=1),
-            nn.BatchNorm2d(8),
-            nn.ReLU(),
+            nn.GRU(input_size=8, hidden_size=64, num_layers=1, bidirectional=True, batch_first=True),
         )
 
     def forward(self, x, eps=1e-6):
         """"
         Returns
         -------
-        log_pi: (bsz, n_components)
-        mu: (bsz, n_components, dim_out)
-        sigma: (bsz, n_components, dim_out)
+        prosody_embedding e
         """
-        # Apply first for weights (w_i)
-        log_pi = torch.log_softmax(self.pi_network(x), dim=-1)
+        # Apply network
+        x, _ = self.network(x)
 
-        # Apply first normal network
-        normal_params = self.normal_network(x)
+        # # Reshape for GRU layer (batch_size, sequence_length, feature_size)
+        # normal_params = normal_params.permute(0, 2, 3, 1).contiguous()
+        # batch_size, height, width, channels = normal_params.size()
+        # normal_params = normal_params.view(batch_size, height, width * channels)
+        # # Apply Bi-GRU layer
+        # normal_params, hn = self.gru(normal_params)
 
-        # Reshape for GRU layer (batch_size, sequence_length, feature_size)
-        normal_params = normal_params.permute(0, 2, 3, 1).contiguous()
-        batch_size, height, width, channels = normal_params.size()
-        normal_params = normal_params.view(batch_size, height, width * channels)
-        # Apply Bi-GRU layer
-        normal_params, hn = self.gru(normal_params)
-        # Apply linear projection to get Gaussian parameters
-        normal_params = self.normal_linear(normal_params)
-        mu = normal_params[..., :self.dim_out * self.n_components]
-        sigma = normal_params[..., self.dim_out * self.n_components:]
-
-        # Add Noise (Don't know if necessary, can set eps=0)
-        sigma = torch.exp(sigma + eps)
-
-        mu = mu.reshape(-1, self.n_components, self.dim_out)
-        sigma = sigma.reshape(-1, self.n_components, self.dim_out)
-
-        return log_pi, mu, sigma
+        return x
 
 
 class ProsodyPredictor(nn.Module):

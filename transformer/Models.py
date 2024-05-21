@@ -304,6 +304,16 @@ class ProsodyPredictor(nn.Module):
 
         # return out
 
+    def phone_loss(self, x, y):
+        log_pi, mu, sigma = self.forward(x)
+        z_score = (y.unsqueeze(1) - mu) / sigma
+        normal_loglik = (
+                -0.5 * torch.einsum("bij,bij->bi", z_score, z_score)
+                - torch.sum(torch.log(sigma), dim=-1)
+        )
+        loglik = torch.logsumexp(log_pi + normal_loglik, dim=-1)
+        return -loglik    # Sum over all phones for total loss (L_pp)
+
 
 if __name__ == "__main__":
 

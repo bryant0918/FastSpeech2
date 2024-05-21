@@ -244,30 +244,29 @@ class ProsodyPredictor(nn.Module):
         self.num_sigma_channels = dim_out * n_components
         num_weights_channels = n_components
 
-        self.base_network = nn.Sequential(
-            nn.Conv1d(in_channels=1, out_channels=8, kernel_size=3, padding=1),
-            nn.ReLU(),
-            nn.LayerNorm(8),
-            nn.Dropout(0.1),
-            nn.Conv1d(in_channels=8, out_channels=8, kernel_size=3, padding=1),
-            nn.ReLU(),
-            nn.LayerNorm(8),
-            nn.Dropout(0.1),
-        )
-        # GRU layer
-        self.gru = nn.GRU(input_size=8 * 8, hidden_size=32, num_layers=1, bidirectional=False, batch_first=True)
-        # Linear layer to output parameters for non-Linear Transform
-        self.linear = nn.Linear(64, dim_out * n_components * 5)
+        self.dim_in = dim_in
+        self.dim_out = dim_out
+        self.n_components = n_components
+
+        self.gru = nn.GRU(input_size=8, hidden_size=512, num_layers=1, bidirectional=False, batch_first=True)
+        # Linear layer to output speaker independent means and log-variances
+        self.normal_linear = nn.Linear(512, dim_out * n_components + self.num_sigma_channels + num_weights_channels)
+
+        self.conv1 = nn.Conv1d(in_channels=dim_in, out_channels=8, kernel_size=3, padding=1)
+        self.relu = nn.ReLU()
+        self.layernorm = nn.LayerNorm(8)
+        self.dropout = nn.Dropout(0.1)
+        self.conv2 = nn.Conv1d(in_channels=8, out_channels=8, kernel_size=3, padding=1)
 
         # Bi-GRU layer
         self.BiGru = nn.GRU(input_size=8 * 8, hidden_size=32, num_layers=1, bidirectional=True, batch_first=True)
         # Linear layer for just means and log variances
-        self.normal_linear = nn.Linear(64, dim_out * n_components + self.num_sigma_channels)
+        self.normal_linear2 = nn.Linear(32, dim_out * n_components + self.num_sigma_channels)
 
         self.linear2 = nn.Linear(dim_out * n_components * 2, dim_out * n_components)
         self.linear3 = nn.Linear(dim_out * n_components * 2, dim_out * n_components)
 
-    def forward(self, h_sd, h_si, prev_e, eps=1e-6):
+    def forward(self, h_sd, h_si, prev_e=None, eps=1e-6):
         # First predict the Speaker Independent means and log-variances
         h_si, _ = self.BiGru(h_si)   # Should we concat h_si and h_n?
         h_si = self.normal_linear(h_si)
@@ -277,13 +276,24 @@ class ProsodyPredictor(nn.Module):
         v = h_si[..., self.dim_out * self.n_components:]
 
         # Run Speaker Dependent features through the base network
-        x = self.base_network(h_sd)
-        out = torch.concatenate(x, prev_e)
+        print("x.size:", x.size())
+        # Permute the input tensor batch, sentence_length, embedding_dim = 20, 19, 10
+        x = x.permute(0, 2, 1)  # Changes shape to (Batch_size, 256, Sequence_length) for conv layer
+        x = self.relu(self.conv1(x))
+        x = x.permute(0, 2, 1)  # Changes shape back to (Batch_size, sequence_length, channels) for layernorm
+        x = self.dropout(self.layernorm(x))
+        x = x.permute(0, 2, 1)  # Changes shape back to (Batch_size, channels, sequence_length) for conv layer
+        x = self.relu(self.conv2(x))
+        x = x.permute(0, 2, 1)  # Changes shape back to (Batch_size, sequence_length, channels) for layernorm
+        x = self.dropout(self.layernorm(x))
 
-        out = self.gru(out) # Should this output be out, hn?
+        if prev_e:
+            x, _ = self.gru(x, prev_e)
+        else:
+            x, _ = self.gru(x)
+        x = self.normal_linear(x)
 
-        out = self.linear(out)
-
+        # Separate Transformation Parameters
         alphas = out[..., :self.dim_out * self.n_components]
         a = out[..., self.dim_out * self.n_components:self.dim_out * self.n_components * 2]
         b = out[..., self.dim_out * self.n_components * 2:self.dim_out * self.n_components * 3]
@@ -297,8 +307,9 @@ class ProsodyPredictor(nn.Module):
         mu = self.linear2(torch.tanh(A @ mu + b))
         v = self.linear3(torch.tanh(C @ v + d))
 
-        mu = mu.reshape(-1, self.n_components, self.dim_out)
-        sigma = v.reshape(-1, self.n_components, self.dim_out)
+        # This puts batch_size in the last dimension
+        # mu = mu.reshape(-1, self.n_components, self.dim_out)
+        # sigma = v.reshape(-1, self.n_components, self.dim_out)
 
         # Add Noise (Don't know if necessary, can set eps=0)
         sigma = torch.exp(sigma + eps)
@@ -337,34 +348,15 @@ class BaseProsodyPredictor(nn.Module):
         self.dim_out = dim_out
         self.n_components = n_components
 
-        # First Conv2d layer
-        # self.conv1 = nn.Conv2d(in_channels=1, out_channels=8, kernel_size=3, padding=1)
-        # self.bn1 = nn.BatchNorm2d(8)
-        # # Second Conv2d layer
-        # self.conv2 = nn.Conv2d(in_channels=8, out_channels=8, kernel_size=3, padding=1)
-        # self.bn2 = nn.BatchNorm2d(8)
-        # GRU layer
         self.gru = nn.GRU(input_size=8, hidden_size=512, num_layers=1, bidirectional=False, batch_first=True)
         # Linear layer to output speaker independent means and log-variances
         self.normal_linear = nn.Linear(512, dim_out*n_components+self.num_sigma_channels + num_weights_channels)
-
-        self.base_network = nn.Sequential(
-            nn.Conv1d(in_channels=dim_in, out_channels=8, kernel_size=3, padding=1),
-            nn.ReLU(),
-            nn.LayerNorm([8, 19]),
-            nn.Dropout(0.1),
-            nn.Conv1d(in_channels=8, out_channels=8, kernel_size=3, padding=1),
-            nn.ReLU(),
-            nn.LayerNorm(8),
-            nn.Dropout(0.1),
-        )
 
         self.conv1 = nn.Conv1d(in_channels=dim_in, out_channels=8, kernel_size=3, padding=1)
         self.relu = nn.ReLU()
         self.layernorm = nn.LayerNorm(8)
         self.dropout = nn.Dropout(0.1)
         self.conv2 = nn.Conv1d(in_channels=8, out_channels=8, kernel_size=3, padding=1)
-
 
     def forward(self, x, prev_e=None, eps=1e-6):
         print("x.size:", x.size())
@@ -378,17 +370,8 @@ class BaseProsodyPredictor(nn.Module):
         x = x.permute(0, 2, 1)  # Changes shape back to (Batch_size, sequence_length, channels) for layernorm
         x = self.dropout(self.layernorm(x))
 
-        print("x.size:", x.size())
-
-        # # Debugging
-        # for layer in self.base_network:
-        #     x = layer(x)
-        #     print("x.size:", x.size())
-        #
-        # x = self.base_network(x)
-
         if prev_e:
-            x, _ = self.gru(x, prev_e) # Should this output be out, hn?
+            x, _ = self.gru(x, prev_e)
         else:
             x, _ = self.gru(x)
 
@@ -408,22 +391,6 @@ class BaseProsodyPredictor(nn.Module):
         log_pi = torch.log_softmax(pi, dim=-1)
 
         return log_pi, mu, sigma
-
-
-        # # Apply first Conv2d, BatchNorm, and ReLU
-        # x = F.relu(self.bn1(self.conv1(x)))
-        # # Apply second Conv2d, BatchNorm, and ReLU
-        # x = F.relu(self.bn2(self.conv2(x)))
-        # # Reshape for GRU layer (batch_size, sequence_length, feature_size)
-        # x = x.permute(0, 2, 3, 1).contiguous()
-        # batch_size, height, width, channels = x.size()
-        # x = x.view(batch_size, height, width * channels)
-        # # Apply Bi-GRU layer
-        # x, _ = self.gru(x)
-        # # Apply linear projection to get Gaussian parameters
-        # x = self.linear(x)
-
-        # return out
 
     def phone_loss(self, e, y):
         log_pi, mu, sigma = e

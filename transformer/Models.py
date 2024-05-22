@@ -181,36 +181,35 @@ class ProsodyExtractor(nn.Module):
         super(ProsodyExtractor, self).__init__()
         num_sigma_channels = dim_out * n_components
         num_weights_channels = n_components
-        # Bi-GRU layer
-        self.gru = nn.GRU(input_size=8 * 8, hidden_size=32, num_layers=1, bidirectional=True, batch_first=True)
 
-        self.network = nn.Sequential(
+        self.cnn = nn.Sequential(
             nn.Conv2d(in_channels=1, out_channels=8, kernel_size=3, padding=1),
             nn.BatchNorm2d(8),
             nn.ReLU(),
             nn.Conv2d(in_channels=8, out_channels=8, kernel_size=3, padding=1),
             nn.BatchNorm2d(8),
             nn.ReLU(),
-            nn.GRU(input_size=8, hidden_size=64, num_layers=1, bidirectional=True, batch_first=True),
+            nn.Flatten(start_dim=2),
         )
+        # Bi-GRU layer
+        self.gru = nn.GRU(input_size=8, hidden_size=64, num_layers=1, bidirectional=True, batch_first=True)
 
-    def forward(self, x, eps=1e-6):
+    def forward(self, x):
         """"
         Returns
         -------
         prosody_embedding e
         """
         # Apply network
-        x, _ = self.network(x)
+        x = self.cnn(x)
 
-        # # Reshape for GRU layer (batch_size, sequence_length, feature_size)
-        # normal_params = normal_params.permute(0, 2, 3, 1).contiguous()
-        # batch_size, height, width, channels = normal_params.size()
-        # normal_params = normal_params.view(batch_size, height, width * channels)
-        # # Apply Bi-GRU layer
-        # normal_params, hn = self.gru(normal_params)
+        x = x.permute(0, 2, 1)  # Permute to [batch_size, height*width, 8] (N,L,H_in)
+        print("x.size:", x.size())
 
-        return x
+        # Apply Bi-GRU layer
+        x, _ = self.gru(x)
+
+        return x   # [batch_size, melspec_sequence_length (HxW), 128]
 
 
 class ProsodyPredictor(nn.Module):
@@ -290,7 +289,7 @@ class ProsodyPredictor(nn.Module):
 
         log_pi = torch.log_softmax(alphas, dim=-1)
 
-        return log_pi, mu, sigma
+        return log_pi, mu, sigma   # each is [batch_size, text_sequence_length, n_components]
 
     def phone_loss(self, x, y):
         log_pi, mu, sigma = self.forward(x)

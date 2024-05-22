@@ -1,6 +1,8 @@
 import re
 import argparse
 from string import punctuation
+import os
+import pickle
 
 import torch
 import yaml
@@ -126,8 +128,9 @@ if __name__ == "__main__":
     parser.add_argument(
         "--source",
         type=str,
-        default=None,
-        help="path to a source file with format like train.txt and val.txt, for batch mode only",
+        default="LJ001-0002",
+        help="path to a source file with format like train.txt and val.txt, for batch mode only"
+             "otherwise for single mode it is the id of the sentence to synthesize",
     )
     parser.add_argument(
         "--text",
@@ -178,7 +181,7 @@ if __name__ == "__main__":
     if args.mode == "batch":
         assert args.source is not None and args.text is None
     if args.mode == "single":
-        assert args.source is None and args.text is not None
+        assert args.text is not None
 
     # Read Config
     preprocess_config = yaml.load(
@@ -199,21 +202,40 @@ if __name__ == "__main__":
     if args.mode == "batch":
         # Get dataset
         dataset = TextDataset(args.source, preprocess_config)
-        batchs = DataLoader(
+        batches = DataLoader(
             dataset,
             batch_size=8,
             collate_fn=dataset.collate_fn,
         )
     if args.mode == "single":
-        ids = raw_texts = [args.text[:100]]
+        # USE args.source for id or filepath or something. This is just a placeholder
+        ids = args.source
+        raw_texts = [args.text[:100]]
         speakers = np.array([args.speaker_id])
         if preprocess_config["preprocessing"]["text"]["language"] == "en":
             texts = np.array([preprocess_english(args.text, preprocess_config)])
         elif preprocess_config["preprocessing"]["text"]["language"] == "zh":
             texts = np.array([preprocess_mandarin(args.text, preprocess_config)])
         text_lens = np.array([len(texts[0])])
-        batchs = [(ids, raw_texts, speakers, texts, text_lens, max(text_lens))]
+        if preprocess_config["dataset"] == "LJSpeech":
+            speaker_id = "LJSpeech"
+        else:
+            speaker_id = speakers[0]
+        mel_path = os.path.join(
+            preprocess_config["path"]["preprocessed_path"],
+            "mel",
+            "{}-mel-{}.npy".format(speaker_id, ids),
+        )
+        mels = np.load(mel_path)
+
+        speaker_emb_path = os.path.join(preprocess_config["path"]["preprocessed_path"], "speaker_emb",
+                                        "{}.pkl_emb.pkl".format(speaker_id))
+        with open(speaker_emb_path, 'rb') as f:
+            emb_dict = pickle.load(f)
+
+        speaker_embs = torch.from_numpy(emb_dict["default"]).to(device).unsqueeze(0).unsqueeze(0).expand(-1, 19, -1)
+        batches = [(ids, raw_texts, speakers, texts, text_lens, max(text_lens)), speaker_embs, mels]
 
     control_values = args.pitch_control, args.energy_control, args.duration_control
 
-    synthesize(model, args.restore_step, configs, vocoder, batchs, control_values)
+    synthesize(model, args.restore_step, configs, vocoder, batches, control_values)

@@ -70,6 +70,18 @@ def to_device(data, device):
 
         return (ids, raw_texts, speakers, texts, src_lens, max_src_len)
 
+    if len(data) == 8:
+        (ids, raw_texts, speakers, texts, src_lens, max_src_len, speaker_embs, mels) = data
+
+        speakers = torch.from_numpy(speakers).long().to(device)
+        texts = torch.from_numpy(texts).long().to(device)
+        src_lens = torch.from_numpy(src_lens).to(device)
+
+        speaker_embs = torch.cat(embeddings, dim=0)
+        mels = torch.cat(mels, dim=0)
+
+        return (ids, raw_texts, speakers, texts, src_lens, max_src_len, speaker_embs, mels)
+
 
 def log(
     logger, step=None, losses=None, fig=None, audio=None, sampling_rate=22050, tag=""

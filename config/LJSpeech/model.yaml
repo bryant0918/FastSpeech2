@@ -35,3 +35,6 @@ max_seq_len: 1000
 vocoder:
   model: "HiFi-GAN" # support 'HiFi-GAN', 'MelGAN'
   speaker: "LJSpeech" # support  'LJSpeech', 'universal'
+
+synthesizer:
+  model: "FastSpeech2_Pros" # support 'FastSpeech2', 'FastSpeech2_Pros'"

@@ -8,6 +8,7 @@ import pickle
 from audio.tools import get_mel_from_wav
 import audio as Audio
 import librosa
+import time
 
 if torch.cuda.is_available():
     device = torch.device("cuda")
@@ -24,8 +25,27 @@ model_config = "config/LJSpeech/model.yaml"
 preprocess_config = yaml.load(open(preprocess_config, "r"), Loader=yaml.FullLoader)
 model_config = yaml.load(open(model_config, "r"), Loader=yaml.FullLoader)
 
+"""Get different speaker embedding"""
+test_embedding = True
+if test_embedding:
+    embedding_path = "/Users/bryantmcarthur/Documents/Ditto/SpeakerEncoder/outputs/tony.pkl_emb.pkl"
+
+    with open(embedding_path, 'rb') as f:
+        emb_dict = pickle.load(f)
+
+    embedding = torch.from_numpy(emb_dict["default"]).to(device).unsqueeze(0).unsqueeze(0).expand(-1, 19, -1)
+    print("Embedding shape: ", embedding.size())   # Mueller's embedding is 256, other is 128. We need 256
+
+    embedding_copy = embedding.clone()
+    embedding_copy2 = embedding_copy.clone()
+    start = time.time()
+    speaker_embs = torch.cat([embedding, embedding_copy, embedding_copy2], dim=0)
+
+    print("Speaker Embeddings shape: ", speaker_embs.size(), "Time: ", time.time() - start)
+
+
 """Test Prosody Extractor"""
-test_extractor = True
+test_extractor = False
 if test_extractor:
     # Create the model
     model = ProsodyExtractor(256, 1, 4, 8).to(device)
@@ -54,6 +74,7 @@ if test_extractor:
 
     melspec = torch.from_numpy(melspec).to(device)
 
+    melspec = melspec.unsqueeze(0).unsqueeze(0)   # To get batch dimension [1,80,462]
     print("Mel shape: ", melspec.size())
 
     # TODO: Match Dimensions :)
@@ -94,16 +115,16 @@ if test_predictor:
 
     # Get Speaker Embedding created by speaker embedding repo
     # style_wav = "/Users/bryantmcarthur/Documents/Ditto/experiment/tony.flac"
-    embedding_path = "/Users/bryantmcarthur/Documents/Ditto/SpeakerEncoder/outputs/out.pkl_emb.pkl"
+    embedding_path = "/Users/bryantmcarthur/Documents/Ditto/SpeakerEncoder/outputs/tony.pkl_emb.pkl"
 
     with open(embedding_path, 'rb') as f:
         emb_dict = pickle.load(f)
 
     embedding = torch.from_numpy(emb_dict["default"]).to(device)
-    print("Embedding shape: ", embedding.size())   # TODO: Embedding dim needs to match output of encoder (rn 128 vs 256)
-
-    embedding = torch.cat((embedding, embedding))
     print("Embedding shape: ", embedding.size())
+
+    # embedding = torch.cat((embedding, embedding))
+    # print("Embedding shape: ", embedding.size())
 
     # Adding new dimensions to tensor_2
     embedding = embedding.unsqueeze(0).unsqueeze(0).expand(-1, 19, -1)

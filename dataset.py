@@ -1,6 +1,7 @@
 import json
 import math
 import os
+import pickle
 
 import numpy as np
 from torch.utils.data import Dataset
@@ -150,9 +151,7 @@ class TextDataset(Dataset):
     def __init__(self, filepath, preprocess_config):
         self.cleaners = preprocess_config["preprocessing"]["text"]["text_cleaners"]
 
-        self.basename, self.speaker, self.text, self.raw_text = self.process_meta(
-            filepath
-        )
+        self.basename, self.speaker, self.text, self.raw_text = self.process_meta(filepath)
         with open(
             os.path.join(
                 preprocess_config["path"]["preprocessed_path"], "speakers.json"
@@ -170,7 +169,21 @@ class TextDataset(Dataset):
         raw_text = self.raw_text[idx]
         phone = np.array(text_to_sequence(self.text[idx], self.cleaners))
 
-        return (basename, speaker_id, phone, raw_text)
+        mel_path = os.path.join(
+            self.preprocessed_path,
+            "mel",
+            "{}-mel-{}.npy".format(speaker, basename),
+        )
+        mel = np.load(mel_path)
+
+        speaker_emb_path = os.path.join(self.preprocess_config["path"]["preprocessed_path"], "speaker_emb",
+                                        "{}.pkl_emb.pkl".format(speaker))
+        with open(speaker_emb_path, 'rb') as f:
+            emb_dict = pickle.load(f)
+
+        embedding = torch.from_numpy(emb_dict["default"]).to(device).unsqueeze(0).unsqueeze(0).expand(-1, 19, -1)
+
+        return (basename, speaker_id, phone, raw_text, embedding, mel)
 
     def process_meta(self, filename):
         with open(filename, "r", encoding="utf-8") as f:
@@ -195,7 +208,10 @@ class TextDataset(Dataset):
 
         texts = pad_1D(texts)
 
-        return ids, raw_texts, speakers, texts, text_lens, max(text_lens)
+        embeddings = [d[4] for d in data]
+        mels = [d[5] for d in data]
+
+        return ids, raw_texts, speakers, texts, text_lens, max(text_lens), speaker_embs, mels
 
 
 if __name__ == "__main__":

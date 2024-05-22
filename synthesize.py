@@ -90,12 +90,13 @@ def preprocess_mandarin(text, preprocess_config):
     return np.array(sequence)
 
 
-def synthesize(model, step, configs, vocoder, batchs, control_values):
+def synthesize(model, step, configs, vocoder, batches, control_values):
     preprocess_config, model_config, train_config = configs
     pitch_control, energy_control, duration_control = control_values
 
-    for batch in batchs:
+    for batch in batches:
         batch = to_device(batch, device)
+        print(*(batch[2:]))
         with torch.no_grad():
             # Forward
             output = model(
@@ -234,7 +235,8 @@ if __name__ == "__main__":
             emb_dict = pickle.load(f)
 
         speaker_embs = torch.from_numpy(emb_dict["default"]).to(device).unsqueeze(0).unsqueeze(0).expand(-1, 19, -1)
-        batches = [(ids, raw_texts, speakers, texts, text_lens, max(text_lens)), speaker_embs, mels]
+        batches = [(ids, raw_texts, speakers, texts, text_lens, max(text_lens), speaker_embs, mels)]
+
 
     control_values = args.pitch_control, args.energy_control, args.duration_control
 

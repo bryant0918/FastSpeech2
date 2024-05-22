@@ -208,7 +208,7 @@ class TextDataset(Dataset):
 
         texts = pad_1D(texts)
 
-        embeddings = [d[4] for d in data]
+        speaker_embs = [d[4] for d in data]
         mels = [d[5] for d in data]
 
         return ids, raw_texts, speakers, texts, text_lens, max(text_lens), speaker_embs, mels

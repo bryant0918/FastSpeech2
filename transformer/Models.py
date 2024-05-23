@@ -3,9 +3,9 @@ import torch.nn as nn
 import torch.nn.functional as F
 import numpy as np
 
-import transformer.Constants as Constants
-from .Layers import FFTBlock
-from text.symbols import symbols
+# import transformer.Constants as Constants
+# from .Layers import FFTBlock
+# from text.symbols import symbols
 
 
 def get_sinusoid_encoding_table(n_position, d_hid, padding_idx=None):
@@ -207,7 +207,51 @@ class ProsodyExtractor(nn.Module):
         # Apply Bi-GRU layer
         x, _ = self.gru(x)
 
-        return x   # [batch_size, melspec_sequence_length (HxW), 128]
+        # TODO: Don't hardcode 80 here, use n_mel_channels from preprocess_config
+        return x.view(x.size()[0], 80, -1, x.size()[-1])   # [batch_size, melspec H, melspec W, 128]
+
+    def split_phones(self, x, durations):
+        """
+        Split the phone embeddings by phone
+        Input:
+            x: Torch.tensor - [batch_size, melspec H, melspec W, 128]
+            durations: List - [batch_size, duration_sequence_length]
+
+        Output:
+            List of phone embeddings - [batch_size,
+        """
+
+        # Figure out how to split a batch
+        # phone_emb_chunks = []
+        # start_frame = 0
+        # for i in range(len(duration)):
+        #     phone_emb_chunks.append(e[:, :, start_frame:start_frame + duration[i]])
+        #     start_frame += duration[i]
+        #
+        # return phone_emb_chunks
+
+        zeros = torch.zeros((durations.shape[0], 1), dtype=torch.int)
+
+        concated = torch.cat([zeros, durations], dim=1)
+        cumulative_durations = torch.cumsum(concated, dim=1)
+
+        start_frames = cumulative_durations[:, :-1]
+        end_frames = cumulative_durations[:, 1:]
+
+        batch_phone_emb_chunks = []
+        # Iterate over each sample in the batch
+        for b in range(x.shape[0]):
+            sample_phone_emb_chunks = []
+            # Iterate over each phoneme
+            for i in range(start_frames.shape[1]):
+                start = start_frames[b, i].item()
+                end = end_frames[b, i].item()
+                # Extract the chunk using slicing
+                chunk = x[b, :, start:end, :]
+                sample_phone_emb_chunks.append(chunk)
+            batch_phone_emb_chunks.append(sample_phone_emb_chunks)
+
+        return batch_phone_emb_chunks
 
 
 class ProsodyPredictor(nn.Module):
@@ -384,15 +428,34 @@ class BaseProsodyPredictor(nn.Module):
 
 
 if __name__ == "__main__":
+    model = ProsodyExtractor()
+    print(model)
 
-    # # Create the model
-    # model = BaseProsodyPredictor(1,1,4,8)
-    # # Print the model summary
-    # print(model)
+    # Example batch data
+    batch_size = 3
+    num_mel_bins = 80
+    max_frames = 158
 
-    # model = ProsodyPredictor(1, 1, 4, 8
-    # print(model)
+    # Generate random batch of mel spectrograms (replace with actual data)
+    batch_mel_spectrogram_embs = torch.rand(batch_size, num_mel_bins, max_frames, 128)
 
-    # model = ProsodyExtractor(1, 1, 4, 8)
-    # print(model)
+    # Example durations, starts, and ends for each spectrogram in the batch
+    durations = torch.tensor([
+        [7, 5, 4, 12, 2, 4, 6, 4, 7, 8, 8, 6, 5, 7, 5, 6, 9, 4, 12, 13, 6, 5, 13],
+        [6, 6, 5, 10, 3, 5, 5, 6, 6, 9, 7, 7, 4, 8, 6, 5, 8, 5, 11, 12, 5, 6, 12],
+        [8, 4, 6, 11, 4, 3, 7, 5, 8, 7, 9, 5, 6, 6, 7, 4, 9, 6, 10, 14, 7, 4, 11]])
+
+    print(durations)
+
+    split = model.split_phones(batch_mel_spectrogram_embs, durations)
+
+    print("Split phone embeddings: ", type(split), len(split), len(split[0]), len(split[1]), len(split[2]),
+          type(split[0]), type(split[0][0]), split[0][0].size(), split[0][1].size(), type(split[0][0][0]))
+
+    # split0 = torch.tensor(split[0])
+
+    # Split is [batch_size, phoneme_sequence_length, melspec H, melspec W, 128]
+
+    # print("Split phone embeddings: ", split0.size())
+
     pass

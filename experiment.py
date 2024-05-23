@@ -11,6 +11,7 @@ import librosa
 import time
 from preprocessor.preprocessor import Preprocessor
 import tgt
+from simalign import SentenceAligner
 
 
 if torch.cuda.is_available():
@@ -27,6 +28,33 @@ model_config = "config/LJSpeech/model.yaml"
 # Read Config
 preprocess_config = yaml.load(open(preprocess_config, "r"), Loader=yaml.FullLoader)
 model_config = yaml.load(open(model_config, "r"), Loader=yaml.FullLoader)
+
+"""Test Sentence Aligner"""
+test_aligner = True
+if test_aligner:
+    # making an instance of our model.
+    # You can specify the embedding model and all alignment settings in the constructor.
+    myaligner = SentenceAligner(model="bert", token_type="bpe", matching_methods="mai")
+
+    # The source and target sentences should be tokenized to words.
+    src_sentence = ["Hello,", "my", "name", "is", "Ditto", "and", "this", "is", "what", "I", "sound", "like"]
+    # trg_sentence = ["Hallo,", "mein", "Name", "ist", "Ditto", "und", "so", "klinge", "ich"]
+    trg_sentence = ["Cześć,", "nazywam", "się", "„Ditto”", "i", "tak", "właśnie", "brzmię"]
+    """
+    Polish:
+    mwmf: [(0, 0), (1, 1), (2, 2), (3, 2), (4, 2), (5, 4), (6, 5), (7, 6), (8, 0), (9, 7), (10, 8), (11, 8), (12, 8),
+           (13, 9)]
+    inter: [(0, 0), (1, 1), (3, 2), (4, 2), (5, 4), (6, 5), (7, 6), (11, 8), (13, 9)]
+    itermax: [(0, 0), (1, 1), (2, 2), (3, 2), (4, 2), (5, 4), (6, 5), (7, 6), (9, 7), (10, 8), (11, 8), (12, 8),
+              (13, 9)]
+    """
+
+    # The output is a dictionary with different matching methods.
+    # Each method has a list of pairs indicating the indexes of aligned words (The alignments are zero-indexed).
+    alignments = myaligner.get_word_aligns(src_sentence, trg_sentence)
+
+    for matching_method in alignments:
+        print(matching_method, ":", alignments[matching_method])
 
 """Get different speaker embedding"""
 test_embedding = False
@@ -48,7 +76,7 @@ if test_embedding:
 
 
 """Test Prosody Extractor"""
-test_extractor = True
+test_extractor = False
 if test_extractor:
     # Create the model
     model = ProsodyExtractor(1, 128, 8).to(device)
@@ -109,7 +137,7 @@ if test_extractor:
 
     phone_emb_chunks = []
     start_frame = 0
-    for i in range(len(starts)):
+    for i in range(len(duration)):
         phone_emb_chunks.append(e[:, :, start_frame:start_frame + duration[i]])
         start_frame += duration[i]
 
@@ -181,52 +209,3 @@ if test_predictor:
     print("pi shape: ", pi.size())
     print("mu shape: ", mu.size())
     print("sigma shape: ", sigma.size())
-
-# def plot_data(x, y):
-#     plt.hist2d(x, y, bins=35)
-#     plt.xlim(-8, 8)
-#     plt.ylim(-1, 1)
-#     plt.axis('off')
-#
-#
-# x, y = gen_data()
-# x = torch.Tensor(x)
-# y = torch.Tensor(y)
-#
-# print(x.size())
-# print(y.size())
-#
-# n_iterations = 10
-#
-# # Create the model
-# model = BaseProsodyPredictor(1, 1, 4, 8)
-# # Print the model summary
-# print(model)
-#
-# optimizer = torch.optim.Adam(model.parameters(), lr=0.005)
-# scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, n_iterations)
-#
-# for i in range(n_iterations):
-#     optimizer.zero_grad()
-#     if i == 0:
-#         e = model(x)
-#     else:
-#         e = model(x, e)
-#     loss = model.phone_loss(e, y).mean()
-#     loss.backward()
-#     optimizer.step()
-#     scheduler.step()
-#
-# print("Loss: ", loss.item)
-#
-# with torch.no_grad():
-#     y_hat = model.sample(x)
-#
-# plt.figure(figsize=(8, 3))
-# plt.subplot(1, 2, 1)
-# plot_data(x[:, 0].numpy(), y[:, 0].numpy())
-# plt.title("Observed data")
-# plt.subplot(1, 2, 2)
-# plot_data(x[:, 0].numpy(), y_hat[:, 0].numpy())
-# plt.title("Sampled data")
-# plt.show()

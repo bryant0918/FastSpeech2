@@ -4,6 +4,7 @@ import json
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from simalign import SentenceAligner
 
 from transformer import Encoder, Decoder, PostNet, ProsodyExtractor, ProsodyPredictor
 from .modules import VarianceAdaptor
@@ -15,6 +16,7 @@ elif torch.backends.mps.is_available():
     device = torch.device("mps")
 else:
     device = torch.device("cpu")
+
 
 class FastSpeech2_Pros(nn.Module):
     """ FastSpeech2 """
@@ -36,8 +38,8 @@ class FastSpeech2_Pros(nn.Module):
         with open(os.path.join(preprocess_config["path"]["preprocessed_path"], "speakers.json"), "r") as f:
             self.speakers_json = json.load(f)
 
-    def forward(self, speakers, texts, src_lens, max_src_len, speaker_embs, mels=None, mel_lens=None, max_mel_len=None,
-                p_targets=None, e_targets=None, d_targets=None, p_control=1.0, e_control=1.0, d_control=1.0,):
+    def forward(self, speakers, texts, src_lens, max_src_len, speaker_embs, mels=None, durations=None, mel_lens=None,
+                max_mel_len=None, p_targets=None, e_targets=None, d_targets=None, p_control=1.0, e_control=1.0, d_control=1.0,):
         # Get masks
         src_masks = get_mask_from_lengths(src_lens, max_src_len)
         mel_masks = (get_mask_from_lengths(mel_lens, max_mel_len) if mel_lens is not None else None)
@@ -50,10 +52,29 @@ class FastSpeech2_Pros(nn.Module):
         # TODO: prosody
         # prosody extractor
         prosody_extractor = ProsodyExtractor(1, 128, 8).to(device)
-        e = prosody_extractor(mels)
+        e = prosody_extractor(mels)   # e is [batch_size, melspec H, melspec W, 128]
+        
+        # Split phone embeddings by phone
+        # [batch_size (list), phoneme_sequence_length (list), melspec H (tensor), melspec W (tensor), 128 (tensor)]
+        split_phones = prosody_extractor.split_phones(e, durations)
+
+        # Get alignments
+        # The source and target sentences should be tokenized to words.
+        # src_sentence = ["Hello,", "my", "name", "is", "Ditto", "and", "this", "is", "what", "I", "sound", "like"]
+        # trg_sentence = ["Hallo,", "mein", "Name", "ist", "Ditto", "und", "so", "klinge", "ich"]
+        # trg_sentence = ["Cześć,", "nazywam", "się", "„Ditto”", "i", "tak", "właśnie", "brzmię"]
+        aligner = SentenceAligner(model="bert", token_type="bpe", matching_methods="mai")
 
 
+        # Switch phone embeddings order to match target language through alignment model
+
+
+        # Get predicted prosody of target language without reference
         # prosody_embedding = prosody_predictor(self.speaker_emb)
+
+        # Maximize posterior of Predicted prosody of target language with reference
+
+        # Concat and pass to Variance Adaptor
 
         (output, p_predictions, e_predictions, log_d_predictions, d_rounded, mel_lens, mel_masks,) = \
             self.variance_adaptor(output, src_masks, mel_masks, max_mel_len, p_targets, e_targets, d_targets, p_control,
@@ -65,18 +86,8 @@ class FastSpeech2_Pros(nn.Module):
 
         postnet_output = self.postnet(output) + output
 
-        return (
-            output,
-            postnet_output,
-            p_predictions,
-            e_predictions,
-            log_d_predictions,
-            d_rounded,
-            src_masks,
-            mel_masks,
-            src_lens,
-            mel_lens,
-        )
+        return (output, postnet_output, p_predictions, e_predictions, log_d_predictions, d_rounded, src_masks,
+                mel_masks, src_lens, mel_lens,)
 
 
 class FastSpeech2(nn.Module):

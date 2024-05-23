@@ -34,7 +34,7 @@ test_aligner = True
 if test_aligner:
     # making an instance of our model.
     # You can specify the embedding model and all alignment settings in the constructor.
-    myaligner = SentenceAligner(model="bert", token_type="bpe", matching_methods="mai")
+    myaligner = SentenceAligner(model="bert", token_type="bpe", matching_methods="m")
 
     # The source and target sentences should be tokenized to words.
     src_sentence = ["Hello,", "my", "name", "is", "Ditto", "and", "this", "is", "what", "I", "sound", "like"]

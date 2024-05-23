@@ -70,8 +70,11 @@ class DatasetPros(Dataset):
             "duration": duration,
         }
 
-        # Randomly choose any sentence from the dataset
+
+        # Get aligned translation
         tgt = ""
+
+        # Get Random Speaker Embedding
 
         return src_sample
 

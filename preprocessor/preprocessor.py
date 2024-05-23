@@ -9,6 +9,7 @@ import pyworld as pw
 from scipy.interpolate import interp1d
 from sklearn.preprocessing import StandardScaler
 from tqdm import tqdm
+from simalign import SentenceAligner
 
 import audio as Audio
 
@@ -55,6 +56,7 @@ class Preprocessor:
         os.makedirs((os.path.join(self.out_dir, "pitch")), exist_ok=True)
         os.makedirs((os.path.join(self.out_dir, "energy")), exist_ok=True)
         os.makedirs((os.path.join(self.out_dir, "duration")), exist_ok=True)
+        os.makedirs((os.path.join(self.out_dir, "alignments", "phone")), exist_ok=True)
 
         print("Processing Data ...")
         out = list()
@@ -160,6 +162,8 @@ class Preprocessor:
     def process_utterance(self, speaker, basename):
         wav_path = os.path.join(self.in_dir, speaker, "{}.wav".format(basename))
         text_path = os.path.join(self.in_dir, speaker, "{}.lab".format(basename))
+        translation_path = os.path.join(self.in_dir, speaker, "{}_tgt.lab".format(basename))
+
         tg_path = os.path.join(
             self.out_dir, "TextGrid", speaker, "{}.TextGrid".format(basename)
         )
@@ -313,3 +317,8 @@ class Preprocessor:
             min_value = min(min_value, min(values))
 
         return min_value, max_value
+
+    def align_phones(self):
+
+
+        return

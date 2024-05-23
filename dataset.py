@@ -174,14 +174,14 @@ class TextDataset(Dataset):
             "mel",
             "{}-mel-{}.npy".format(speaker, basename),
         )
-        mel = np.load(mel_path)
+        mel = torch.from_numpy(np.load(mel_path)).unsqueeze(0).unsqueeze(0)
 
         speaker_emb_path = os.path.join(self.preprocess_config["path"]["preprocessed_path"], "speaker_emb",
                                         "{}.pkl_emb.pkl".format(speaker))
         with open(speaker_emb_path, 'rb') as f:
             emb_dict = pickle.load(f)
 
-        embedding = torch.from_numpy(emb_dict["default"]).to(device).unsqueeze(0).unsqueeze(0).expand(-1, 19, -1)
+        embedding = torch.from_numpy(emb_dict["default"]).unsqueeze(0).unsqueeze(0).expand(-1, 19, -1)
 
         return (basename, speaker_id, phone, raw_text, embedding, mel)
 

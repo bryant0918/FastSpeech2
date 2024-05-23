@@ -77,8 +77,15 @@ def to_device(data, device):
         texts = torch.from_numpy(texts).long().to(device)
         src_lens = torch.from_numpy(src_lens).to(device)
 
-        speaker_embs = torch.cat(speaker_embs, dim=0)
-        mels = torch.cat(mels, dim=0)
+        if len(speaker_embs) > 1:
+            speaker_embs = torch.cat(speaker_embs, dim=0).to(device)
+        else:
+            speaker_embs = speaker_embs.to(device)
+        if len(mels) > 1:
+            print(len(mels))
+            mels = torch.cat(mels, dim=0).to(device)
+        else:
+            mels = mels.to(device)
 
         return (ids, raw_texts, speakers, texts, src_lens, max_src_len, speaker_embs, mels)
 

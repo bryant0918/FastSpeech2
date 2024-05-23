@@ -1,12 +1,11 @@
 import os
 import json
-import pickle
 
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from transformer import Encoder, Decoder, PostNet
+from transformer import Encoder, Decoder, PostNet, ProsodyExtractor, ProsodyPredictor
 from .modules import VarianceAdaptor
 from utils.tools import get_mask_from_lengths
 
@@ -49,6 +48,11 @@ class FastSpeech2_Pros(nn.Module):
         output = output + speaker_embs
 
         # TODO: prosody
+        # prosody extractor
+        prosody_extractor = ProsodyExtractor(1, 128, 8).to(device)
+        e = prosody_extractor(mels)
+
+
         # prosody_embedding = prosody_predictor(self.speaker_emb)
 
         (output, p_predictions, e_predictions, log_d_predictions, d_rounded, mel_lens, mel_masks,) = \

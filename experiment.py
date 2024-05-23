@@ -9,6 +9,9 @@ from audio.tools import get_mel_from_wav
 import audio as Audio
 import librosa
 import time
+from preprocessor.preprocessor import Preprocessor
+import tgt
+
 
 if torch.cuda.is_available():
     device = torch.device("cuda")
@@ -26,7 +29,7 @@ preprocess_config = yaml.load(open(preprocess_config, "r"), Loader=yaml.FullLoad
 model_config = yaml.load(open(model_config, "r"), Loader=yaml.FullLoader)
 
 """Get different speaker embedding"""
-test_embedding = True
+test_embedding = False
 if test_embedding:
     embedding_path = "/Users/bryantmcarthur/Documents/Ditto/SpeakerEncoder/outputs/tony.pkl_emb.pkl"
 
@@ -45,42 +48,76 @@ if test_embedding:
 
 
 """Test Prosody Extractor"""
-test_extractor = False
+test_extractor = True
 if test_extractor:
     # Create the model
-    model = ProsodyExtractor(256, 1, 4, 8).to(device)
+    model = ProsodyExtractor(1, 128, 8).to(device)
     # Print the model summary
     print(model)
     config = preprocess_config
 
-    STFT = Audio.stft.TacotronSTFT(
-        config["preprocessing"]["stft"]["filter_length"],
-        config["preprocessing"]["stft"]["hop_length"],
-        config["preprocessing"]["stft"]["win_length"],
-        config["preprocessing"]["mel"]["n_mel_channels"],
-        config["preprocessing"]["audio"]["sampling_rate"],
-        config["preprocessing"]["mel"]["mel_fmin"],
-        config["preprocessing"]["mel"]["mel_fmax"],
-    )
+    get_mel = False
+    if get_mel:
+        STFT = Audio.stft.TacotronSTFT(
+            config["preprocessing"]["stft"]["filter_length"],
+            config["preprocessing"]["stft"]["hop_length"],
+            config["preprocessing"]["stft"]["win_length"],
+            config["preprocessing"]["mel"]["n_mel_channels"],
+            config["preprocessing"]["audio"]["sampling_rate"],
+            config["preprocessing"]["mel"]["mel_fmin"],
+            config["preprocessing"]["mel"]["mel_fmax"],
+        )
 
-    wav_path = "/Users/bryantmcarthur/Documents/Ditto/experiment/tony.flac"
-    sampling_rate = config["preprocessing"]["audio"]["sampling_rate"]
+        wav_path = "/Users/bryantmcarthur/Documents/Ditto/experiment/tony.flac"
+        sampling_rate = config["preprocessing"]["audio"]["sampling_rate"]
 
-    # Read and trim wav files
-    wav, _ = librosa.load(wav_path)
-    wav = torch.from_numpy(wav.astype(np.float32))
+        # Read and trim wav files
+        wav, _ = librosa.load(wav_path)
+        wav = torch.from_numpy(wav.astype(np.float32))
 
-    melspec, energy = get_mel_from_wav(wav, STFT)
+        melspec, energy = get_mel_from_wav(wav, STFT)
 
-    melspec = torch.from_numpy(melspec).to(device)
+        melspec = torch.from_numpy(melspec).to(device)
+    else:
+        mel_path = "preprocessed_data/LJSpeech2/mel/LJSpeech-mel-LJ001-0002.npy"
+        text_grid_path = "preprocessed_data/LJSpeech2/TextGrid/LJSpeech/LJ001-0002.TextGrid"
 
-    melspec = melspec.unsqueeze(0).unsqueeze(0)   # To get batch dimension [1,80,462]
+        melspec = torch.from_numpy(np.load(mel_path)).to(device)
+
+    melspec = melspec.unsqueeze(0).unsqueeze(0)   # To get dimension [1,1,H:80,W:462]
     print("Mel shape: ", melspec.size())
 
-    # TODO: Match Dimensions :)
     e = model(melspec)
     print("e shape: ", e.size())
+    print("shape of e after view", e.view(e.size()[0], 80, -1, e.size()[-1]).size())
+    e = e.view(e.size()[0], 80, -1, e.size()[-1])
 
+    # Somehow split this up by phoneme time steps
+    preprocessor = Preprocessor(preprocess_config)
+    # Get alignments TODO: Get phones from train.txt, and durations from duration folder
+    textgrid = tgt.io.read_textgrid(text_grid_path)
+    phone, duration, start, end = preprocessor.get_alignment(textgrid.get_tier_by_name("phones"))
+    print("Phones", phone, len(phone))
+    print("Duration", duration, len(duration))
+
+    duration_path = "preprocessed_data/LJSpeech2/duration/LJSpeech-duration-LJ001-0002.npy"
+    duration = np.load(duration_path)
+    print("Duration", duration, len(duration)) # They match!
+
+    print("start", start)
+    print("end", end)
+
+    phone_emb_chunks = []
+    start_frame = 0
+    for i in range(len(starts)):
+        phone_emb_chunks.append(e[:, :, start_frame:start_frame + duration[i]])
+        start_frame += duration[i]
+
+    print("Phone emb chunks: ", len(phone_emb_chunks), phone_emb_chunks[0].size(), phone_emb_chunks[1].size(),
+          phone_emb_chunks[2].size(), phone_emb_chunks[3].size(), phone_emb_chunks[4].size(), phone_emb_chunks[5].size())
+
+    total_len = sum([phone_emb_chunk.size()[2] for phone_emb_chunk in phone_emb_chunks])
+    print(total_len)
 
 """Test Prosody Predictor"""
 test_predictor = False

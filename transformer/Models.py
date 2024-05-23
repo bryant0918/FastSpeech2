@@ -3,9 +3,9 @@ import torch.nn as nn
 import torch.nn.functional as F
 import numpy as np
 
-# import transformer.Constants as Constants
-# from .Layers import FFTBlock
-# from text.symbols import symbols
+import transformer.Constants as Constants
+from .Layers import FFTBlock
+from text.symbols import symbols
 
 
 def get_sinusoid_encoding_table(n_position, d_hid, padding_idx=None):

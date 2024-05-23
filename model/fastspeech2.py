@@ -18,11 +18,11 @@ else:
     device = torch.device("cpu")
 
 
-class FastSpeech2_Pros(nn.Module):
+class FastSpeech2Pros(nn.Module):
     """ FastSpeech2 """
 
     def __init__(self, preprocess_config, model_config):
-        super(FastSpeech2_Pros, self).__init__()
+        super(FastSpeech2Pros, self).__init__()
         self.model_config = model_config
         self.preprocess_config = preprocess_config
         self.encoder = Encoder(model_config)
@@ -38,8 +38,10 @@ class FastSpeech2_Pros(nn.Module):
         with open(os.path.join(preprocess_config["path"]["preprocessed_path"], "speakers.json"), "r") as f:
             self.speakers_json = json.load(f)
 
-    def forward(self, speakers, texts, src_lens, max_src_len, speaker_embs, mels=None, durations=None, mel_lens=None,
-                max_mel_len=None, p_targets=None, e_targets=None, d_targets=None, p_control=1.0, e_control=1.0, d_control=1.0,):
+    def forward(self, speakers, texts, src_lens, max_src_len, speaker_embs, mels=None, mel_lens=None, max_mel_len=None,
+                durations=None, alignments=None, p_targets=None, e_targets=None, d_targets=None, p_control=1.0,
+                e_control=1.0, d_control=1.0,):
+
         # Get masks
         src_masks = get_mask_from_lengths(src_lens, max_src_len)
         mel_masks = (get_mask_from_lengths(mel_lens, max_mel_len) if mel_lens is not None else None)
@@ -58,13 +60,18 @@ class FastSpeech2_Pros(nn.Module):
         # [batch_size (list), phoneme_sequence_length (list), melspec H (tensor), melspec W (tensor), 128 (tensor)]
         split_phones = prosody_extractor.split_phones(e, durations)
 
-        # Get alignments
+        # TODO: Get alignments
+        # Should get alignments in data loader
         # The source and target sentences should be tokenized to words.
         # src_sentence = ["Hello,", "my", "name", "is", "Ditto", "and", "this", "is", "what", "I", "sound", "like"]
         # trg_sentence = ["Hallo,", "mein", "Name", "ist", "Ditto", "und", "so", "klinge", "ich"]
         # trg_sentence = ["Cześć,", "nazywam", "się", "„Ditto”", "i", "tak", "właśnie", "brzmię"]
+
         aligner = SentenceAligner(model="bert", token_type="bpe", matching_methods="mai")
 
+        # Get word aligments
+
+        # Get phone alignments
 
         # Switch phone embeddings order to match target language through alignment model
 

@@ -13,7 +13,7 @@ from pypinyin import pinyin, Style
 
 from utils.model import get_model, get_vocoder
 from utils.tools import to_device, synth_samples
-from dataset import TextDataset
+from dataset import SynthDataset
 from text import text_to_sequence
 
 if torch.cuda.is_available():
@@ -202,7 +202,7 @@ if __name__ == "__main__":
     # Preprocess texts
     if args.mode == "batch":
         # Get dataset
-        dataset = TextDataset(args.source, preprocess_config)
+        dataset = SynthDataset(args.source, preprocess_config)
         batches = DataLoader(
             dataset,
             batch_size=8,
@@ -214,7 +214,7 @@ if __name__ == "__main__":
         raw_texts = [args.text[:100]]
         speakers = np.array([args.speaker_id])
         if preprocess_config["preprocessing"]["text"]["language"] == "en":
-            texts = np.array([preprocess_english(args.text, preprocess_config)])
+            texts = np.array([preprocess_english(args.text, preprocess_config)])   # IDs of phonemes
         elif preprocess_config["preprocessing"]["text"]["language"] == "zh":
             texts = np.array([preprocess_mandarin(args.text, preprocess_config)])
         text_lens = np.array([len(texts[0])])

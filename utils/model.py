@@ -5,7 +5,7 @@ import torch
 import numpy as np
 
 import hifigan
-from model import FastSpeech2, ScheduledOptim, FastSpeech2_Pros
+from model import FastSpeech2, ScheduledOptim, FastSpeech2Pros
 
 
 def get_model(args, configs, device, train=False):
@@ -13,8 +13,8 @@ def get_model(args, configs, device, train=False):
 
     if model_config["synthesizer"]["model"] == "FastSpeech2":
         model = FastSpeech2(preprocess_config, model_config).to(device)
-    elif model_config["synthesizer"]["model"] == "FastSpeech2_Pros":
-        model = FastSpeech2_Pros(preprocess_config, model_config).to(device)
+    elif model_config["synthesizer"]["model"] == "FastSpeech2Pros":
+        model = FastSpeech2Pros(preprocess_config, model_config).to(device)
 
     if args.restore_step:
         ckpt_path = os.path.join(

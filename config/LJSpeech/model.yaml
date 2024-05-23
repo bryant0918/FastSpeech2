@@ -37,4 +37,4 @@ vocoder:
   speaker: "LJSpeech" # support  'LJSpeech', 'universal'
 
 synthesizer:
-  model: "FastSpeech2_Pros" # support 'FastSpeech2', 'FastSpeech2_Pros'"
+  model: "FastSpeech2Pros" # support 'FastSpeech2', 'FastSpeech2Pros'"

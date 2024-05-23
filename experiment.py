@@ -1,4 +1,4 @@
-from model import FastSpeech2_Pros
+from model import FastSpeech2Pros
 import torch
 import yaml
 import numpy as np
@@ -150,7 +150,7 @@ if test_extractor:
 """Test Prosody Predictor"""
 test_predictor = False
 if test_predictor:
-    model = FastSpeech2_Pros(preprocess_config, model_config).to(device)
+    model = FastSpeech2Pros(preprocess_config, model_config).to(device)
 
     text = "Hello, how are you doing today?"
     texts = np.array([preprocess_english(text, preprocess_config)])

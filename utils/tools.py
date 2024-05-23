@@ -46,20 +46,8 @@ def to_device(data, device):
         energies = torch.from_numpy(energies).to(device)
         durations = torch.from_numpy(durations).long().to(device)
 
-        return (
-            ids,
-            raw_texts,
-            speakers,
-            texts,
-            src_lens,
-            max_src_len,
-            mels,
-            mel_lens,
-            max_mel_len,
-            pitches,
-            energies,
-            durations,
-        )
+        return (ids, raw_texts, speakers, texts, src_lens, max_src_len, mels, mel_lens, max_mel_len, pitches, energies,
+                durations)
 
     if len(data) == 6:
         (ids, raw_texts, speakers, texts, src_lens, max_src_len) = data
@@ -68,7 +56,7 @@ def to_device(data, device):
         texts = torch.from_numpy(texts).long().to(device)
         src_lens = torch.from_numpy(src_lens).to(device)
 
-        return (ids, raw_texts, speakers, texts, src_lens, max_src_len)
+        return ids, raw_texts, speakers, texts, src_lens, max_src_len
 
     if len(data) == 8:
         (ids, raw_texts, speakers, texts, src_lens, max_src_len, speaker_embs, mels) = data
@@ -87,7 +75,7 @@ def to_device(data, device):
         else:
             mels = mels.to(device)
 
-        return (ids, raw_texts, speakers, texts, src_lens, max_src_len, speaker_embs, mels)
+        return ids, raw_texts, speakers, texts, src_lens, max_src_len, speaker_embs, mels
 
 
 def log(

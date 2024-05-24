@@ -1,5 +1,8 @@
+epitran >= 1.25
 g2p-en >= 2.1.0
+g2pk >= 0.9.4
 inflect >= 4.1.0
+jamo >= 0.4.1
 librosa == 0.10.2.post1
 matplotlib == 3.9.0
 numba == 0.59.1

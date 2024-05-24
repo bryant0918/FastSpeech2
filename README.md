@@ -97,12 +97,19 @@ We take LJSpeech as an example hereafter.
 
 ## Preprocessing
  
-First, run 
+### Prepare Align
+First, we need to take the metadata csv files that contain the fileID, transcription and translation as well as the 
+.wav file of the audio and resave the transcription and translation as a .lab file and copy over the .wav file in order 
+to create the TextGrid files.
+
+We also perform a word alignment on the transcription and translation and save it separately to be used later.
+
+run 
 ```
 python3 prepare_align.py config/LJSpeech/preprocess.yaml
 ```
-for some preparations.
 
+### Get the TextGrid Files
 As described in the paper, [Montreal Forced Aligner](https://montreal-forced-aligner.readthedocs.io/en/latest/) (MFA) is used to obtain the alignments between the utterances and the phoneme sequences.
 Alignments of the supported datasets are provided [here](https://drive.google.com/drive/folders/1DBRkALpPd6FL9gjHMmMEdHODmkgNIIK4?usp=sharing).
 
@@ -117,25 +124,31 @@ You have to unzip the files in ``preprocessed_data/LJSpeech/TextGrid/``.
 
 ```unzip preprocessed_data/LJSpeech/LJSpeech.zip -d preprocessed_data/LJSpeech/```
 
-After that, run the preprocessing script by
-```
-python3 preprocess.py config/LJSpeech/preprocess.yaml
-```
 
-Alternately, you can align the corpus by yourself. 
+
+Alternately, you can align the corpus by yourself to get the TextGrid Files. 
 Download the official MFA package and run
 ```
 ./montreal-forced-aligner/bin/mfa_align raw_data/LJSpeech/ lexicon/librispeech-lexicon.txt english preprocessed_data/LJSpeech
+```
+
+```
+./montreal-forced-aligner/bin/mfa_align raw_data/Bryant/ lexicon/librispeech-lexicon.txt english preprocessed_data/Bryant
 ```
 or
 ```
 ./montreal-forced-aligner/bin/mfa_train_and_align raw_data/LJSpeech/ lexicon/librispeech-lexicon.txt preprocessed_data/LJSpeech
 ```
 
-to align the corpus and then run the preprocessing script.
+to align the corpus.
+
+### Preprocessing Script
+
+After that, run the preprocessing script by
 ```
 python3 preprocess.py config/LJSpeech/preprocess.yaml
 ```
+
 
 ## Training
 

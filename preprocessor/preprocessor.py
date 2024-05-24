@@ -73,9 +73,7 @@ class Preprocessor:
                     continue
 
                 basename = wav_name.split(".")[0]
-                tg_path = os.path.join(
-                    self.out_dir, "TextGrid", speaker, "{}.TextGrid".format(basename)
-                )
+                tg_path = os.path.join(self.out_dir, "TextGrid", speaker, "{}.TextGrid".format(basename))
                 if os.path.exists(tg_path):
                     ret = self.process_utterance(speaker, basename)
                     if ret is None:
@@ -161,18 +159,14 @@ class Preprocessor:
 
     def process_utterance(self, speaker, basename):
         wav_path = os.path.join(self.in_dir, speaker, "{}.wav".format(basename))
-        text_path = os.path.join(self.in_dir, speaker, "{}.lab".format(basename))
+        text_path = os.path.join(self.in_dir, speaker, "{}_src.lab".format(basename))
         translation_path = os.path.join(self.in_dir, speaker, "{}_tgt.lab".format(basename))
 
-        tg_path = os.path.join(
-            self.out_dir, "TextGrid", speaker, "{}.TextGrid".format(basename)
-        )
+        tg_path = os.path.join(self.out_dir, "TextGrid", speaker, "{}.TextGrid".format(basename))
 
-        # Get alignments
+        # Get src time alignments
         textgrid = tgt.io.read_textgrid(tg_path)
-        phone, duration, start, end = self.get_alignment(
-            textgrid.get_tier_by_name("phones")
-        )
+        phone, duration, start, end = self.get_alignment(textgrid.get_tier_by_name("phones"))
         text = "{" + " ".join(phone) + "}"
         if start >= end:
             return None

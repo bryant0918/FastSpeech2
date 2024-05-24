@@ -11,7 +11,6 @@ import librosa
 import time
 from preprocessor.preprocessor import Preprocessor
 import tgt
-from simalign import SentenceAligner
 
 
 if torch.cuda.is_available():
@@ -29,9 +28,45 @@ model_config = "config/LJSpeech/model.yaml"
 preprocess_config = yaml.load(open(preprocess_config, "r"), Loader=yaml.FullLoader)
 model_config = yaml.load(open(model_config, "r"), Loader=yaml.FullLoader)
 
+"""Test Epitran"""
+test_epitran = True
+if test_epitran:
+    import epitran
+    from text.ipadict import db
+    from string import punctuation
+    import re
+
+    epi = epitran.Epitran("spa-Latn")
+
+    print(punctuation)
+    new_punc = "¡!\"#$%&'()*+,-./:;<=>¿?@[\]^_`{|}~"
+
+    text = "¡Hola! ¿cómo estás niño?"
+    test_str = text.translate(str.maketrans('', '', new_punc))
+    print(test_str)
+
+    res = re.sub(r'[^\w\s]', '', text)  # Remove all non word or space characters
+    print(res)
+    phones = epi.transliterate(text)
+    print(phones)
+
+    print(phones.split())
+    phones_by_word = phones.split()
+    for word in phones_by_word:
+        for char in word:
+            print(char, db[char])
+
+
+    # text = "Cześć, jak się masz?"
+    # epi = epitran.Epitran("pol-Latn")
+    # phones = epi.transliterate(text)
+    # print(phones)
+
+
 """Test Sentence Aligner"""
-test_aligner = True
+test_aligner = False
 if test_aligner:
+    from simalign import SentenceAligner
     # making an instance of our model.
     # You can specify the embedding model and all alignment settings in the constructor.
     myaligner = SentenceAligner(model="bert", token_type="bpe", matching_methods="m")

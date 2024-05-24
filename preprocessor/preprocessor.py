@@ -1,6 +1,7 @@
 import os
 import random
 import json
+import pickle
 
 import tgt
 import librosa
@@ -270,8 +271,12 @@ class Preprocessor:
         mel_filename = "{}-mel-{}.npy".format(speaker, basename)
         np.save(os.path.join(self.out_dir, "mel", mel_filename), mel_spectrogram.T)
 
-        phone_alignment_filename = "{}-phone_alignment-{}.npy".format(speaker, basename)
-        np.save(os.path.join(self.out_dir, "alignments", "phone", phone_alignment_filename), phone_alignments)
+        phone_alignment_filename = "{}-phone_alignment-{}".format(speaker, basename)
+        # np.save(os.path.join(self.out_dir, "alignments", "phone", phone_alignment_filename), phone_alignments)
+
+        # Saving the dictionary
+        with open(os.path.join(self.out_dir, "alignments", "phone", phone_alignment_filename + '.pkl'), 'wb') as f:
+            pickle.dump(phone_alignments, f)
 
         return (
             "|".join([basename, speaker, text, raw_text]),
@@ -330,14 +335,35 @@ class Preprocessor:
     def get_phoneme_alignment(self, word_alignments, src_phones, tgt_phones):
         phone_alignments = {}
 
+        print("src_phones", src_phones)
+        print("cumsums", np.cumsum([len(src_phone) for src_phone in src_phones]))
+        src_phone_cumsums = np.cumsum([len(src_phone) for src_phone in src_phones])
+        # print("cumsums", np.cumsum(tgt_phones))
+        # To flatten phones
+        flat_src_phones = list(chain.from_iterable(src_phones))
+        flat_tgt_phones = list(chain.from_iterable(tgt_phones))
+
+        flat_phone_alignments = []
+
         for word_alignment in word_alignments:
             i, j = word_alignment[0], word_alignment[1]
+
+            if i == 0:
+                flat_src_phones_idx = 0
+            else:
+                flat_src_phones_idx = src_phone_cumsums[i-1]
+
+            if j == 0:
+                flat_tgt_phones_idx = 0
+            else:
+                flat_tgt_phones_idx = len(tgt_phones[j-1])
+
 
             tgt_word_phones = tgt_phones[i]
             src_word_phones = src_phones[j]
 
             phone_weight = len(src_word_phones) / len(tgt_word_phones)
-            phone_alignment = []
+            phone_alignment, flat_phone_alignment = [], []
             current_src_phone = 0
             phone_accumulations = 0
             tgt_phone = 0
@@ -348,30 +374,51 @@ class Preprocessor:
                     phone_accumulations += phone_weight
                     if current_src_phone not in phone_alignment:
                         phone_alignment.append(current_src_phone)
+                        flat_phone_alignment.append(flat_src_phones_idx)
                     # Reset
                     phone_weight = len(src_word_phones) / len(tgt_word_phones)
                     tgt_phone += 1
+                    flat_tgt_phones_idx += 1
                     the_word.append(phone_alignment)
+                    flat_phone_alignments.append(flat_phone_alignment)
                     phone_alignment = []
+                    flat_phone_alignment = []
 
                 elif phone_weight == (1-phone_accumulations):   # Use all of the phone_weight left
                     phone_alignment.append(current_src_phone)
+                    flat_phone_alignment.append(flat_src_phones_idx)
                     phone_accumulations = 0
                     current_src_phone += 1
+                    flat_src_phones_idx += 1
                     tgt_phone += 1
+                    flat_tgt_phones_idx += 1
                     phone_weight = len(src_word_phones) / len(tgt_word_phones)
                     the_word.append(phone_alignment)
+                    flat_phone_alignments.append(flat_phone_alignment)
                     phone_alignment = []
+                    flat_phone_alignment = []
 
                 else:   # Phone weight > what's available --> Use part of the phone_weight
                     phone_alignment.append(current_src_phone)
+                    flat_phone_alignment.append(flat_src_phones_idx)
                     current_src_phone += 1
+                    flat_src_phones_idx += 1
                     phone_weight = phone_weight - (1 - phone_accumulations)
                     phone_accumulations = 0
 
-            phone_alignments[i] = {j: {k: corresponding_tgt_phones for k, corresponding_tgt_phones in enumerate(the_word)}}
+            if i not in phone_alignments:
+                phone_alignments[i] = {}
 
-        return phone_alignments
+            if j not in phone_alignments[i]:
+                phone_alignments[i][j] = {}
+
+            phone_alignments[i][j] = {k: corresponding_tgt_phones for k, corresponding_tgt_phones in enumerate(the_word)}
+
+        # TODO: Get rid of phone_alignments?
+        print(phone_alignments)
+        print("Flat phone alignments: ", flat_phone_alignments)
+
+        return flat_phone_alignments
 
     def remove_outlier(self, values):
         values = np.array(values)

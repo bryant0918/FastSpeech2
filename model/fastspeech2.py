@@ -61,17 +61,6 @@ class FastSpeech2Pros(nn.Module):
         split_phones = prosody_extractor.split_phones(e, durations)
 
         # TODO: Get alignments
-        # Should get alignments in data loader
-        # The source and target sentences should be tokenized to words.
-        # src_sentence = ["Hello,", "my", "name", "is", "Ditto", "and", "this", "is", "what", "I", "sound", "like"]
-        # trg_sentence = ["Hallo,", "mein", "Name", "ist", "Ditto", "und", "so", "klinge", "ich"]
-        # trg_sentence = ["Cześć,", "nazywam", "się", "„Ditto”", "i", "tak", "właśnie", "brzmię"]
-
-        aligner = SentenceAligner(model="bert", token_type="bpe", matching_methods="mai")
-
-        # Get word aligments
-
-        # Get phone alignments
 
         # Switch phone embeddings order to match target language through alignment model
 

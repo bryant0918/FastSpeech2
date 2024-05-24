@@ -51,14 +51,17 @@ class FastSpeech2Pros(nn.Module):
 
         output = output + speaker_embs
 
-        # TODO: prosody
+        # TODO: Prosody Predictor
+        prosody_predictor = ProsodyPredictor().to(device)
+
+
         # prosody extractor
         prosody_extractor = ProsodyExtractor(1, 128, 8).to(device)
-        e = prosody_extractor(mels)   # e is [batch_size, melspec H, melspec W, 128]
+        e_src = prosody_extractor(mels)   # e is [batch_size, melspec H, melspec W, 128]
         
         # Split phone embeddings by phone
         # [batch_size (list), phoneme_sequence_length (list), melspec H (tensor), melspec W (tensor), 128 (tensor)]
-        split_phones = prosody_extractor.split_phones(e, durations)
+        split_phones = prosody_extractor.split_phones(e_src, durations)
 
         # TODO: Get alignments
 
@@ -145,9 +148,6 @@ class FastSpeech2(nn.Module):
         # This speaker embedding is just an embedding of the speaker ID (Not allowing for zero-shot voice cloning)
         if self.speaker_emb is not None:
             output = output + self.speaker_emb(speakers).unsqueeze(1).expand(-1, max_src_len, -1)
-
-        # TODO: prosody
-        # prosody_embedding = prosody_predictor(self.speaker_emb)
 
         (output, p_predictions, e_predictions, log_d_predictions, d_rounded, mel_lens, mel_masks,) = \
             self.variance_adaptor(output, src_masks, mel_masks, max_mel_len, p_targets, e_targets, d_targets, p_control,

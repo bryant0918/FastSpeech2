@@ -28,8 +28,80 @@ model_config = "config/LJSpeech/model.yaml"
 preprocess_config = yaml.load(open(preprocess_config, "r"), Loader=yaml.FullLoader)
 model_config = yaml.load(open(model_config, "r"), Loader=yaml.FullLoader)
 
+"""Test TextGrid"""
+test_textgrid = False
+if test_textgrid:
+    import tgt
+    import os
+    tg_path = os.path.join("preprocessed_data/Bryant", "TextGrid", "Bryant", "{}.TextGrid".format("LJ001-002"))
+    tg_path = "preprocessed_data/Bryant/TextGrid/Bryant/LJ001-0002.TextGrid"
+    # tg_path = "preprocessed_data/LJSpeech2/TextGrid/LJSpeech/LJ001-0004.TextGrid"
+
+    # Get src time alignments
+    textgrid = tgt.io.read_textgrid(tg_path)
+
+    phones_tier = textgrid.get_tier_by_name("phones")
+    words_tier = textgrid.get_tier_by_name("words")
+
+    print(words_tier)
+    word_end_times = [w.end_time for w in words_tier._objects]
+    print(word_end_times)
+
+    sil_phones = ["sil", "sp", "spn"]
+
+    all_phones = []
+    word_phones = []
+    durations = []
+    start_time = 0
+    end_time = 0
+    end_idx = 0
+    word_idx = 0
+    num_phones = 0
+    for t in phones_tier._objects:
+        s, e, p = t.start_time, t.end_time, t.text
+
+        # Trim leading silences
+        if all_phones == [] and word_phones == []:
+            if p in sil_phones:
+                continue
+            else:
+                start_time = s
+
+        if p not in sil_phones:
+            # For ordinary phones
+            word_phones.append(p)
+            num_phones += 1
+            if word_end_times[word_idx] == e:
+                print(p)
+                word_idx += 1
+                all_phones.append(word_phones)
+                word_phones = []
+
+            end_time = e
+            end_idx = num_phones
+        else:
+            # For silent phones
+            print("SIlent", p)
+            all_phones.append(p)
+            num_phones += 1
+
+        durations.append(int(np.round(e * 22050 / 256) - np.round(s * 22050 / 256)))
+
+    # Trim tailing silences
+    phones = all_phones[:len(word_end_times)]
+    durations = durations[:end_idx]
+
+    print("Phones: ", phones)
+    print("Durations: ", durations)
+
+    # To flatten if necessary
+    from itertools import chain
+    print(list(chain.from_iterable(phones)))
+
+    # return phones, durations, start_time, end_time
+
 """Test Epitran"""
-test_epitran = True
+test_epitran = False
 if test_epitran:
     import epitran
     from text.ipadict import db
@@ -47,20 +119,54 @@ if test_epitran:
 
     res = re.sub(r'[^\w\s]', '', text)  # Remove all non word or space characters
     print(res)
-    phones = epi.transliterate(text)
+
+    phones = epi.transliterate(test_str)
     print(phones)
 
     print(phones.split())
     phones_by_word = phones.split()
-    for word in phones_by_word:
-        for char in word:
-            print(char, db[char])
+    # for word in phones_by_word:
+    #     for char in word:
+    #         print(char, db[char]['unicode'], db[char]['id'])
+
+    phones_by_word = [[char for char in word] for word in phones_by_word]
+    print(phones_by_word)
+
+    text = "Cześć, jak się masz?"
+    test_str = text.translate(str.maketrans('', '', new_punc))
+    epi = epitran.Epitran("pol-Latn")
+    phones = epi.transliterate(test_str)
+    print(phones)
+
+    phones_by_word = phones.split()
+
+    def split_with_tie_bar(text):
+        result = []
+        i = 0
+        while i < len(text):
+            if i + 2 < len(text) and text[i + 1] == '͡':
+                # Group the character with the tie bar and the following character
+                result.append(text[i:i + 3])
+                i += 3
+            else:
+                # Just append the single character
+                result.append(text[i])
+                i += 1
+        return result
+
+    phones_by_word = [split_with_tie_bar(word) for word in phones_by_word]
+
+    print(phones_by_word)
+
+"""Go through word_alignment"""
+test_word_alignment = True
+if test_word_alignment:
+    word_alignment = np.array([[0, 0], [1, 1], [2, 2], [3, 2], [3, 3]])
+    words = 4
+    phoneme_alignment = {i: [] for i in range(words)}
 
 
-    # text = "Cześć, jak się masz?"
-    # epi = epitran.Epitran("pol-Latn")
-    # phones = epi.transliterate(text)
-    # print(phones)
+
 
 
 """Test Sentence Aligner"""

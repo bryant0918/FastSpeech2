@@ -9,8 +9,11 @@ import pyworld as pw
 from scipy.interpolate import interp1d
 from sklearn.preprocessing import StandardScaler
 from tqdm import tqdm
-from simalign import SentenceAligner
+import epitran
+from itertools import chain
 
+from text.ipadict import db
+from text import _es_punctuations
 import audio as Audio
 
 
@@ -161,21 +164,45 @@ class Preprocessor:
         wav_path = os.path.join(self.in_dir, speaker, "{}.wav".format(basename))
         text_path = os.path.join(self.in_dir, speaker, "{}_src.lab".format(basename))
         translation_path = os.path.join(self.in_dir, speaker, "{}_tgt.lab".format(basename))
+        word_alignment_path = os.path.join(self.out_dir, "alignments", "word", "{}-word_alignment-{}.npy".format(speaker, basename))
 
         tg_path = os.path.join(self.out_dir, "TextGrid", speaker, "{}.TextGrid".format(basename))
 
         # Get src time alignments
         textgrid = tgt.io.read_textgrid(tg_path)
-        phone, duration, start, end = self.get_alignment(textgrid.get_tier_by_name("phones"))
-        text = "{" + " ".join(phone) + "}"
+
+        # TODO: Must return phones broken up by word somehow
+
+        src_phones, duration, start, end = self.get_alignment(textgrid)
+
+        # To flatten phones
+        flat_phones = list(chain.from_iterable(src_phones))
+        text = "{" + " ".join(flat_phones) + "}"
         if start >= end:
             return None
 
+        # Read raw translation text
+        with open(translation_path, "r") as f:
+            raw_translation = f.readline().strip("\n")
+
+        # Clean translation text # TODO: change punctuation based on language and add more cleaners if not already done.
+        translation = raw_translation.translate(str.maketrans('', '', _es_punctuations))
+
+        epi = epitran.Epitran('spa-Latn') # TODO: Change based on language
+        tgt_phones = epi.transliterate(translation)
+        tgt_phones = tgt_phones.split()
+        tgt_phones = [[char for char in word] for word in tgt_phones]
+
+        # Open word alignment file
+        word_alignments = np.load(word_alignment_path)
+
+        # Get src tgt phone alignments
+        phone_alignments = self.get_phoneme_alignment(word_alignments, src_phones, tgt_phones)
+
+
         # Read and trim wav files
         wav, _ = librosa.load(wav_path)
-        wav = wav[
-            int(self.sampling_rate * start) : int(self.sampling_rate * end)
-        ].astype(np.float32)
+        wav = wav[int(self.sampling_rate * start) : int(self.sampling_rate * end)].astype(np.float32)
 
         # Read raw text
         with open(text_path, "r") as f:
@@ -241,10 +268,10 @@ class Preprocessor:
         np.save(os.path.join(self.out_dir, "energy", energy_filename), energy)
 
         mel_filename = "{}-mel-{}.npy".format(speaker, basename)
-        np.save(
-            os.path.join(self.out_dir, "mel", mel_filename),
-            mel_spectrogram.T,
-        )
+        np.save(os.path.join(self.out_dir, "mel", mel_filename), mel_spectrogram.T)
+
+        phone_alignment_filename = "{}-phone_alignment-{}.npy".format(speaker, basename)
+        np.save(os.path.join(self.out_dir, "alignments", "phone", phone_alignment_filename), phone_alignments)
 
         return (
             "|".join([basename, speaker, text, raw_text]),
@@ -253,19 +280,23 @@ class Preprocessor:
             mel_spectrogram.shape[1],
         )
 
-    def get_alignment(self, tier):
+    def get_alignment(self, textgrid):
+        phones_tier = textgrid.get_tier_by_name("phones")
+        words_tier = textgrid.get_tier_by_name("words")
+        word_end_times = [w.end_time for w in words_tier._objects]
+
         sil_phones = ["sil", "sp", "spn"]
 
-        phones = []
-        durations = []
-        start_time = 0
-        end_time = 0
-        end_idx = 0
-        for t in tier._objects:
+        all_phones, word_phones, durations = [], [], []
+        start_time, end_time = 0, 0
+        end_idx, word_idx = 0, 0
+        num_phones = 0
+
+        for t in phones_tier._objects:
             s, e, p = t.start_time, t.end_time, t.text
 
             # Trim leading silences
-            if phones == []:
+            if all_phones == [] and word_phones == []:
                 if p in sil_phones:
                     continue
                 else:
@@ -273,21 +304,78 @@ class Preprocessor:
 
             if p not in sil_phones:
                 # For ordinary phones
-                phones.append(p)
+                word_phones.append(p)
+                num_phones += 1
+                if word_end_times[word_idx] == e:
+                    word_idx += 1
+                    all_phones.append(word_phones)
+                    word_phones = []
+
                 end_time = e
-                end_idx = len(phones)
+                end_idx = num_phones
             else:
                 # For silent phones
-                phones.append(p)
+                all_phones.append(p)
+                num_phones += 1
 
-            durations.append(int(np.round(e * self.sampling_rate / self.hop_length)
-                                 - np.round(s * self.sampling_rate / self.hop_length)))
+            durations.append(int(np.round(e * self.sampling_rate / self.hop_length) -
+                                 np.round(s * self.sampling_rate / self.hop_length)))
 
         # Trim tailing silences
-        phones = phones[:end_idx]
+        phones = all_phones[:len(word_end_times)]
         durations = durations[:end_idx]
 
         return phones, durations, start_time, end_time
+
+    def get_phoneme_alignment(self, word_alignments, src_phones, tgt_phones):
+        phone_alignments = {}
+        print("Src phones: ", src_phones)
+        print("Tgt phones: ", tgt_phones)
+        print("Word alignments: ", word_alignments)
+
+        for word_alignment in enumerate(word_alignments):
+            aligned_words = {}
+            i, j = word_alignment[0], word_alignment[1]
+
+            tgt_word_phones = tgt_phones[i]
+            src_word_phones = src_phones[j]
+
+            phone_weight = len(src_word_phones) / len(tgt_word_phones)
+            phone_alignment = []
+            current_src_phone = 0
+            phone_accumulations = 0
+            tgt_phone = 0
+            print("Starting phone weight", phone_weight)
+
+            while tgt_phone < len(tgt_word_phones):
+                if (1-phone_accumulations) > phone_weight:   # Use all of the phone_weight left
+                    phone_accumulations += phone_weight
+                    # Reset
+                    phone_weight = len(src_word_phones) / len(tgt_word_phones)
+                    tgt_phone += 1
+
+                elif phone_weight == (1-phone_accumulations):   # Use all of the phone_weight left
+                    phone_alignment.append(src_word_phones[current_src_phone])
+                    phone_accumulations = 0
+                    current_src_phone += 1
+                    tgt_phone += 1
+                    phone_weight = len(src_word_phones) / len(tgt_word_phones)
+
+                else:   # Phone weight > what's available --> Use part of the phone_weight
+                    phone_alignment.append(src_word_phones[current_src_phone])
+                    current_src_phone += 1
+                    phone_weight = phone_weight - (1 - phone_accumulations)
+                    phone_accumulations = 0
+
+            # aligned_words.append(phone_alignment)
+            # aligned_words['i']
+
+            # phone_alignments.append(aligned_words)
+            phone_alignments['i'] = {'j': {f'{k}': corresponding_tgt_phones for k,corresponding_tgt_phones in phone_alignment}}
+
+        print("Phone alignments: ", phone_alignments)
+        raise Exception("Stop")
+        return phone_alignments
 
     def remove_outlier(self, values):
         values = np.array(values)
@@ -312,7 +400,3 @@ class Preprocessor:
 
         return min_value, max_value
 
-    def align_phones(self):
-
-
-        return

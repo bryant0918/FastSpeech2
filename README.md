@@ -148,6 +148,9 @@ After that, run the preprocessing script by
 ```
 python3 preprocess.py config/LJSpeech/preprocess.yaml
 ```
+```
+python3 preprocess.py config/Bryant/preprocess.yaml
+```
 
 
 ## Training

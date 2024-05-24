@@ -329,12 +329,8 @@ class Preprocessor:
 
     def get_phoneme_alignment(self, word_alignments, src_phones, tgt_phones):
         phone_alignments = {}
-        print("Src phones: ", src_phones)
-        print("Tgt phones: ", tgt_phones)
-        print("Word alignments: ", word_alignments)
 
-        for word_alignment in enumerate(word_alignments):
-            aligned_words = {}
+        for word_alignment in word_alignments:
             i, j = word_alignment[0], word_alignment[1]
 
             tgt_word_phones = tgt_phones[i]
@@ -345,36 +341,36 @@ class Preprocessor:
             current_src_phone = 0
             phone_accumulations = 0
             tgt_phone = 0
-            print("Starting phone weight", phone_weight)
+            the_word = []
 
             while tgt_phone < len(tgt_word_phones):
                 if (1-phone_accumulations) > phone_weight:   # Use all of the phone_weight left
                     phone_accumulations += phone_weight
+                    if current_src_phone not in phone_alignment:
+                        phone_alignment.append(current_src_phone)
                     # Reset
                     phone_weight = len(src_word_phones) / len(tgt_word_phones)
                     tgt_phone += 1
+                    the_word.append(phone_alignment)
+                    phone_alignment = []
 
                 elif phone_weight == (1-phone_accumulations):   # Use all of the phone_weight left
-                    phone_alignment.append(src_word_phones[current_src_phone])
+                    phone_alignment.append(current_src_phone)
                     phone_accumulations = 0
                     current_src_phone += 1
                     tgt_phone += 1
                     phone_weight = len(src_word_phones) / len(tgt_word_phones)
+                    the_word.append(phone_alignment)
+                    phone_alignment = []
 
                 else:   # Phone weight > what's available --> Use part of the phone_weight
-                    phone_alignment.append(src_word_phones[current_src_phone])
+                    phone_alignment.append(current_src_phone)
                     current_src_phone += 1
                     phone_weight = phone_weight - (1 - phone_accumulations)
                     phone_accumulations = 0
 
-            # aligned_words.append(phone_alignment)
-            # aligned_words['i']
+            phone_alignments[i] = {j: {k: corresponding_tgt_phones for k, corresponding_tgt_phones in enumerate(the_word)}}
 
-            # phone_alignments.append(aligned_words)
-            phone_alignments['i'] = {'j': {f'{k}': corresponding_tgt_phones for k,corresponding_tgt_phones in phone_alignment}}
-
-        print("Phone alignments: ", phone_alignments)
-        raise Exception("Stop")
         return phone_alignments
 
     def remove_outlier(self, values):

@@ -165,8 +165,9 @@ if test_word_alignment:
     words = 4
     phoneme_alignment = {i: [] for i in range(words)}
 
-
-
+    pth = "preprocessed_data/Bryant/alignments/phone/Bryant-phone_alignment-LJ001-0002.npy"
+    phone_alignment = np.load(pth, allow_pickle=True)
+    print(phone_alignment)
 
 
 """Test Sentence Aligner"""

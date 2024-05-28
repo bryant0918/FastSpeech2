@@ -39,9 +39,13 @@ class FastSpeech2Pros(nn.Module):
         with open(os.path.join(preprocess_config["path"]["preprocessed_path"], "speakers.json"), "r") as f:
             self.speakers_json = json.load(f)
 
-    def forward(self, speakers, texts, src_lens, max_src_len, speaker_embs, mels=None, mel_lens=None, max_mel_len=None,
-                durations=None, alignments=None, p_targets=None, e_targets=None, d_targets=None, p_control=1.0,
+    def forward(self, speakers, texts, src_lens, max_src_len, mels=None, mel_lens=None, max_mel_len=None,
+                translations=None, translation_lens=None, speaker_embs=None,
+                alignments=None, p_targets=None, e_targets=None, d_targets=None, p_control=1.0,
                 e_control=1.0, d_control=1.0,):
+        # batch = (ids, raw_texts, raw_translations, speakers, texts, src_lens, max_text_lens, mels, mel_lens,
+        #                 max_mel_lens, translations, translation_lens, speaker_embeddings, alignments, pitches, energies,
+        #                 durations)
 
         # Get masks
         src_masks = get_mask_from_lengths(src_lens, max_src_len)
@@ -54,21 +58,17 @@ class FastSpeech2Pros(nn.Module):
         output_with_speaker_embs = output + speaker_embs
         print("output of encoder shape: ", output_with_speaker_embs.shape)
 
-        raise NotImplementedError
-
         # TODO: Prosody Predictor
         prosody_predictor = ProsodyPredictor().to(device)
         prosody_predictor(output + speaker_embs, output)
 
-
-        raise NotImplementedError
         # prosody extractor
         prosody_extractor = ProsodyExtractor(1, 128, 8).to(device)
         e_src = prosody_extractor(mels)   # e is [batch_size, melspec H, melspec W, 128]
         
         # Split phone embeddings by phone
         # [batch_size (list), phoneme_sequence_length (list), melspec H (tensor), melspec W (tensor), 128 (tensor)]
-        split_phones = prosody_extractor.split_phones(e_src, durations)
+        split_phones = prosody_extractor.split_phones(e_src, d_targets)
 
         # TODO: Get alignments
 

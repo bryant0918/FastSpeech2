@@ -24,6 +24,7 @@ else:
 
 print("Device", device)
 
+
 def main(args, configs):
     print("Prepare training ...")
 
@@ -48,9 +49,9 @@ def main(args, configs):
     for batches in loader:
         for batch in batches:
             batch = to_device(batch, device)
-            print("batch", batch[7], batch[8])
-            input = batch[2:]
-            print("input", input[5], input[6])
+            print("batch", batch[8], batch[9])
+            input = batch[3:]
+            print("input", input[6], input[7])
 
             raise NotImplementedError
 
@@ -98,10 +99,10 @@ def main(args, configs):
                 batch = to_device(batch, device)
 
                 # Forward
-                print("batch", batch[7], batch[8])
-                input = batch[2:]
-                print("input", input[5], input[6])
-                output = model(*(batch[2:]))
+                print("batch", batch[8], batch[9])
+                input = batch[3:]
+                print("input", input[6], input[7])
+                output = model(*(batch[3:]))
 
                 # Cal Loss
                 losses = Loss(batch, output)

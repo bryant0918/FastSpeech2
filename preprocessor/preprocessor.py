@@ -173,8 +173,6 @@ class Preprocessor:
         # Get src time alignments
         textgrid = tgt.io.read_textgrid(tg_path)
 
-        # TODO: Must return phones broken up by word somehow
-
         src_phones, duration, start, end = self.get_alignment(textgrid)
 
         # To flatten phones
@@ -188,19 +186,23 @@ class Preprocessor:
             raw_translation = f.readline().strip("\n")
 
         # Clean translation text # TODO: change punctuation based on language and add more cleaners if not already done.
-        translation = raw_translation.translate(str.maketrans('', '', _es_punctuations))
+        # also currently cleaning in ljspeech.py
+        raw_translation = raw_translation.translate(str.maketrans('', '', _es_punctuations))
 
         epi = epitran.Epitran('spa-Latn') # TODO: Change based on language
-        tgt_phones = epi.transliterate(translation)
+        tgt_phones = epi.transliterate(raw_translation)
         tgt_phones = tgt_phones.split()
         tgt_phones = [[char for char in word] for word in tgt_phones]
+
+        # Flatten tgt_phones to save to train.txt, val.txt
+        flat_phones = list(chain.from_iterable(tgt_phones))
+        translation = "{" + " ".join(flat_phones) + "}"
 
         # Open word alignment file
         word_alignments = np.load(word_alignment_path)
 
         # Get src tgt phone alignments
         phone_alignments = self.get_phoneme_alignment(word_alignments, src_phones, tgt_phones)
-
 
         # Read and trim wav files
         wav, _ = librosa.load(wav_path)
@@ -273,14 +275,14 @@ class Preprocessor:
         np.save(os.path.join(self.out_dir, "mel", mel_filename), mel_spectrogram.T)
 
         phone_alignment_filename = "{}-phone_alignment-{}".format(speaker, basename)
-        # np.save(os.path.join(self.out_dir, "alignments", "phone", phone_alignment_filename), phone_alignments)
+        np.save(os.path.join(self.out_dir, "alignments", "phone", phone_alignment_filename), phone_alignments)
 
-        # Saving the dictionary
-        with open(os.path.join(self.out_dir, "alignments", "phone", phone_alignment_filename + '.pkl'), 'wb') as f:
-            pickle.dump(phone_alignments, f)
+        # Saving the dictionary if it's not a flat vector
+        # with open(os.path.join(self.out_dir, "alignments", "phone", phone_alignment_filename + '.pkl'), 'wb') as f:
+        #     pickle.dump(phone_alignments, f)
 
         return (
-            "|".join([basename, speaker, text, raw_text]),
+            "|".join([basename, speaker, text, raw_text, translation, raw_translation]),
             self.remove_outlier(pitch),
             self.remove_outlier(energy),
             mel_spectrogram.shape[1],

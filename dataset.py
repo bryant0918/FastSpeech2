@@ -17,9 +17,9 @@ class DatasetPros(Dataset):
         self.cleaners = preprocess_config["preprocessing"]["text"]["text_cleaners"]
         self.batch_size = train_config["optimizer"]["batch_size"]
 
-        self.basename, self.speaker, self.text, self.raw_text = self.process_meta(
-            filename
-        )
+        self.basename, self.speaker, self.text, self.raw_text, self.translation, self.raw_translation = \
+            self.process_meta(filename)
+
         with open(os.path.join(self.preprocessed_path, "speakers.json")) as f:
             self.speaker_map = json.load(f)
         self.sort = sort
@@ -33,7 +33,11 @@ class DatasetPros(Dataset):
         speaker = self.speaker[idx]
         speaker_id = self.speaker_map[speaker]
         raw_text = self.raw_text[idx]
-        phone = np.array(text_to_sequence(self.text[idx], self.cleaners))
+        raw_translation = self.raw_translation[idx]
+
+        src_phone = np.array(text_to_sequence(self.text[idx], self.cleaners))
+        tgt_phone = np.array(text_to_sequence(self.translation[idx], self.cleaners)) # TODO: Cleaners here?
+
         mel_path = os.path.join(
             self.preprocessed_path,
             "mel",
@@ -59,20 +63,6 @@ class DatasetPros(Dataset):
         )
         duration = np.load(duration_path)
 
-        src_sample = {
-            "id": basename,
-            "speaker": speaker_id,
-            "text": phone,
-            "raw_text": raw_text,
-            "mel": mel,
-            "pitch": pitch,
-            "energy": energy,
-            "duration": duration,
-        }
-
-        # Get aligned translation
-        tgt = ""
-
         # Get Random Speaker Embedding
         speaker_emb_path = os.path.join(self.preprocess_config["path"]["preprocessed_path"], "speaker_emb",
                                         "{}.pkl_emb.pkl".format(speaker))
@@ -81,23 +71,41 @@ class DatasetPros(Dataset):
 
         embedding = torch.from_numpy(emb_dict["default"]).unsqueeze(0).unsqueeze(0).expand(-1, 19, -1)
 
-        return src_sample
+        alignments_path = os.path.join(self.preprocessed_path, "alignments", "phone",
+                                       "{}-phone_alignment-{}.npy".format(speaker, basename))
+        alignments = np.load(alignments_path
+
+        sample = {
+            "id": basename,
+            "speaker": speaker_id,
+            "text": src_phone,
+            "raw_text": raw_text,
+            "mel": mel,
+            "pitch": pitch,
+            "energy": energy,
+            "duration": duration,
+            "translation": tgt_phone,
+            "raw_translation": raw_translation,
+            "speaker_emb": embedding,
+            "alignments": alignments,
+        }
+
+        return sample
 
     def process_meta(self, filename):
-        with open(
-            os.path.join(self.preprocessed_path, filename), "r", encoding="utf-8"
-        ) as f:
-            name = []
-            speaker = []
-            text = []
-            raw_text = []
+        name, speaker, text, raw_text, translation, raw_translation = [], [], [], [], [], []
+        with open(os.path.join(self.preprocessed_path, filename), "r", encoding="utf-8") as f:
+
             for line in f.readlines():
-                n, s, t, r = line.strip("\n").split("|")
+                n, s, t, r, tr, rtr = line.strip("\n").split("|")
                 name.append(n)
                 speaker.append(s)
                 text.append(t)
                 raw_text.append(r)
-            return name, speaker, text, raw_text
+                translation.append(tr)
+                raw_translation.append(rtr)
+
+        return name, speaker, text, raw_text, translation, raw_translation
 
     def reprocess(self, data, idxs):
         ids = [data[idx]["id"] for idx in idxs]
@@ -108,9 +116,14 @@ class DatasetPros(Dataset):
         pitches = [data[idx]["pitch"] for idx in idxs]
         energies = [data[idx]["energy"] for idx in idxs]
         durations = [data[idx]["duration"] for idx in idxs]
+        translations = [data[idx]["translation"] for idx in idxs]
+        raw_translations = [data[idx]["raw_translation"] for idx in idxs]
+        speaker_embeddings = [data[idx]["speaker_emb"] for idx in idxs]
+        alignments = [data[idx]["alignments"] for idx in idxs]
 
         text_lens = np.array([text.shape[0] for text in texts])
         mel_lens = np.array([mel.shape[0] for mel in mels])
+        translation_lens = np.array([translation.shape[0] for translation in translations])
 
         speakers = np.array(speakers)
         texts = pad_1D(texts)
@@ -118,9 +131,12 @@ class DatasetPros(Dataset):
         pitches = pad_1D(pitches)
         energies = pad_1D(energies)
         durations = pad_1D(durations)
+        translations = pad_1D(translations)
+        alignments = pad_1D(alignments)
 
-        return (ids, raw_texts, speakers, texts, text_lens, max(text_lens), mels, mel_lens, max(mel_lens), pitches,
-                energies, durations)
+        return (ids, raw_texts, raw_translations, speakers, texts, text_lens, max(text_lens), mels, mel_lens,
+                max(mel_lens), translations, translation_lens, speaker_embeddings, alignments, pitches, energies,
+                durations)
 
     def collate_fn(self, data):
         data_size = len(data)

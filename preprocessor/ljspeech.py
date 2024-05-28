@@ -7,9 +7,6 @@ from tqdm import tqdm
 
 from text import _clean_text
 
-from soundfile import LibsndfileError
-from audioread.exceptions import NoBackendError
-
 from deep_translator import GoogleTranslator
 from simalign import SentenceAligner
 
@@ -34,9 +31,9 @@ def prepare_align(config):
             text = parts[2]
             text = _clean_text(text, cleaners)
 
-            # TODO: Get cleaners for translation language
+            # TODO: Get cleaners for translation language also currently cleaning in preprocesor.process_utterance
             translation = GoogleTranslator(source='auto', target='es').translate(text)
-            translation = _clean_text(translation, cleaners)
+            # translation = _clean_text(translation, cleaners)
 
             wav_path = os.path.join(in_dir, "wavs", "{}.wav".format(base_name))
             if os.path.exists(wav_path):
@@ -52,10 +49,7 @@ def prepare_align(config):
                     sampling_rate,
                     wav.astype(np.int16),
                 )
-                with open(
-                    os.path.join(out_dir, speaker, "{}_src.lab".format(base_name)),
-                    "w",
-                ) as f1:
+                with open(os.path.join(out_dir, speaker, "{}_src.lab".format(base_name)), "w") as f1:
                     f1.write(text)
 
                 with open(os.path.join(out_dir, speaker, "{}_tgt.lab".format(base_name)), "w") as f1:

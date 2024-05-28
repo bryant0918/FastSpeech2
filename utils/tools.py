@@ -21,11 +21,31 @@ else:
 
 
 def to_device(data, device):
+    if len(data) == 17:
+        (ids, raw_texts, raw_translations, speakers, texts, text_lens, max_text_lens, mels, mel_lens,
+        max_mel_lens, translations, translation_lens, speaker_embeddings, alignments, pitches, energies,
+        durations) = data
+
+        speakers = torch.from_numpy(speakers).long().to(device)
+        texts = torch.from_numpy(texts).long().to(device)
+        src_lens = torch.from_numpy(text_lens).to(device)
+        mels = torch.from_numpy(mels).float().to(device)
+        mel_lens = torch.from_numpy(mel_lens).to(device)
+        translations = torch.from_numpy(translations).long().to(device)
+        translation_lens = torch.from_numpy(translation_lens).to(device)
+        speaker_embeddings = torch.Tensor(speaker_embeddings).to(device)
+        alignments = torch.from_numpy(alignments).float().to(device)
+        pitches = torch.from_numpy(pitches).float().to(device)
+        energies = torch.from_numpy(energies).to(device)
+        durations = torch.from_numpy(durations).long().to(device)
+
+        return (ids, raw_texts, raw_translations, speakers, texts, src_lens, max_text_lens, mels, mel_lens,
+                max_mel_lens, translations, translation_lens, speaker_embeddings, alignments, pitches, energies,
+                durations)
+
     if len(data) == 12:
         (ids, raw_texts, speakers, texts, src_lens, max_src_len, mels, mel_lens, max_mel_len, pitches, energies,
          durations) = data
-
-
 
         speakers = torch.from_numpy(speakers).long().to(device)
         texts = torch.from_numpy(texts).long().to(device)
@@ -113,7 +133,11 @@ def expand(values, durations):
 
 
 def synth_one_sample(targets, predictions, vocoder, model_config, preprocess_config):
+    # batch = (ids, raw_texts, raw_translations, speakers, texts, src_lens, max_text_lens, mels, mel_lens,
+    #                 max_mel_lens, translations, translation_lens, speaker_embeddings, alignments, pitches, energies,
+    #                 durations)
 
+    # TODO: Change these indices to match new batch as above
     basename = targets[0][0]
     src_len = predictions[8][0].item()
     mel_len = predictions[9][0].item()

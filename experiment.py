@@ -29,74 +29,156 @@ preprocess_config = yaml.load(open(preprocess_config, "r"), Loader=yaml.FullLoad
 model_config = yaml.load(open(model_config, "r"), Loader=yaml.FullLoader)
 
 """Test TextGrid"""
-test_textgrid = False
+test_textgrid = True
 if test_textgrid:
     import tgt
     import os
     tg_path = os.path.join("preprocessed_data/Bryant", "TextGrid", "Bryant", "{}.TextGrid".format("LJ001-002"))
     tg_path = "preprocessed_data/Bryant/TextGrid/Bryant/LJ001-0002.TextGrid"
-    # tg_path = "preprocessed_data/LJSpeech2/TextGrid/LJSpeech/LJ001-0004.TextGrid"
+    tg_path = "preprocessed_data/LJSpeech/TextGrid/LJSpeech/LJ032-0007.TextGrid"
+    tg_path = "preprocessed_data/LJSpeech/TextGrid/LJSpeech/LJ036-0179.TextGrid"
+    tg_path = "preprocessed_data/LJSpeech/TextGrid/LJSpeech/LJ030-0041.TextGrid"
 
     # Get src time alignments
     textgrid = tgt.io.read_textgrid(tg_path)
 
+    # phones_tier = textgrid.get_tier_by_name("phones")
+    # words_tier = textgrid.get_tier_by_name("words")
+    #
+    # print(words_tier)
+    # word_end_times = [w.end_time for w in words_tier._objects]
+    # print(word_end_times)
+    #
+    # sil_phones = ["sil", "sp", "spn"]
+    #
+    # all_phones = []
+    # word_phones = []
+    # durations = []
+    # start_time = 0
+    # end_time = 0
+    # end_idx = 0
+    # word_idx = 0
+    # num_phones = 0
+    # for t in phones_tier._objects:
+    #     s, e, p = t.start_time, t.end_time, t.text
+    #
+    #     # Trim leading silences
+    #     if all_phones == [] and word_phones == []:
+    #         if p in sil_phones:
+    #             continue
+    #         else:
+    #             start_time = s
+    #
+    #     if p not in sil_phones:
+    #         # For ordinary phones
+    #         word_phones.append(p)
+    #         num_phones += 1
+    #         if word_end_times[word_idx] == e:
+    #             print(p)
+    #             word_idx += 1
+    #             all_phones.append(word_phones)
+    #             word_phones = []
+    #
+    #         end_time = e
+    #         end_idx = num_phones
+    #     else:
+    #         # For silent phones
+    #         print("SIlent", p)
+    #         all_phones.append(p)
+    #         num_phones += 1
+    #
+    #     durations.append(int(np.round(e * 22050 / 256) - np.round(s * 22050 / 256)))
+    #
+    # # Trim tailing silences
+    # phones = all_phones[:len(word_end_times)]
+    # durations = durations[:end_idx]
+    #
+    # print("Phones: ", phones)
+    # print("Durations: ", durations)
+    #
+    # # To flatten if necessary
+    # from itertools import chain
+    # print(list(chain.from_iterable(phones)))
+
+    # return phones, durations, start_time, end_time
+
     phones_tier = textgrid.get_tier_by_name("phones")
     words_tier = textgrid.get_tier_by_name("words")
-
-    print(words_tier)
     word_end_times = [w.end_time for w in words_tier._objects]
-    print(word_end_times)
 
-    sil_phones = ["sil", "sp", "spn"]
+    sil_phones = ["sil", "sp"]   # Not 'spn'
 
-    all_phones = []
-    word_phones = []
-    durations = []
-    start_time = 0
-    end_time = 0
-    end_idx = 0
-    word_idx = 0
-    num_phones = 0
+    all_phones, word_phones, durations = [], [], []
+    start_time, end_time = 0, 0
+    end_idx, word_idx = 0, 0
+    num_phones, num_words = 0, 0
+
     for t in phones_tier._objects:
         s, e, p = t.start_time, t.end_time, t.text
+        print(p,s,e)
+        print("Word_idx", word_idx, words_tier.intervals[word_idx].text, word_end_times[word_idx], words_tier.intervals[word_idx].end_time)
 
         # Trim leading silences
         if all_phones == [] and word_phones == []:
             if p in sil_phones:
+                print("Continuing")
                 continue
             else:
                 start_time = s
 
         if p not in sil_phones:
+            if p == "spn" and words_tier.intervals[word_idx].text == "<unk>":
+                # For spoken noise
+                word_phones.append(p)
+                num_phones += 1
+            elif p == "spn" and words_tier.intervals[word_idx].text != "<unk>":
+                if not isinstance(all_phones[-1], list):
+                    all_phones[-1] = p
+                else:
+                    all_phones.append(p)
+                num_phones += 1
+                num_words += 1
+
             # For ordinary phones
-            word_phones.append(p)
-            num_phones += 1
+            else:
+                word_phones.append(p)
+                num_phones += 1
+
             if word_end_times[word_idx] == e:
-                print(p)
-                word_idx += 1
                 all_phones.append(word_phones)
                 word_phones = []
+                end_time = e
+                end_idx = num_phones
+                num_words += 1
 
-            end_time = e
-            end_idx = num_phones
-        else:
-            # For silent phones
-            print("SIlent", p)
+                if word_idx == len(words_tier.intervals)-1:  # That was the last word
+                    break
+
+                word_idx += 1
+
+
+        else:  # For silent phones
             all_phones.append(p)
             num_phones += 1
+            num_words += 1
 
+            # ending number of words will not be the same as word index since words_tier excludes silent phones
+            # but we will keep them. I am getting word alignment assuming praat gets all the words. However,
+            # there are <unk> words so I need to append ['spn'] when there is an <unk> word for my alignment.
+            # Maybe I can check my lexicon for a pronounciation as well. I should also account for this in the duration,
+            # pitch and energy as well.
+
+        # durations.append(int(np.round(e * self.sampling_rate / self.hop_length) -
+        #                      np.round(s * self.sampling_rate / self.hop_length)))
         durations.append(int(np.round(e * 22050 / 256) - np.round(s * 22050 / 256)))
 
+    print("Phones: ", all_phones)
+    print(len(all_phones), word_idx, num_words)
     # Trim tailing silences
-    phones = all_phones[:len(word_end_times)]
+    phones = all_phones[:num_words]
     durations = durations[:end_idx]
 
     print("Phones: ", phones)
-    print("Durations: ", durations)
-
-    # To flatten if necessary
-    from itertools import chain
-    print(list(chain.from_iterable(phones)))
 
     # return phones, durations, start_time, end_time
 
@@ -159,7 +241,7 @@ if test_epitran:
     print(phones_by_word)
 
 """Go through word_alignment"""
-test_word_alignment = True
+test_word_alignment = False
 if test_word_alignment:
     word_alignment = np.array([[0, 0], [1, 1], [2, 2], [3, 2], [3, 3]])
     words = 4

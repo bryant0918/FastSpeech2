@@ -72,7 +72,7 @@ class Preprocessor:
         speakers = {}
         for i, speaker in enumerate(tqdm(os.listdir(self.in_dir))):
             speakers[speaker] = i
-            for wav_name in os.listdir(os.path.join(self.in_dir, speaker)):
+            for j, wav_name in enumerate(os.listdir(os.path.join(self.in_dir, speaker))):
                 if ".wav" not in wav_name:
                     continue
 
@@ -182,6 +182,8 @@ class Preprocessor:
             return None
 
         # Read raw translation text
+        if not os.path.exists(translation_path):
+            return None
         with open(translation_path, "r") as f:
             raw_translation = f.readline().strip("\n")
 
@@ -190,12 +192,20 @@ class Preprocessor:
         raw_translation = raw_translation.translate(str.maketrans('', '', _es_punctuations))
 
         epi = epitran.Epitran('spa-Latn') # TODO: Change based on language
+
         tgt_phones = epi.transliterate(raw_translation)
         tgt_phones = tgt_phones.split()
+
+        if len(tgt_phones) != len(raw_translation.split()): # TODO: Figure this out
+            print(f"{basename} Length of raw translation does not equal length of phonemes! ",
+                  raw_translation, tgt_phones, "Continuing...")
+            return None
+
         tgt_phones = [[char for char in word] for word in tgt_phones]
 
         # Flatten tgt_phones to save to train.txt, val.txt
         flat_phones = list(chain.from_iterable(tgt_phones))
+
         translation = "{" + " ".join(flat_phones) + "}"
 
         # Open word alignment file
@@ -211,6 +221,10 @@ class Preprocessor:
         # Read raw text
         with open(text_path, "r") as f:
             raw_text = f.readline().strip("\n")
+        if phone_alignments is IndexError:
+            print(text_path)
+            print("raw text", raw_text)
+            raise IndexError
 
         # Compute fundamental frequency
         pitch, t = pw.dio(
@@ -275,11 +289,10 @@ class Preprocessor:
         np.save(os.path.join(self.out_dir, "mel", mel_filename), mel_spectrogram.T)
 
         phone_alignment_filename = "{}-phone_alignment-{}".format(speaker, basename)
-        np.save(os.path.join(self.out_dir, "alignments", "phone", phone_alignment_filename), phone_alignments)
-
-        # Saving the dictionary if it's not a flat vector
-        # with open(os.path.join(self.out_dir, "alignments", "phone", phone_alignment_filename + '.pkl'), 'wb') as f:
-        #     pickle.dump(phone_alignments, f)
+        # np.save(os.path.join(self.out_dir, "alignments", "phone", phone_alignment_filename), phone_alignments)
+        # Saving the dictionary
+        with open(os.path.join(self.out_dir, "alignments", "phone", phone_alignment_filename + '.pkl'), 'wb') as f:
+            pickle.dump(phone_alignments, f)
 
         return (
             "|".join([basename, speaker, text, raw_text, translation, raw_translation]),
@@ -293,12 +306,12 @@ class Preprocessor:
         words_tier = textgrid.get_tier_by_name("words")
         word_end_times = [w.end_time for w in words_tier._objects]
 
-        sil_phones = ["sil", "sp", "spn"]
+        sil_phones = ["sil", "sp"]  # Not 'spn'
 
         all_phones, word_phones, durations = [], [], []
         start_time, end_time = 0, 0
         end_idx, word_idx = 0, 0
-        num_phones = 0
+        num_phones, num_words = 0, 0
 
         for t in phones_tier._objects:
             s, e, p = t.start_time, t.end_time, t.text
@@ -311,26 +324,43 @@ class Preprocessor:
                     start_time = s
 
             if p not in sil_phones:
+                if p == "spn" and words_tier.intervals[word_idx].text == "<unk>":
+                    # For spoken noise
+                    word_phones.append(p)
+                    num_phones += 1
+                elif p == "spn" and words_tier.intervals[word_idx].text != "<unk>":
+                    all_phones.append(p)
+                    num_phones += 1
+                    num_words += 1
+
                 # For ordinary phones
-                word_phones.append(p)
-                num_phones += 1
+                else:
+                    word_phones.append(p)
+                    num_phones += 1
+
                 if word_end_times[word_idx] == e:
-                    word_idx += 1
                     all_phones.append(word_phones)
                     word_phones = []
+                    end_time = e
+                    end_idx = num_phones
+                    num_words += 1
 
-                end_time = e
-                end_idx = num_phones
-            else:
-                # For silent phones
+                    if word_idx == len(words_tier.intervals) - 1:  # That was the last word
+                        break
+
+                    word_idx += 1
+
+            else:  # For silent phones
                 all_phones.append(p)
                 num_phones += 1
+                num_words += 1
 
             durations.append(int(np.round(e * self.sampling_rate / self.hop_length) -
                                  np.round(s * self.sampling_rate / self.hop_length)))
+            # durations.append(int(np.round(e * 22050 / 256) - np.round(s * 22050 / 256)))
 
         # Trim tailing silences
-        phones = all_phones[:len(word_end_times)]
+        phones = all_phones[:num_words]
         durations = durations[:end_idx]
 
         return phones, durations, start_time, end_time
@@ -338,8 +368,10 @@ class Preprocessor:
     def get_phoneme_alignment(self, word_alignments, src_phones, tgt_phones):
         phone_alignments = {}
 
-        print("src_phones", src_phones)
-        print("cumsums", np.cumsum([len(src_phone) for src_phone in src_phones]))
+        # print("src_phones", src_phones)
+        # print("tgt_phones", tgt_phones)
+        # print("word_alignments", word_alignments)
+        # print("cumsums", np.cumsum([len(src_phone) for src_phone in src_phones]))
         src_phone_cumsums = np.cumsum([len(src_phone) for src_phone in src_phones])
         # print("cumsums", np.cumsum(tgt_phones))
         # To flatten phones
@@ -361,9 +393,18 @@ class Preprocessor:
             else:
                 flat_tgt_phones_idx = len(tgt_phones[j-1])
 
+            try:
+                src_word_phones = src_phones[i]
+                tgt_word_phones = tgt_phones[j]
+            except IndexError:
+                print("src_phones", src_phones)
+                print("tgt_phones", tgt_phones)
+                print("word_alignment", word_alignment)
+                print("Word alignments", word_alignments)
+                print("i, j", i, j)
 
-            tgt_word_phones = tgt_phones[i]
-            src_word_phones = src_phones[j]
+                return IndexError
+
 
             phone_weight = len(src_word_phones) / len(tgt_word_phones)
             phone_alignment, flat_phone_alignment = [], []
@@ -418,8 +459,6 @@ class Preprocessor:
             phone_alignments[i][j] = {k: corresponding_tgt_phones for k, corresponding_tgt_phones in enumerate(the_word)}
 
         # TODO: Get rid of phone_alignments?
-        print(phone_alignments)
-        print("Flat phone alignments: ", flat_phone_alignments)
 
         return flat_phone_alignments
 

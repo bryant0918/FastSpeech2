@@ -73,7 +73,7 @@ class DatasetPros(Dataset):
 
         alignments_path = os.path.join(self.preprocessed_path, "alignments", "phone",
                                        "{}-phone_alignment-{}.npy".format(speaker, basename))
-        alignments = np.load(alignments_path
+        alignments = np.load(alignments_path)
 
         sample = {
             "id": basename,

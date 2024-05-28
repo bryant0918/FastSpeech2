@@ -197,6 +197,8 @@ class Preprocessor:
         tgt_phones = tgt_phones.split()
 
         if len(tgt_phones) != len(raw_translation.split()): # TODO: Figure this out
+            # So far only loses singular 'h' like for middle initial because h is silent in spanish
+            # Can check and insert myself.
             print(f"{basename} Length of raw translation does not equal length of phonemes! ",
                   raw_translation, tgt_phones, "Continuing...")
             return None
@@ -329,7 +331,10 @@ class Preprocessor:
                     word_phones.append(p)
                     num_phones += 1
                 elif p == "spn" and words_tier.intervals[word_idx].text != "<unk>":
-                    all_phones.append(p)
+                    if not isinstance(all_phones[-1], list):
+                        all_phones[-1] = p
+                    else:
+                        all_phones.append(p)
                     num_phones += 1
                     num_words += 1
 

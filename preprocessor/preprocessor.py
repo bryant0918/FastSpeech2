@@ -330,6 +330,29 @@ class Preprocessor:
                     # For spoken noise
                     word_phones.append(p)
                     num_phones += 1
+                    if not isinstance(all_phones[-1], list):
+                        if word_end_times[word_idx] == e:
+                            all_phones[-1] = word_phones
+                            word_phones = []
+                            end_time = e
+                            end_idx = num_phones
+
+                            if word_idx == len(words_tier.intervals) - 1:  # That was the last word
+                                break
+                            word_idx += 1
+                    else:
+                        if word_end_times[word_idx] == e:
+                            all_phones.append(word_phones)
+                            word_phones = []
+                            end_time = e
+                            end_idx = num_phones
+                            num_words += 1
+
+                            if word_idx == len(words_tier.intervals) - 1:  # That was the last word
+                                break
+                            word_idx += 1
+
+
                 elif p == "spn" and words_tier.intervals[word_idx].text != "<unk>":
                     if not isinstance(all_phones[-1], list):
                         all_phones[-1] = p
@@ -343,17 +366,17 @@ class Preprocessor:
                     word_phones.append(p)
                     num_phones += 1
 
-                if word_end_times[word_idx] == e:
-                    all_phones.append(word_phones)
-                    word_phones = []
-                    end_time = e
-                    end_idx = num_phones
-                    num_words += 1
+                    if word_end_times[word_idx] == e:
+                        all_phones.append(word_phones)
+                        word_phones = []
+                        end_time = e
+                        end_idx = num_phones
+                        num_words += 1
 
-                    if word_idx == len(words_tier.intervals) - 1:  # That was the last word
-                        break
+                        if word_idx == len(words_tier.intervals) - 1:  # That was the last word
+                            break
+                        word_idx += 1
 
-                    word_idx += 1
 
             else:  # For silent phones
                 all_phones.append(p)

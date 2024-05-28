@@ -70,11 +70,16 @@ class DatasetPros(Dataset):
             "duration": duration,
         }
 
-
         # Get aligned translation
         tgt = ""
 
         # Get Random Speaker Embedding
+        speaker_emb_path = os.path.join(self.preprocess_config["path"]["preprocessed_path"], "speaker_emb",
+                                        "{}.pkl_emb.pkl".format(speaker))
+        with open(speaker_emb_path, 'rb') as f:
+            emb_dict = pickle.load(f)
+
+        embedding = torch.from_numpy(emb_dict["default"]).unsqueeze(0).unsqueeze(0).expand(-1, 19, -1)
 
         return src_sample
 
@@ -114,20 +119,8 @@ class DatasetPros(Dataset):
         energies = pad_1D(energies)
         durations = pad_1D(durations)
 
-        return (
-            ids,
-            raw_texts,
-            speakers,
-            texts,
-            text_lens,
-            max(text_lens),
-            mels,
-            mel_lens,
-            max(mel_lens),
-            pitches,
-            energies,
-            durations,
-        )
+        return (ids, raw_texts, speakers, texts, text_lens, max(text_lens), mels, mel_lens, max(mel_lens), pitches,
+                energies, durations)
 
     def collate_fn(self, data):
         data_size = len(data)

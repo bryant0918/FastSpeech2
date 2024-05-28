@@ -150,6 +150,7 @@ class Preprocessor:
 
         random.shuffle(out)
         out = [r for r in out if r is not None]
+        print("Length of out: ", len(out), out)
 
         # Write metadata
         with open(os.path.join(self.out_dir, "train.txt"), "w", encoding="utf-8") as f:

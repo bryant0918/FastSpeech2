@@ -98,9 +98,9 @@ We take LJSpeech as an example hereafter.
 ## Preprocessing
  
 ### Prepare Align
-First, we need to take the metadata csv files that contain the fileID, transcription and translation as well as the 
-.wav file of the audio and resave the transcription and translation as a .lab file and copy over the .wav file in order 
-to create the TextGrid files.
+First, we need to take the metadata csv files that contain the fileID, transcription as well as the 
+.wav file of the audio and translate the text to our tgt language to train on (if translation doesn't already exist) and
+resave the transcription and translation as a .lab file and copy over the .wav file in order to create the TextGrid files.
 
 We also perform a word alignment on the transcription and translation and save it separately to be used later.
 
@@ -158,6 +158,9 @@ python3 preprocess.py config/Bryant/preprocess.yaml
 Train your model with
 ```
 python3 train.py -p config/LJSpeech/preprocess.yaml -m config/LJSpeech/model.yaml -t config/LJSpeech/train.yaml
+```
+```
+python3 train.py -p config/Bryant/preprocess.yaml -m config/Bryant/model.yaml -t config/Bryant/train.yaml
 ```
 
 The model takes less than 10k steps (less than 1 hour on my GTX1080Ti GPU) of training to generate audio samples with acceptable quality, which is much more efficient than the autoregressive models such as Tacotron2.

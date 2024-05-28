@@ -23,6 +23,7 @@ class FastSpeech2Pros(nn.Module):
 
     def __init__(self, preprocess_config, model_config):
         super(FastSpeech2Pros, self).__init__()
+
         self.model_config = model_config
         self.preprocess_config = preprocess_config
         self.encoder = Encoder(model_config)
@@ -44,17 +45,23 @@ class FastSpeech2Pros(nn.Module):
 
         # Get masks
         src_masks = get_mask_from_lengths(src_lens, max_src_len)
+        print("mel_lengths", mel_lens)
         mel_masks = (get_mask_from_lengths(mel_lens, max_mel_len) if mel_lens is not None else None)
 
         output = self.encoder(texts, src_masks)
         print("output of encoder shape: ", output.shape)
 
-        output = output + speaker_embs
+        output_with_speaker_embs = output + speaker_embs
+        print("output of encoder shape: ", output_with_speaker_embs.shape)
+
+        raise NotImplementedError
 
         # TODO: Prosody Predictor
         prosody_predictor = ProsodyPredictor().to(device)
+        prosody_predictor(output + speaker_embs, output)
 
 
+        raise NotImplementedError
         # prosody extractor
         prosody_extractor = ProsodyExtractor(1, 128, 8).to(device)
         e_src = prosody_extractor(mels)   # e is [batch_size, melspec H, melspec W, 128]

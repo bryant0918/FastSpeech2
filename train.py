@@ -34,14 +34,26 @@ def main(args, configs):
         "train.txt", preprocess_config, train_config, sort=True, drop_last=True
     )
     batch_size = train_config["optimizer"]["batch_size"]
-    group_size = 4  # Set this larger than 1 to enable sorting in Dataset
-    assert batch_size * group_size < len(dataset)
+    group_size = 1  # Set this larger than 1 (4) to enable sorting in Dataset
+    # assert batch_size * group_size < len(dataset)
     loader = DataLoader(
         dataset,
         batch_size=batch_size * group_size,
         shuffle=True,
         collate_fn=dataset.collate_fn,
     )
+
+    # Debugging dataset
+    print("loader: ", loader)
+    for batches in loader:
+        for batch in batches:
+            batch = to_device(batch, device)
+            print("batch", batch[7], batch[8])
+            input = batch[2:]
+            print("input", input[5], input[6])
+
+            raise NotImplementedError
+
 
     # Prepare model
     model, optimizer = get_model(args, configs, device, train=True)
@@ -78,15 +90,17 @@ def main(args, configs):
     outer_bar.n = args.restore_step
     outer_bar.update()
 
-
     while True:
         inner_bar = tqdm(total=len(loader), desc="Epoch {}".format(epoch), position=1)
-        for batchs in loader:
-            for batch in batchs:
 
+        for batches in loader:
+            for batch in batches:
                 batch = to_device(batch, device)
 
                 # Forward
+                print("batch", batch[7], batch[8])
+                input = batch[2:]
+                print("input", input[5], input[6])
                 output = model(*(batch[2:]))
 
                 # Cal Loss

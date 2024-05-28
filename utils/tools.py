@@ -22,20 +22,10 @@ else:
 
 def to_device(data, device):
     if len(data) == 12:
-        (
-            ids,
-            raw_texts,
-            speakers,
-            texts,
-            src_lens,
-            max_src_len,
-            mels,
-            mel_lens,
-            max_mel_len,
-            pitches,
-            energies,
-            durations,
-        ) = data
+        (ids, raw_texts, speakers, texts, src_lens, max_src_len, mels, mel_lens, max_mel_len, pitches, energies,
+         durations) = data
+
+
 
         speakers = torch.from_numpy(speakers).long().to(device)
         texts = torch.from_numpy(texts).long().to(device)
@@ -45,6 +35,9 @@ def to_device(data, device):
         pitches = torch.from_numpy(pitches).float().to(device)
         energies = torch.from_numpy(energies).to(device)
         durations = torch.from_numpy(durations).long().to(device)
+
+        print("mels_lens", mel_lens, max_mel_len)
+        # speakers, texts, src_lens, max_src_len, speaker_embs, mels = None, mel_lens = None, max_mel_len = None,
 
         return (ids, raw_texts, speakers, texts, src_lens, max_src_len, mels, mel_lens, max_mel_len, pitches, energies,
                 durations)
@@ -101,6 +94,7 @@ def log(
 
 
 def get_mask_from_lengths(lengths, max_len=None):
+    print("Lengths,", lengths)
     batch_size = lengths.shape[0]
     if max_len is None:
         max_len = torch.max(lengths).item()

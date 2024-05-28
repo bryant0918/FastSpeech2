@@ -258,7 +258,6 @@ class ProsodyPredictor(nn.Module):
     def __init__(self, dim_in, dim_out, n_components, hidden_dim):
         super(ProsodyPredictor, self).__init__()
         self.num_sigma_channels = dim_out * n_components
-        num_weights_channels = n_components
 
         self.dim_in = dim_in
         self.dim_out = dim_out

@@ -29,7 +29,7 @@ preprocess_config = yaml.load(open(preprocess_config, "r"), Loader=yaml.FullLoad
 model_config = yaml.load(open(model_config, "r"), Loader=yaml.FullLoader)
 
 """Test TextGrid"""
-test_textgrid = True
+test_textgrid = False
 if test_textgrid:
     import tgt
     import os
@@ -283,7 +283,7 @@ if test_word_alignment:
 
 
 """Test Sentence Aligner"""
-test_aligner = False
+test_aligner = True
 if test_aligner:
     from simalign import SentenceAligner
     # making an instance of our model.
@@ -309,6 +309,16 @@ if test_aligner:
 
     for matching_method in alignments:
         print(matching_method, ":", alignments[matching_method])
+
+    src = "motorcycles. -- dallas police motorcycles preceded the pilot car."
+    tgt = "motocicletas. -- las motocicletas de la policia de dallas precedieron al coche del piloto."
+
+    alignments = myaligner.get_word_aligns(src.split(), tgt.split())
+    print("Src.split(): ", src.split())
+    print("Tgt.split(): ", tgt.split())
+    print(alignments)
+
+
 
 """Get different speaker embedding"""
 test_embedding = False

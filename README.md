@@ -108,6 +108,9 @@ run
 ```
 python3 prepare_align.py config/LJSpeech/preprocess.yaml
 ```
+```
+nohup python3 prepare_align.py config/LJSpeech/preprocess.yaml &
+```
 
 ### Get the TextGrid Files
 As described in the paper, [Montreal Forced Aligner](https://montreal-forced-aligner.readthedocs.io/en/latest/) (MFA) is used to obtain the alignments between the utterances and the phoneme sequences.
@@ -150,6 +153,9 @@ python3 preprocess.py config/LJSpeech/preprocess.yaml
 ```
 ```
 python3 preprocess.py config/Bryant/preprocess.yaml
+```
+```
+nohup python3 preprocess.py config/LJSpeech/preprocess.yaml &
 ```
 
 

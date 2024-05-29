@@ -14,7 +14,6 @@ import epitran
 from itertools import chain
 
 from text.ipadict import db
-from text import _es_punctuations
 import audio as Audio
 
 
@@ -187,10 +186,6 @@ class Preprocessor:
         with open(translation_path, "r") as f:
             raw_translation = f.readline().strip("\n")
 
-        # Clean translation text # TODO: change punctuation based on language and add more cleaners if not already done.
-        # also currently cleaning in ljspeech.py
-        raw_translation = raw_translation.translate(str.maketrans('', '', _es_punctuations))
-
         epi = epitran.Epitran('spa-Latn') # TODO: Change based on language
 
         tgt_phones = epi.transliterate(raw_translation)
@@ -226,6 +221,8 @@ class Preprocessor:
         if phone_alignments is IndexError:
             print(text_path)
             print("raw text", raw_text)
+            print("raw translation", raw_translation)  #righthere onnmotorcycle
+            print(epi.transliterate(raw_translation).split())
             raise IndexError
 
         # Compute fundamental frequency

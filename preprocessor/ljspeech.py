@@ -29,7 +29,7 @@ def prepare_align(config):
             parts = line.strip().split("|")
             base_name = parts[0]
             text = parts[2]
-            text = _clean_text(text, cleaners)
+            text = _clean_text(text, cleaners)  # TODO: This doesn't remove punctuations
 
             # TODO: Get cleaners for translation language also currently cleaning in preprocesor.process_utterance
             translation = GoogleTranslator(source='auto', target='es').translate(text)

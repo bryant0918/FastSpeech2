@@ -41,6 +41,13 @@ _abbreviations = [(re.compile('\\b%s\\.' % x[0], re.IGNORECASE), x[1]) for x in 
     ('ft', 'fort'),
 ]]
 
+# Punctuation to remove:
+_punc = "¡!\"#$%&'()*+,-./:;<=>¿?@[\]^_`{|}~"
+
+
+def remove_punctuation(text):
+    return text.translate(str.maketrans('', '', _punc))
+
 
 def expand_abbreviations(text):
     for regex, replacement in _abbreviations:
@@ -86,4 +93,5 @@ def english_cleaners(text):
     text = expand_numbers(text)
     text = expand_abbreviations(text)
     text = collapse_whitespace(text)
+    text = remove_punctuation(text)
     return text

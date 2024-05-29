@@ -156,6 +156,7 @@ python3 preprocess.py config/Bryant/preprocess.yaml
 ```
 ```
 nohup python3 preprocess.py config/LJSpeech/preprocess.yaml &
+ps -ef | grep 2040278
 ```
 
 

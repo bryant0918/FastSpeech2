@@ -28,6 +28,82 @@ model_config = "config/LJSpeech/model.yaml"
 preprocess_config = yaml.load(open(preprocess_config, "r"), Loader=yaml.FullLoader)
 model_config = yaml.load(open(model_config, "r"), Loader=yaml.FullLoader)
 
+
+"""Test phoneme realignment"""
+# Switch phone embeddings order to match target language through alignment model
+# aligned_split_phones = split_phones * alignments
+phone_realignment = False
+if phone_realignment:
+    import epitran
+    phone_alignment_path = "preprocessed_data/LJSpeech/alignments/phone/LJSpeech-phone_alignment-LJ001-0048.pkl"
+    src_text_path = "raw_data/LJSpeech/LJSpeech/LJ001-0048_src.lab"
+    tgt_text_path = "raw_data/LJSpeech/LJSpeech/LJ001-0048_tgt.lab"
+    mel_path = "preprocessed_data/LJSpeech/mel/LJSpeech-mel-LJ001-0048.npy"
+    durations_path = "preprocessed_data/LJSpeech/duration/LJSpeech-duration-LJ001-0048.npy"
+
+    src_phones = "{HH IH1 Z L EH1 T ER0 IH0 Z AE1 D M ER0 AH0 B L IY0 K L IH1 R AE1 N D R EH1 G Y AH0 L ER0 sp B AH1 T " \
+                 "sp AE1 T L IY1 S T EH1 Z B Y UW1 T AH0 F AH0 L AE1 Z EH1 N IY0 AH1 DH ER0 R OW1 M AH0 N T AY1 P}"
+
+    with open(phone_alignment_path, 'rb') as f:
+        phone_alignments = pickle.load(f)
+
+    with open(src_text_path, 'r') as f:
+        src_text = f.read()
+
+    with open(tgt_text_path, 'r') as f:
+        tgt_text = f.read()
+
+    epi = epitran.Epitran('spa-Latn')  # TODO: Change based on language
+
+    tgt_phones = epi.transliterate(tgt_text)
+    tgt_phones = tgt_phones.split()
+
+    d_targets = torch.from_numpy(np.load(durations_path)).unsqueeze(0).to(device)
+    print("duration shape: ", d_targets.size())
+
+    get_split_phones = False
+    if get_split_phones:
+
+        mels = torch.from_numpy(np.load(mel_path)).unsqueeze(0).unsqueeze(0).to(device)
+        print("Mel shape: ", mels.size())
+
+        # print("mel_lengths", mel_lens)
+        # mel_masks = (get_mask_from_lengths(mel_lens, max_mel_len) if mel_lens is not None else None)
+
+        # prosody extractor
+        prosody_extractor = ProsodyExtractor(1, 128, 8).to(device)
+        e_src = prosody_extractor(mels)  # e is [batch_size, melspec H, melspec W, 128]
+
+        print("e_src shape: ", e_src.size())
+        # Split phone embeddings by phone
+        # [batch_size (list), phoneme_sequence_length (list), melspec H (tensor), melspec W (tensor), 128 (tensor)]
+        split_phones = prosody_extractor.split_phones(e_src, d_targets, 'mps')
+
+        print("split_phones", len(split_phones))
+        torch.save(split_phones, "preprocessed_data/Bryant/split_phones.pt")
+
+    else:
+        split_phones = torch.load("preprocessed_data/Bryant/split_phones.pt")
+
+    print(type(split_phones), len(split_phones))
+    print(type(split_phones[0]), [len(phone) for phone in split_phones])
+    print([split_phones[0][i].size() for i in range(len(split_phones[0]))])
+    print("d_targets", d_targets)
+    print()
+
+    # Get prosody prediction
+    prosody_predictor = ProsodyPredictor(256, 128, 4, 8).to(device)
+    h_si = torch.rand([1, 19, 256], device=device)
+    h_sd = torch.rand([1,19,256], device=device)
+
+    e = model(h_sd, h_si)
+
+
+    print(len(phone_alignments), phone_alignments)
+    print()
+
+
+
 """Test TextGrid"""
 test_textgrid = False
 if test_textgrid:
@@ -283,7 +359,7 @@ if test_word_alignment:
 
 
 """Test Sentence Aligner"""
-test_aligner = True
+test_aligner = False
 if test_aligner:
     from simalign import SentenceAligner
     # making an instance of our model.
@@ -317,7 +393,6 @@ if test_aligner:
     print("Src.split(): ", src.split())
     print("Tgt.split(): ", tgt.split())
     print(alignments)
-
 
 
 """Get different speaker embedding"""
@@ -412,32 +487,32 @@ if test_extractor:
     print(total_len)
 
 """Test Prosody Predictor"""
-test_predictor = False
+test_predictor = True
 if test_predictor:
-    model = FastSpeech2Pros(preprocess_config, model_config).to(device)
-
-    text = "Hello, how are you doing today?"
-    texts = np.array([preprocess_english(text, preprocess_config)])
-
-    print("Texts shape: ", texts.shape)
-
-    ids = raw_texts = [text[:100]]
-    speakers = np.array([0])
-    text_lens = np.array([len(texts[0])])
-
-    speakers = torch.from_numpy(speakers).long().to(device)
-    texts = torch.from_numpy(texts).long().to(device)
-    src_lens = torch.from_numpy(text_lens).to(device)
-
-    max_src_lens = max(text_lens)
-    print(max_src_lens)
-
-    batch = (speakers, texts, src_lens, max_src_lens)
-
-    with torch.no_grad():
-        # Forward
-        output = model(*batch)[0]
-        print("Output shape: ", output.size())
+    # model = FastSpeech2Pros(preprocess_config, model_config).to(device)
+    #
+    # text = "Hello, how are you doing today?"
+    # texts = np.array([preprocess_english(text, preprocess_config)])
+    #
+    # print("Texts shape: ", texts.shape)
+    #
+    # ids = raw_texts = [text[:100]]
+    # speakers = np.array([0])
+    # text_lens = np.array([len(texts[0])])
+    #
+    # speakers = torch.from_numpy(speakers).long().to(device)
+    # texts = torch.from_numpy(texts).long().to(device)
+    # src_lens = torch.from_numpy(text_lens).to(device)
+    #
+    # max_src_lens = max(text_lens)
+    # print(max_src_lens)
+    #
+    # batch = (speakers, texts, src_lens, max_src_lens)
+    #
+    # with torch.no_grad():
+    #     # Forward
+    #     output = model(*batch)[0]
+    #     print("Output shape: ", output.size())
 
     h_si = torch.rand([1, 19, 256], device=device)
     print("h_si shape: ", h_si.size())
@@ -463,7 +538,7 @@ if test_predictor:
     print("h_sd shape: ", h_sd.size())
 
     # Create the model
-    model = ProsodyPredictor(256, 1, 4, 8).to(device)
+    model = ProsodyPredictor(256, 128, 4, 8).to(device)
     # Print the model summary
     print(model)
 
@@ -473,3 +548,9 @@ if test_predictor:
     print("pi shape: ", pi.size())
     print("mu shape: ", mu.size())
     print("sigma shape: ", sigma.size())
+
+    sample = model.sample2(h_sd, h_si)
+    print("Sample shape: ", sample.size())
+
+    # sample = model.sample(h_sd, h_si)
+    # print("Sample shape: ", sample.size())

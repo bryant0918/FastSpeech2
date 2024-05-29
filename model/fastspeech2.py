@@ -61,8 +61,8 @@ class FastSpeech2Pros(nn.Module):
         # TODO: Prosody Predictor
         h_sd = output + speaker_embs
         h_si = output
-        prosody_predictor = ProsodyPredictor().to(device)
-        prosody_predictor(h_sd, h_si, prev_e)
+        prosody_predictor = ProsodyPredictor(256, 128, 4, 8).to(device)
+        pi, mu, sigma = prosody_predictor(h_sd, h_si, prev_e)
 
         # prosody extractor
         prosody_extractor = ProsodyExtractor(1, 128, 8).to(device)

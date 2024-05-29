@@ -43,8 +43,8 @@ class Encoder(nn.Module):
         n_layers = config["transformer"]["encoder_layer"]
         n_head = config["transformer"]["encoder_head"]
         d_k = d_v = (
-            config["transformer"]["encoder_hidden"]
-            // config["transformer"]["encoder_head"]
+                config["transformer"]["encoder_hidden"]
+                // config["transformer"]["encoder_head"]
         )
         d_model = config["transformer"]["encoder_hidden"]
         d_inner = config["transformer"]["conv_filter_size"]
@@ -73,7 +73,6 @@ class Encoder(nn.Module):
 
     def forward(self, src_seq, mask, return_attns=False):
 
-
         enc_slf_attn_list = []
         batch_size, max_len = src_seq.shape[0], src_seq.shape[1]
 
@@ -90,8 +89,8 @@ class Encoder(nn.Module):
 
         else:
             enc_output = self.src_word_emb(src_seq) + self.position_enc[
-                :, :max_len, :
-            ].expand(batch_size, -1, -1)
+                                                      :, :max_len, :
+                                                      ].expand(batch_size, -1, -1)
 
         for enc_layer in self.layer_stack:
 
@@ -116,8 +115,8 @@ class Decoder(nn.Module):
         n_layers = config["transformer"]["decoder_layer"]
         n_head = config["transformer"]["decoder_head"]
         d_k = d_v = (
-            config["transformer"]["decoder_hidden"]
-            // config["transformer"]["decoder_head"]
+                config["transformer"]["decoder_hidden"]
+                // config["transformer"]["decoder_head"]
         )
         d_model = config["transformer"]["decoder_hidden"]
         d_inner = config["transformer"]["conv_filter_size"]
@@ -161,8 +160,8 @@ class Decoder(nn.Module):
             # -- Prepare masks
             slf_attn_mask = mask.unsqueeze(1).expand(-1, max_len, -1)
             dec_output = enc_seq[:, :max_len, :] + self.position_enc[
-                :, :max_len, :
-            ].expand(batch_size, -1, -1)
+                                                   :, :max_len, :
+                                                   ].expand(batch_size, -1, -1)
             mask = mask[:, :max_len]
             slf_attn_mask = slf_attn_mask[:, :, :max_len]
 
@@ -190,10 +189,13 @@ class ProsodyExtractor(nn.Module):
             nn.Flatten(start_dim=2),
         )
         # Bi-GRU layer
-        self.gru = nn.GRU(input_size=hidden_dim, hidden_size=dim_out//2, num_layers=1, bidirectional=True, batch_first=True)
+        self.gru = nn.GRU(input_size=hidden_dim, hidden_size=dim_out // 2, num_layers=1, bidirectional=True,
+                          batch_first=True)
 
     def forward(self, x):
         """"
+        Input:
+            x: mels
         Returns
         -------
         prosody_embedding e
@@ -205,32 +207,25 @@ class ProsodyExtractor(nn.Module):
         print("x.size:", x.size())
 
         # Apply Bi-GRU layer
-        x, _ = self.gru(x)   # [batch_size, melspec H * melspec W, 128]
+        x, _ = self.gru(x)  # [batch_size, melspec H * melspec W, 128]
 
         # TODO: Don't hardcode 80 here, use n_mel_channels from preprocess_config
-        return x.view(x.size()[0], 80, -1, x.size()[-1])   # [batch_size, melspec H, melspec W, 128]
+        return x.view(x.size()[0], 80, -1, x.size()[-1])  # [batch_size, melspec H, melspec W, 128]
 
-    def split_phones(self, x, durations):
+    def split_phones(self, x, durations, device='cuda'):
         """
         Split the phone embeddings by phone
         Input:
-            x: Torch.tensor - [batch_size, melspec H, melspec W, 128]
+            x: e, Torch.tensor - [batch_size, melspec H, melspec W, 128]
             durations: List - [batch_size, duration_sequence_length]
 
         Output:
-            List of phone embeddings - [batch_size,
+            List of phone embedding chunks - [batch_size, phoneme_sequence_length, melspec H, melspec W, 128]
         """
 
-        # Figure out how to split a batch
-        # phone_emb_chunks = []
-        # start_frame = 0
-        # for i in range(len(duration)):
-        #     phone_emb_chunks.append(e[:, :, start_frame:start_frame + duration[i]])
-        #     start_frame += duration[i]
-        #
-        # return phone_emb_chunks
-
-        zeros = torch.zeros((durations.shape[0], 1), dtype=torch.int)
+        zeros = torch.zeros((durations.shape[0], 1), dtype=torch.int).to(device)
+        print("zeros.size:", zeros.size())
+        print("durations.size:", durations.size())
 
         concated = torch.cat([zeros, durations], dim=1)
         cumulative_durations = torch.cumsum(concated, dim=1)
@@ -266,8 +261,9 @@ class ProsodyPredictor(nn.Module):
         # GRU layer (SD)
         self.gru = nn.GRU(input_size=8, hidden_size=512, num_layers=1, bidirectional=False, batch_first=True)
         # Linear layer to output nonlinear transformation parameters
-        self.normal_linear = nn.Linear(512, self.dim_out * self.n_components * 5)
+        self.normal_linear = nn.Linear(512, self.dim_out * self.n_components * 4 + self.n_components)
 
+        # CNN Block (SD)
         self.conv1 = nn.Conv1d(in_channels=dim_in, out_channels=8, kernel_size=3, padding=1)
         self.relu = nn.ReLU()
         self.layernorm = nn.LayerNorm(8)
@@ -284,7 +280,7 @@ class ProsodyPredictor(nn.Module):
 
     def forward(self, h_sd, h_si, prev_e=None, eps=1e-6):
         # First predict the Speaker Independent means and log-variances
-        h_si, _ = self.BiGru(h_si)   # Should we concat h_si and h_n?
+        h_si, _ = self.BiGru(h_si)  # Should we concat h_si and h_n?
         print("h_si.size:", h_si.size())
         h_si = self.normal_linear2(h_si)
 
@@ -293,7 +289,6 @@ class ProsodyPredictor(nn.Module):
         v = h_si[..., self.dim_out * self.n_components:]
 
         # Run Speaker Dependent features through the base network
-        print("h_sd.size:", h_sd.size())
         # Permute the input tensor batch, sentence_length, embedding_dim = 20, 19, 10
         h_sd = h_sd.permute(0, 2, 1)  # Changes shape to (Batch_size, 256, Sequence_length) for conv layer
         h_sd = self.relu(self.conv1(h_sd))
@@ -311,26 +306,29 @@ class ProsodyPredictor(nn.Module):
         h_sd = self.normal_linear(h_sd)
 
         # Separate Transformation Parameters
-        alphas = h_sd[..., :self.dim_out * self.n_components]
-        a = h_sd[..., self.dim_out * self.n_components:self.dim_out * self.n_components * 2]
-        b = h_sd[..., self.dim_out * self.n_components * 2:self.dim_out * self.n_components * 3]
-        c = h_sd[..., self.dim_out * self.n_components * 3:self.dim_out * self.n_components * 4]
-        d = h_sd[..., self.dim_out * self.n_components * 4:]
+        alphas = h_sd[..., :self.n_components]
+        a = h_sd[..., self.n_components:self.dim_out * self.n_components + self.n_components]
+        b = h_sd[..., self.dim_out * self.n_components + self.n_components:
+                      2 * self.dim_out * self.n_components + self.n_components]
+        c = h_sd[..., 2 * self.dim_out * self.n_components + self.n_components:
+                      3 * self.dim_out * self.n_components + self.n_components]
+        d = h_sd[..., 3 * self.dim_out * self.n_components + self.n_components:]
 
         # Perform non-Linear Transformation
         mu = self.linear2(torch.tanh(torch.multiply(a, mu) + b))
         v = self.linear3(torch.tanh(torch.multiply(c, v) + d))
 
-        # This puts batch_size in the last dimension
-        # mu = mu.reshape(-1, self.n_components, self.dim_out)
-        # sigma = v.reshape(-1, self.n_components, self.dim_out)
-
         # Add Noise (Don't know if necessary, can set eps=0)
         sigma = torch.exp(v + eps)
 
-        log_pi = torch.log_softmax(alphas, dim=-1)
+        print("alphas", alphas.size())
+        log_pi = torch.log_softmax(alphas, dim=-1) # [batch_size, text_sequence_length, n_components]
 
-        return log_pi, mu, sigma   # each is [batch_size, text_sequence_length, n_components]
+        # Separate
+        mu = mu.reshape(mu.size()[0], -1, self.n_components, self.dim_out)
+        sigma = sigma.reshape(sigma.size()[0], -1, self.n_components, self.dim_out)
+
+        return log_pi, mu, sigma  # mu,sigma is [batch_size, text_sequence_length, n_components*dim_out]
 
     def phone_loss(self, x, y):
         """
@@ -348,15 +346,38 @@ class ProsodyPredictor(nn.Module):
                 - torch.sum(torch.log(sigma), dim=-1)
         )
         loglik = torch.logsumexp(log_pi + normal_loglik, dim=-1)
-        return -loglik    # Sum over all phones for total loss (L_pp)
+        return -loglik  # Sum over all phones for total loss (L_pp)
 
-    def sample(self, x):
-        log_pi, mu, sigma = self.forward(x)
+    def sample(self, h_sd, h_si, prev_e=None):
+        log_pi, mu, sigma = self.forward(h_sd, h_si, prev_e)
         cum_pi = torch.cumsum(torch.exp(log_pi), dim=-1)
-        rvs = torch.rand(len(x), 1).to(x)
+        rvs = torch.rand(len(h_sd), 1).to(h_sd) # Not working
+
         rand_pi = torch.searchsorted(cum_pi, rvs)
         rand_normal = torch.randn_like(mu) * sigma + mu
         samples = torch.take_along_dim(rand_normal, indices=rand_pi.unsqueeze(-1), dim=1).squeeze(dim=1)
+        return samples
+
+    def sample2(self, h_sd, h_si):
+        log_pi, mu, sigma = self.forward(h_sd, h_si)
+
+        # Convert log_pi to probabilities
+        pi = torch.exp(log_pi)
+
+        # # Sample a component index for each item in the batch and sequence
+        batch_size, seq_len, n_components, dim_out = mu.size()
+
+        components = torch.multinomial(pi.view(-1, n_components), 1)
+        components = components.view(batch_size, seq_len)
+
+        # # Gather the corresponding means and variances
+        selected_mu = torch.gather(mu, 2, components.unsqueeze(-1).unsqueeze(-1).expand(-1, -1, -1, dim_out)).squeeze(2)
+        selected_sigma = torch.gather(sigma, 2, components.unsqueeze(-1).unsqueeze(-1).expand(-1, -1, -1, dim_out)).squeeze(2)
+
+        # # Sample from the selected Gaussian components
+        normal_samples = torch.randn_like(selected_mu)
+        samples = selected_mu + selected_sigma * normal_samples
+
         return samples
 
 
@@ -372,7 +393,7 @@ class BaseProsodyPredictor(nn.Module):
 
         self.gru = nn.GRU(input_size=8, hidden_size=512, num_layers=1, bidirectional=False, batch_first=True)
         # Linear layer to output speaker independent means and log-variances
-        self.normal_linear = nn.Linear(512, dim_out*n_components+self.num_sigma_channels + num_weights_channels)
+        self.normal_linear = nn.Linear(512, dim_out * n_components + self.num_sigma_channels + num_weights_channels)
 
         self.conv1 = nn.Conv1d(in_channels=dim_in, out_channels=8, kernel_size=3, padding=1)
         self.relu = nn.ReLU()
@@ -400,8 +421,8 @@ class BaseProsodyPredictor(nn.Module):
         x = self.normal_linear(x)
 
         mu = x[..., :self.dim_out * self.n_components]
-        sigma = x[..., self.dim_out * self.n_components:self.dim_out*self.n_components+self.num_sigma_channels]
-        pi = x[..., self.dim_out*self.n_components+self.num_sigma_channels:]
+        sigma = x[..., self.dim_out * self.n_components:self.dim_out * self.n_components + self.num_sigma_channels]
+        pi = x[..., self.dim_out * self.n_components + self.num_sigma_channels:]
 
         # This puts batch_size in the last dimension
         # mu = mu.reshape(-1, self.n_components, self.dim_out)
@@ -422,7 +443,7 @@ class BaseProsodyPredictor(nn.Module):
                 - torch.sum(torch.log(sigma), dim=-1)
         )
         loglik = torch.logsumexp(log_pi + normal_loglik, dim=-1)
-        return -loglik    # Sum over all phones for total loss (L_pp)
+        return -loglik  # Sum over all phones for total loss (L_pp)
 
     def sample(self, x):
         log_pi, mu, sigma = self.forward(x)
@@ -460,9 +481,7 @@ if __name__ == "__main__":
           type(split[0]), type(split[0][0]), split[0][0].size(), split[0][1].size(), type(split[0][0][0]))
 
     # split0 = torch.tensor(split[0])
-
     # Split is [batch_size, phoneme_sequence_length, melspec H, melspec W, 128]
-
     # print("Split phone embeddings: ", split0.size())
 
     pass

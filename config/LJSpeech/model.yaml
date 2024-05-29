@@ -20,6 +20,17 @@ variance_embedding:
   energy_quantization: "linear" # support 'linear' or 'log', 'log' is allowed only if the energy values are not normalized during preprocessing
   n_bins: 256
 
+prosody_extractor:
+  dim_in: 1
+  dim_out: 256
+  hidden_dim: 8
+
+prosody_predictor:
+  dim_in: 256
+  dim_out: 256
+  n_components: 8
+  hidden_dim: 8
+
 # gst:
 #   use_gst: False
 #   conv_filters: [32, 32, 64, 64, 128, 128]

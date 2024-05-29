@@ -183,7 +183,7 @@ class Decoder(nn.Module):
 
 
 class ProsodyExtractor(nn.Module):
-    def __init__(self, dim_in=1, dim_out=128, hidden_dim=8):
+    def __init__(self, dim_in=1, dim_out=128, hidden_dim=8):   # TODO: intialize with config
         super(ProsodyExtractor, self).__init__()
 
         self.cnn = nn.Sequential(
@@ -257,7 +257,7 @@ class ProsodyExtractor(nn.Module):
 
 
 class ProsodyPredictor(nn.Module):
-    def __init__(self, dim_in, dim_out, n_components, hidden_dim):
+    def __init__(self, dim_in, dim_out=256, n_components=8, hidden_dim=8):   # TODO: intialize with config
         super(ProsodyPredictor, self).__init__()
         self.num_sigma_channels = dim_out * n_components
 
@@ -266,16 +266,16 @@ class ProsodyPredictor(nn.Module):
         self.n_components = n_components
 
         # GRU layer (SD)
-        self.gru = nn.GRU(input_size=8, hidden_size=512, num_layers=1, bidirectional=False, batch_first=True)
+        self.gru = nn.GRU(input_size=hidden_dim, hidden_size=512, num_layers=1, bidirectional=False, batch_first=True)
         # Linear layer to output nonlinear transformation parameters
         self.normal_linear = nn.Linear(512, self.dim_out * self.n_components * 4 + self.n_components)
 
         # CNN Block (SD)
-        self.conv1 = nn.Conv1d(in_channels=dim_in, out_channels=8, kernel_size=3, padding=1)
+        self.conv1 = nn.Conv1d(in_channels=dim_in, out_channels=hidden_dim, kernel_size=3, padding=1)
         self.relu = nn.ReLU()
-        self.layernorm = nn.LayerNorm(8)
+        self.layernorm = nn.LayerNorm(hidden_dim)
         self.dropout = nn.Dropout(0.1)
-        self.conv2 = nn.Conv1d(in_channels=8, out_channels=8, kernel_size=3, padding=1)
+        self.conv2 = nn.Conv1d(in_channels=hidden_dim, out_channels=hidden_dim, kernel_size=3, padding=1)
 
         # Bi-GRU layer (SI)
         self.BiGru = nn.GRU(input_size=256, hidden_size=32, num_layers=1, bidirectional=True, batch_first=True)

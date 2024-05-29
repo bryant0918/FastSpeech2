@@ -58,7 +58,7 @@ class FastSpeech2Pros(nn.Module):
         print("output of encoder shape: ", h_sd.shape)
 
         h_si = output
-        prosody_predictor = ProsodyPredictor(256, 128, 4, 8).to(device)
+        prosody_predictor = ProsodyPredictor(256, 256, 4, 8).to(device)
         e_tgt = prosody_predictor(h_sd, h_si, prev_e)
 
         # prosody extractor

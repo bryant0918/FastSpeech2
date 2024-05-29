@@ -7,6 +7,13 @@ import transformer.Constants as Constants
 from .Layers import FFTBlock
 from text.symbols import symbols
 
+if torch.cuda.is_available():
+    device = torch.device("cuda")
+elif torch.backends.mps.is_available():
+    device = torch.device("mps")
+else:
+    device = torch.device("cpu")
+
 
 def get_sinusoid_encoding_table(n_position, d_hid, padding_idx=None):
     """ Sinusoid position encoding table """
@@ -281,7 +288,6 @@ class ProsodyPredictor(nn.Module):
     def forward(self, h_sd, h_si, prev_e=None, eps=1e-6):
         # First predict the Speaker Independent means and log-variances
         h_si, _ = self.BiGru(h_si)  # Should we concat h_si and h_n?
-        print("h_si.size:", h_si.size())
         h_si = self.normal_linear2(h_si)
 
         # Separate mus and log-variances
@@ -321,14 +327,13 @@ class ProsodyPredictor(nn.Module):
         # Add Noise (Don't know if necessary, can set eps=0)
         sigma = torch.exp(v + eps)
 
-        print("alphas", alphas.size())
         log_pi = torch.log_softmax(alphas, dim=-1) # [batch_size, text_sequence_length, n_components]
 
         # Separate
         mu = mu.reshape(mu.size()[0], -1, self.n_components, self.dim_out)
         sigma = sigma.reshape(sigma.size()[0], -1, self.n_components, self.dim_out)
 
-        return log_pi, mu, sigma  # mu,sigma is [batch_size, text_sequence_length, n_components*dim_out]
+        return log_pi, mu, sigma  # mu,sigma is [batch_size, text_sequence_length, n_components, dim_out]
 
     def phone_loss(self, x, y):
         """
@@ -358,8 +363,19 @@ class ProsodyPredictor(nn.Module):
         samples = torch.take_along_dim(rand_normal, indices=rand_pi.unsqueeze(-1), dim=1).squeeze(dim=1)
         return samples
 
-    def sample2(self, h_sd, h_si):
-        log_pi, mu, sigma = self.forward(h_sd, h_si)
+    def sample2(self, e):
+        """
+        Take a sample from e (log_pi, mu, sigma)
+        Input:
+            e: (log_pi, mu, sigma)
+                log_pi: [batch_size, text_sequence_length, n_components]
+                mu: [batch_size, text_sequence_length, n_components, dim_out]
+                sigma: [batch_size, text_sequence_length, n_components, dim_out]
+        Output:
+            sample: [batch_size, text_sequence_length, dim_out]
+        """
+
+        log_pi, mu, sigma = e
 
         # Convert log_pi to probabilities
         pi = torch.exp(log_pi)
@@ -376,9 +392,34 @@ class ProsodyPredictor(nn.Module):
 
         # # Sample from the selected Gaussian components
         normal_samples = torch.randn_like(selected_mu)
-        samples = selected_mu + selected_sigma * normal_samples
+        sample = selected_mu + selected_sigma * normal_samples
 
-        return samples
+        return sample
+
+    def prosody_realigner(self, phone_alignments, tgt_samp, e_k_src):
+        beta = 0.1
+        new_e = torch.zeros(1, 88, 128, device=device)
+        counts = torch.zeros(88, device=device)  # Tensor to keep count of how many times each index is updated
+
+        for j in range(len(phone_alignments)):
+            for i in phone_alignments[j]:
+                # Reshape B to be broadcastable to A's shape
+                B_broadcasted = tgt_samp[0][j].unsqueeze(0).unsqueeze(0)
+
+                # Compute the weighted combination
+                result = (1 - beta) * B_broadcasted + beta * e_k_src[0][i]
+                new_mean = result.mean(dim=(0, 1))  # [128]
+
+                # Accumulate the new_mean for each index
+                new_e[:, i] += new_mean
+                counts[i] += 1
+
+        # Average the accumulated results
+        for i in range(88):
+            if counts[i] > 0:
+                new_e[:, i] /= counts[i]
+
+        return new_e
 
 
 class BaseProsodyPredictor(nn.Module):

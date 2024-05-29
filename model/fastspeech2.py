@@ -49,42 +49,32 @@ class FastSpeech2Pros(nn.Module):
 
         # Get masks
         src_masks = get_mask_from_lengths(src_lens, max_src_len)
-        print("mel_lengths", mel_lens)
         mel_masks = (get_mask_from_lengths(mel_lens, max_mel_len) if mel_lens is not None else None)
 
-        output = self.encoder(texts, src_masks)
+        output = self.encoder(texts, src_masks)  # torch.Size([Batch, seq_len, 256])
         print("output of encoder shape: ", output.shape)
 
-        output_with_speaker_embs = output + speaker_embs
-        print("output of encoder shape: ", output_with_speaker_embs.shape)
+        h_sd = output + speaker_embs  # torch.Size([Batch, seq_len, 256])
+        print("output of encoder shape: ", h_sd.shape)
 
-        # TODO: Prosody Predictor
-        h_sd = output + speaker_embs
         h_si = output
         prosody_predictor = ProsodyPredictor(256, 128, 4, 8).to(device)
-        pi, mu, sigma = prosody_predictor(h_sd, h_si, prev_e)
+        e_tgt = prosody_predictor(h_sd, h_si, prev_e)
 
         # prosody extractor
         prosody_extractor = ProsodyExtractor(1, 128, 8).to(device)
         e_src = prosody_extractor(mels)   # e is [batch_size, melspec H, melspec W, 128]
         
-        # Split phone embeddings by phone
+        # Split phone pros embeddings by phone duration
         # [batch_size (list), phoneme_sequence_length (list), melspec H (tensor), melspec W (tensor), 128 (tensor)]
-        split_phones = prosody_extractor.split_phones(e_src, d_targets)
+        e_k_src = prosody_extractor.split_phones(e_src, d_targets)
 
-        # TODO: Get alignments
+        tgt_samp = prosody_predictor.sample2(e_tgt)
 
-        # Switch phone embeddings order to match target language through alignment model
-        aligned_split_phones = split_phones * alignments
+        e = prosody_predictor.prosody_realigner(alignments, tgt_samp, e_k_src)
 
-        # To calculate prosody loss I need h_si, h_sd, prev_e and extracted e_k. pass it on.
-
-        # Get predicted prosody of target language without reference
-        # prosody_embedding = prosody_predictor(self.speaker_emb)
-
-        # Maximize posterior of Predicted prosody of target language with reference
-
-        # Concat and pass to Variance Adaptor
+        # Concat
+        output = h_sd + e
 
         (output, p_predictions, e_predictions, log_d_predictions, d_rounded, mel_lens, mel_masks,) = \
             self.variance_adaptor(output, src_masks, mel_masks, max_mel_len, p_targets, e_targets, d_targets, p_control,

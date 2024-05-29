@@ -32,7 +32,7 @@ model_config = yaml.load(open(model_config, "r"), Loader=yaml.FullLoader)
 """Test phoneme realignment"""
 # Switch phone embeddings order to match target language through alignment model
 # aligned_split_phones = split_phones * alignments
-phone_realignment = False
+phone_realignment = True
 if phone_realignment:
     import epitran
     phone_alignment_path = "preprocessed_data/LJSpeech/alignments/phone/LJSpeech-phone_alignment-LJ001-0048.pkl"
@@ -59,7 +59,7 @@ if phone_realignment:
     tgt_phones = tgt_phones.split()
 
     d_targets = torch.from_numpy(np.load(durations_path)).unsqueeze(0).to(device)
-    print("duration shape: ", d_targets.size())
+    # print("duration shape: ", d_targets.size())
 
     get_split_phones = False
     if get_split_phones:
@@ -83,26 +83,50 @@ if phone_realignment:
         torch.save(split_phones, "preprocessed_data/Bryant/split_phones.pt")
 
     else:
-        split_phones = torch.load("preprocessed_data/Bryant/split_phones.pt")
+        split_src_phones = torch.load("preprocessed_data/Bryant/split_phones.pt")
 
-    print(type(split_phones), len(split_phones))
-    print(type(split_phones[0]), [len(phone) for phone in split_phones])
-    print([split_phones[0][i].size() for i in range(len(split_phones[0]))])
+    # print(type(split_phones), len(split_phones))
+    print(type(split_src_phones[0]), [len(phone) for phone in split_src_phones])
+    # print([split_phones[0][i].size() for i in range(len(split_phones[0]))])
     print("d_targets", d_targets)
     print()
 
-    # Get prosody prediction
+    # Get prosody prediction  ( I may want 256 output to be able to concat)
     prosody_predictor = ProsodyPredictor(256, 128, 4, 8).to(device)
-    h_si = torch.rand([1, 19, 256], device=device)
-    h_sd = torch.rand([1,19,256], device=device)
+    h_si = torch.rand([1, 88, 256], device=device)
+    h_sd = torch.rand([1, 88, 256], device=device)
 
-    e = model(h_sd, h_si)
+    e = prosody_predictor(h_sd, h_si)
+    tgt_samp = prosody_predictor.sample2(e)
+    print("Target Sample shape: ", tgt_samp.size())
 
+    beta = 0.1
+    new_e = torch.zeros(1, 88, 128, device=device)
+    sum_results = torch.zeros(1, 88, 128, device=device)  # Tensor to accumulate results
+    counts = torch.zeros(88, device=device)  # Tensor to keep count of how many times each index is updated
+
+    for j in range(len(phone_alignments)):
+        for i in phone_alignments[j]:
+            # Reshape B to be broadcastable to A's shape
+            B_broadcasted = tgt_samp[0][j].unsqueeze(0).unsqueeze(0)
+
+            # Compute the weighted combination
+            result = (1 - beta) * B_broadcasted + beta * split_src_phones[0][i]
+            new_mean = result.mean(dim=(0, 1))  # [128]
+
+            # Accumulate the new_mean for each index
+            sum_results[:, i] += new_mean
+            counts[i] += 1
+
+    # Average the accumulated results
+    for i in range(88):
+        if counts[i] > 0:
+            new_e[:, i] = sum_results[:, i] / counts[i]
+
+    print("New e shape: ", new_e.size())
 
     print(len(phone_alignments), phone_alignments)
     print()
-
-
 
 """Test TextGrid"""
 test_textgrid = False
@@ -487,70 +511,70 @@ if test_extractor:
     print(total_len)
 
 """Test Prosody Predictor"""
-test_predictor = True
+test_predictor = False
 if test_predictor:
-    # model = FastSpeech2Pros(preprocess_config, model_config).to(device)
-    #
-    # text = "Hello, how are you doing today?"
-    # texts = np.array([preprocess_english(text, preprocess_config)])
-    #
-    # print("Texts shape: ", texts.shape)
-    #
-    # ids = raw_texts = [text[:100]]
-    # speakers = np.array([0])
-    # text_lens = np.array([len(texts[0])])
-    #
-    # speakers = torch.from_numpy(speakers).long().to(device)
-    # texts = torch.from_numpy(texts).long().to(device)
-    # src_lens = torch.from_numpy(text_lens).to(device)
-    #
-    # max_src_lens = max(text_lens)
-    # print(max_src_lens)
-    #
-    # batch = (speakers, texts, src_lens, max_src_lens)
-    #
-    # with torch.no_grad():
-    #     # Forward
-    #     output = model(*batch)[0]
-    #     print("Output shape: ", output.size())
+    model = FastSpeech2Pros(preprocess_config, model_config).to(device)
 
-    h_si = torch.rand([1, 19, 256], device=device)
-    print("h_si shape: ", h_si.size())
+    text = "Hello, how are you doing today?"
+    texts = np.array([preprocess_english(text, preprocess_config)])
 
-    # Get Speaker Embedding created by speaker embedding repo
-    # style_wav = "/Users/bryantmcarthur/Documents/Ditto/experiment/tony.flac"
-    embedding_path = "/Users/bryantmcarthur/Documents/Ditto/SpeakerEncoder/outputs/tony.pkl_emb.pkl"
+    print("Texts shape: ", texts.shape)
 
-    with open(embedding_path, 'rb') as f:
-        emb_dict = pickle.load(f)
+    ids = raw_texts = [text[:100]]
+    speakers = np.array([0])
+    text_lens = np.array([len(texts[0])])
 
-    embedding = torch.from_numpy(emb_dict["default"]).to(device)
-    print("Embedding shape: ", embedding.size())
+    speakers = torch.from_numpy(speakers).long().to(device)
+    texts = torch.from_numpy(texts).long().to(device)
+    src_lens = torch.from_numpy(text_lens).to(device)
 
-    # embedding = torch.cat((embedding, embedding))
+    max_src_lens = max(text_lens)
+    print(max_src_lens)
+
+    batch = (speakers, texts, src_lens, max_src_lens)
+
+    with torch.no_grad():
+        # Forward
+        output = model(*batch)[0]
+        print("Output shape: ", output.size())
+
+    # h_si = torch.rand([1, 19, 256], device=device)
+    # print("h_si shape: ", h_si.size())
+    #
+    # # Get Speaker Embedding created by speaker embedding repo
+    # # style_wav = "/Users/bryantmcarthur/Documents/Ditto/experiment/tony.flac"
+    # embedding_path = "/Users/bryantmcarthur/Documents/Ditto/SpeakerEncoder/outputs/tony.pkl_emb.pkl"
+    #
+    # with open(embedding_path, 'rb') as f:
+    #     emb_dict = pickle.load(f)
+    #
+    # embedding = torch.from_numpy(emb_dict["default"]).to(device)
     # print("Embedding shape: ", embedding.size())
-
-    # Adding new dimensions to tensor_2
-    embedding = embedding.unsqueeze(0).unsqueeze(0).expand(-1, 19, -1)
-
-    h_sd = h_si + embedding
-
-    print("h_sd shape: ", h_sd.size())
-
-    # Create the model
-    model = ProsodyPredictor(256, 128, 4, 8).to(device)
-    # Print the model summary
-    print(model)
-
-    e = model(h_sd, h_si)
-
-    pi, mu, sigma = e
-    print("pi shape: ", pi.size())
-    print("mu shape: ", mu.size())
-    print("sigma shape: ", sigma.size())
-
-    sample = model.sample2(h_sd, h_si)
-    print("Sample shape: ", sample.size())
+    #
+    # # embedding = torch.cat((embedding, embedding))
+    # # print("Embedding shape: ", embedding.size())
+    #
+    # # Adding new dimensions to tensor_2
+    # embedding = embedding.unsqueeze(0).unsqueeze(0).expand(-1, 19, -1)
+    #
+    # h_sd = h_si + embedding
+    #
+    # print("h_sd shape: ", h_sd.size())
+    #
+    # # Create the model
+    # model = ProsodyPredictor(256, 128, 4, 8).to(device)
+    # # Print the model summary
+    # print(model)
+    #
+    # e = model(h_sd, h_si)
+    #
+    # pi, mu, sigma = e
+    # print("pi shape: ", pi.size())
+    # print("mu shape: ", mu.size())
+    # print("sigma shape: ", sigma.size())
+    #
+    # sample = model.sample2(h_sd, h_si)
+    # print("Sample shape: ", sample.size())
 
     # sample = model.sample(h_sd, h_si)
     # print("Sample shape: ", sample.size())

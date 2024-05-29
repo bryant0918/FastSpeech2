@@ -205,7 +205,7 @@ class ProsodyExtractor(nn.Module):
         print("x.size:", x.size())
 
         # Apply Bi-GRU layer
-        x, _ = self.gru(x)
+        x, _ = self.gru(x)   # [batch_size, melspec H * melspec W, 128]
 
         # TODO: Don't hardcode 80 here, use n_mel_channels from preprocess_config
         return x.view(x.size()[0], 80, -1, x.size()[-1])   # [batch_size, melspec H, melspec W, 128]
@@ -333,6 +333,14 @@ class ProsodyPredictor(nn.Module):
         return log_pi, mu, sigma   # each is [batch_size, text_sequence_length, n_components]
 
     def phone_loss(self, x, y):
+        """
+        Calculate the negative log-likelihood of the phone sequence given the prosody features
+        Input:
+            x: (h_sd, h_si, prev_e)
+            y: prosody embeddings e_k from prosody extractor
+        Output:
+            -loglik: Negative log-likelihood of the phone sequence given the prosody features
+        """
         log_pi, mu, sigma = self.forward(x)
         z_score = (y.unsqueeze(1) - mu) / sigma
         normal_loglik = (

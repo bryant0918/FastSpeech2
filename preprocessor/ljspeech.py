@@ -28,10 +28,15 @@ def prepare_align(config):
         for line in tqdm(f):
             parts = line.strip().split("|")
             base_name = parts[0]
-            text = parts[2]
-            text = _clean_text(text, cleaners)  # TODO: This doesn't remove punctuations
 
-            # TODO: Get cleaners for translation language also currently cleaning in preprocesor.process_utterance
+            out_translation_path = os.path.join(out_dir, speaker, "{}_tgt.lab".format(base_name))
+            if os.path.exists(out_translation_path):
+                continue
+
+            text = parts[2]
+            text = _clean_text(text, cleaners)
+
+            # TODO: Get cleaners for translation language also (and handle api connection errors)
             translation = GoogleTranslator(source='auto', target='es').translate(text)
             # translation = _clean_text(translation, cleaners)
 
@@ -52,7 +57,7 @@ def prepare_align(config):
                 with open(os.path.join(out_dir, speaker, "{}_src.lab".format(base_name)), "w") as f1:
                     f1.write(text)
 
-                with open(os.path.join(out_dir, speaker, "{}_tgt.lab".format(base_name)), "w") as f1:
+                with open(out_translation_path, "w") as f1:
                     f1.write(translation)
 
                 alignments = word_aligner.get_word_aligns(text.split(), translation.split())

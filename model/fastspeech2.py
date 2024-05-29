@@ -41,7 +41,7 @@ class FastSpeech2Pros(nn.Module):
 
     def forward(self, speakers, texts, src_lens, max_src_len, mels=None, mel_lens=None, max_mel_len=None,
                 translations=None, translation_lens=None, speaker_embs=None,
-                alignments=None, p_targets=None, e_targets=None, d_targets=None, p_control=1.0,
+                alignments=None, p_targets=None, e_targets=None, d_targets=None, prev_e=None, p_control=1.0,
                 e_control=1.0, d_control=1.0,):
         # batch = (ids, raw_texts, raw_translations, speakers, texts, src_lens, max_text_lens, mels, mel_lens,
         #                 max_mel_lens, translations, translation_lens, speaker_embeddings, alignments, pitches, energies,
@@ -59,8 +59,10 @@ class FastSpeech2Pros(nn.Module):
         print("output of encoder shape: ", output_with_speaker_embs.shape)
 
         # TODO: Prosody Predictor
+        h_sd = output + speaker_embs
+        h_si = output
         prosody_predictor = ProsodyPredictor().to(device)
-        prosody_predictor(output + speaker_embs, output)
+        prosody_predictor(h_sd, h_si, prev_e)
 
         # prosody extractor
         prosody_extractor = ProsodyExtractor(1, 128, 8).to(device)
@@ -73,7 +75,9 @@ class FastSpeech2Pros(nn.Module):
         # TODO: Get alignments
 
         # Switch phone embeddings order to match target language through alignment model
+        aligned_split_phones = split_phones * alignments
 
+        # To calculate prosody loss I need h_si, h_sd, prev_e and extracted e_k. pass it on.
 
         # Get predicted prosody of target language without reference
         # prosody_embedding = prosody_predictor(self.speaker_emb)

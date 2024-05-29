@@ -221,9 +221,9 @@ class Preprocessor:
         if phone_alignments is IndexError:
             print(text_path)
             print("raw text", raw_text)
-            print("raw translation", raw_translation)  #righthere onnmotorcycle
+            print("raw translation", raw_translation)  # right here on motorcycle
             print(epi.transliterate(raw_translation).split())
-            raise IndexError
+            return None
 
         # Compute fundamental frequency
         pitch, t = pw.dio(
@@ -362,7 +362,6 @@ class Preprocessor:
                                 break
                             word_idx += 1
 
-
                 elif p == "spn" and words_tier.intervals[word_idx].text != "<unk>":
                     if all_phones:
                         if not isinstance(all_phones[-1], list):
@@ -389,7 +388,6 @@ class Preprocessor:
                         if word_idx == len(words_tier.intervals) - 1:  # That was the last word
                             break
                         word_idx += 1
-
 
             else:  # For silent phones
                 all_phones.append(p)
@@ -445,7 +443,6 @@ class Preprocessor:
                 print("i, j", i, j)
 
                 return IndexError
-
 
             phone_weight = len(src_word_phones) / len(tgt_word_phones)
             phone_alignment, flat_phone_alignment = [], []

@@ -11,7 +11,7 @@ from tqdm import tqdm
 from utils.model import get_model, get_vocoder, get_param_num
 from utils.tools import to_device, log, synth_one_sample
 from model import FastSpeech2Loss
-from dataset import Dataset
+from dataset import Dataset, TrainDataset
 
 from evaluate import evaluate
 
@@ -31,9 +31,7 @@ def main(args, configs):
     preprocess_config, model_config, train_config = configs
 
     # Get dataset
-    dataset = Dataset(
-        "train.txt", preprocess_config, train_config, sort=True, drop_last=True
-    )
+    dataset = TrainDataset("train.txt", preprocess_config, train_config, sort=True, drop_last=True)
     batch_size = train_config["optimizer"]["batch_size"]
     group_size = 1  # Set this larger than 1 (4) to enable sorting in Dataset
     # assert batch_size * group_size < len(dataset)

@@ -10,7 +10,7 @@ from text import text_to_sequence
 from utils.tools import pad_1D, pad_2D
 
 
-class DatasetPros(Dataset):
+class TrainDataset(Dataset):
     def __init__(self, filename, preprocess_config, train_config, sort=False, drop_last=False):
         self.dataset_name = preprocess_config["dataset"]
         self.preprocessed_path = preprocess_config["path"]["preprocessed_path"]
@@ -64,7 +64,7 @@ class DatasetPros(Dataset):
         duration = np.load(duration_path)
 
         # Get Random Speaker Embedding
-        speaker_emb_path = os.path.join(self.preprocess_config["path"]["preprocessed_path"], "speaker_emb",
+        speaker_emb_path = os.path.join(preprocess_config["path"]["preprocessed_path"], "speaker_emb",
                                         "{}.pkl_emb.pkl".format(speaker))
         with open(speaker_emb_path, 'rb') as f:
             emb_dict = pickle.load(f)

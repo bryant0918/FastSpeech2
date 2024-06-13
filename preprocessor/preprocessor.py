@@ -365,11 +365,11 @@ class Preprocessor:
                 elif p == "spn" and words_tier.intervals[word_idx].text != "<unk>":
                     if all_phones:
                         if not isinstance(all_phones[-1], list):
-                            all_phones[-1] = p
+                            all_phones[-1] = [p]
                         else:
-                            all_phones.append(p)
+                            all_phones.append([p])
                     else:
-                        all_phones.append(p)
+                        all_phones.append([p])
                     num_phones += 1
                     num_words += 1
 
@@ -390,7 +390,7 @@ class Preprocessor:
                         word_idx += 1
 
             else:  # For silent phones
-                all_phones.append(p)
+                all_phones.append([p])
                 num_phones += 1
                 num_words += 1
 

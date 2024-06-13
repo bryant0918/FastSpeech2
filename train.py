@@ -42,20 +42,21 @@ def main(args, configs):
         collate_fn=dataset.collate_fn,
     )
 
-    # Debugging dataset
-    print("loader: ", loader)
-    for batches in loader:
-        for batch in batches:
-            batch = to_device(batch, device)
-            print("batch", batch[8], batch[9])
-            input = batch[3:]
-            print("input", input[6], input[7])
+    # # Debugging dataset
+    # print("loader: ", loader)
+    # for batches in loader:
+    #     for batch in batches:
+    #         batch = to_device(batch, device)
+    #         print("batch", batch[8], batch[9])
+    #         input = batch[3:]
+    #         print("input", input[6], input[7])
 
-            raise NotImplementedError
+    #         raise NotImplementedError
 
 
     # Prepare model
     model, optimizer = get_model(args, configs, device, train=True)
+    print(next(model.parameters()).device)    
     model = nn.DataParallel(model)
     num_param = get_param_num(model)
     Loss = FastSpeech2Loss(preprocess_config, model_config).to(device)
@@ -63,6 +64,7 @@ def main(args, configs):
 
     # Load vocoder
     vocoder = get_vocoder(model_config, device)
+    print("Vocoder Loaded")
 
     # Init loggerc
     for p in train_config["path"].values():
@@ -99,7 +101,7 @@ def main(args, configs):
                 # Forward
                 print("batch", batch[8], batch[9])
                 input = batch[3:]
-                print("input", input[6], input[7])
+                print("input[2] src_lens:", input[2].device)
                 output = model(*(batch[3:]))
 
                 # Cal Loss

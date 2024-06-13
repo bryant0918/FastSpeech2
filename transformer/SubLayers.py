@@ -62,7 +62,7 @@ class PositionwiseFeedForward(nn.Module):
 
     def __init__(self, d_in, d_hid, kernel_size, dropout=0.1):
         super().__init__()
-
+        print("POSITIONWISE FEED FORWARD D_IN", d_in)
         # Use Conv1D
         # position-wise
         self.w_1 = nn.Conv1d(
@@ -83,15 +83,21 @@ class PositionwiseFeedForward(nn.Module):
         self.dropout = nn.Dropout(dropout)
 
     def forward(self, x):
-
+        print("x in PositionwiseFeedForward", x.shape)
         residual = x
         output = x.transpose(1, 2)
+        print("output", output.shape, output.device, output.dtype)
+        print(self.w_1, self.w_1.weight.size())
+        print(output[0][0])
+
+        # Segmentation fault (core dumped)
+        print(self.w_1(output))        
 
         output = self.w_2(F.relu(self.w_1(output)))
-
+        print("output", output.shape)
         output = output.transpose(1, 2)
         output = self.dropout(output)
-
+        print("output", output.shape)
         output = self.layer_norm(output + residual)
-
+        print("output", output.shape)
         return output

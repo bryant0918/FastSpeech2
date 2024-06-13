@@ -48,9 +48,16 @@ class FastSpeech2Pros(nn.Module):
         #                 durations)
 
         # Get masks
+        print("src_lens: ", src_lens.device)
         src_masks = get_mask_from_lengths(src_lens, max_src_len)
+        print("Got masks from lengths.")
         mel_masks = (get_mask_from_lengths(mel_lens, max_mel_len) if mel_lens is not None else None)
+        print("Got mel masks from lengths.")
 
+        texts = texts.to(device)
+        src_masks = src_masks.to(device)
+        self.encoder = self.encoder.to(device)
+        
         output = self.encoder(texts, src_masks)  # torch.Size([Batch, seq_len, 256])
         print("output of encoder shape: ", output.shape)
 
@@ -71,6 +78,7 @@ class FastSpeech2Pros(nn.Module):
 
         tgt_samp = prosody_predictor.sample2(e_tgt)
 
+        print("alignments shape: ", alignments.shape)  # TODO: unpad alignments for realigner otherwise everything mapped to 0.
         e = prosody_predictor.prosody_realigner(alignments, tgt_samp, e_k_src)
 
         # Concat

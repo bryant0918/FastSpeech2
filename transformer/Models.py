@@ -79,13 +79,13 @@ class Encoder(nn.Module):
         )
 
     def forward(self, src_seq, mask, return_attns=False):
-
+        print("Encoder forward function.")
         enc_slf_attn_list = []
         batch_size, max_len = src_seq.shape[0], src_seq.shape[1]
-
+        print("Encoder forward function.")
         # -- Prepare masks
         slf_attn_mask = mask.unsqueeze(1).expand(-1, max_len, -1)
-
+        print("Masks prepared")
         # -- Forward
         if not self.training and src_seq.shape[1] > self.max_seq_len:
             enc_output = self.src_word_emb(src_seq) + get_sinusoid_encoding_table(
@@ -99,15 +99,16 @@ class Encoder(nn.Module):
                                                       :, :max_len, :
                                                       ].expand(batch_size, -1, -1)
 
+        print("Before for in Encoder forward function.")
         for enc_layer in self.layer_stack:
-
-            enc_output, enc_slf_attn = enc_layer(
-                enc_output, mask=mask, slf_attn_mask=slf_attn_mask
-            )
-
+            print("Enc_layer", enc_layer)
+            for name, param in enc_layer.named_parameters():
+                print(f"Parameter: {name}, Device: {param.device}, dtype: {param.dtype}")
+            enc_output, enc_slf_attn = enc_layer(enc_output, mask=mask, slf_attn_mask=slf_attn_mask)
+            print("Enc_output", enc_output)
             if return_attns:
                 enc_slf_attn_list += [enc_slf_attn]
-
+        print("Returning from Encoder forward function.")
         return enc_output
 
 

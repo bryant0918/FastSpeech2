@@ -28,11 +28,45 @@ model_config = "config/LJSpeech/model.yaml"
 preprocess_config = yaml.load(open(preprocess_config, "r"), Loader=yaml.FullLoader)
 model_config = yaml.load(open(model_config, "r"), Loader=yaml.FullLoader)
 
+"""Debug segmentatin fault"""
+seg_fault = True
+if seg_fault:
+    import torch.nn as nn
+
+    # Assuming output is your tensor and model definition
+    output = torch.randn(16, 256, 102).cuda()  # Example tensor on CUDA
+
+    # Print output details
+    print("output", output.shape, output.device, output.dtype)
+
+    # Assuming self.w_1 is a nn.Conv1d layer
+    class ExampleModel(nn.Module):
+        def __init__(self):
+            super(ExampleModel, self).__init__()
+            self.w_1 = nn.Conv1d(in_channels=256, out_channels=1024, kernel_size=9, stride=1, padding=4)
+        
+        def forward(self, x):
+            return self.w_1(x)
+
+    # Create an instance of the model
+    model = ExampleModel()
+    model = model.cuda()  # Move model to CUDA if not already there
+
+    # Print weights of self.w_1
+    print("Weights of self.w_1:", model.w_1.weight.size())
+
+    # Attempt to forward pass
+    try:
+        output_after_w1 = model.w_1(output)
+        print("Output shape after self.w_1:", output_after_w1.shape)
+    except Exception as e:
+        print("Error during forward pass:", e)
+
 
 """Test phoneme realignment"""
 # Switch phone embeddings order to match target language through alignment model
 # aligned_split_phones = split_phones * alignments
-phone_realignment = True
+phone_realignment = False
 if phone_realignment:
     import epitran
     phone_alignment_path = "preprocessed_data/LJSpeech/alignments/phone/LJSpeech-phone_alignment-LJ001-0048.pkl"
@@ -381,7 +415,6 @@ if test_word_alignment:
 
     print(phone_alignments)
 
-
 """Test Sentence Aligner"""
 test_aligner = False
 if test_aligner:
@@ -418,7 +451,6 @@ if test_aligner:
     print("Tgt.split(): ", tgt.split())
     print(alignments)
 
-
 """Get different speaker embedding"""
 test_embedding = False
 if test_embedding:
@@ -436,7 +468,6 @@ if test_embedding:
     speaker_embs = torch.cat([embedding, embedding_copy, embedding_copy2], dim=0)
 
     print("Speaker Embeddings shape: ", speaker_embs.size(), "Time: ", time.time() - start)
-
 
 """Test Prosody Extractor"""
 test_extractor = False

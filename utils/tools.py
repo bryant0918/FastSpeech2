@@ -11,7 +11,6 @@ from matplotlib import pyplot as plt
 
 matplotlib.use("Agg")
 
-
 if torch.cuda.is_available():
     device = torch.device("cuda")
 elif torch.backends.mps.is_available():
@@ -29,11 +28,16 @@ def to_device(data, device):
         speakers = torch.from_numpy(speakers).long().to(device)
         texts = torch.from_numpy(texts).long().to(device)
         src_lens = torch.from_numpy(text_lens).to(device)
+        print("Src_lens:", src_lens.device)
         mels = torch.from_numpy(mels).float().to(device)
         mel_lens = torch.from_numpy(mel_lens).to(device)
         translations = torch.from_numpy(translations).long().to(device)
         translation_lens = torch.from_numpy(translation_lens).to(device)
-        speaker_embeddings = torch.Tensor(speaker_embeddings).to(device)
+
+        print("Speaker Embeddings: ", type(speaker_embeddings), len(speaker_embeddings), speaker_embeddings[0])
+        speaker_embeddings = np.array(speaker_embeddings)
+        speaker_embeddings = torch.from_numpy(speaker_embeddings).to(device)
+
         alignments = torch.from_numpy(alignments).float().to(device)
         pitches = torch.from_numpy(pitches).float().to(device)
         energies = torch.from_numpy(energies).to(device)
@@ -120,6 +124,11 @@ def get_mask_from_lengths(lengths, max_len=None):
         max_len = torch.max(lengths).item()
 
     ids = torch.arange(0, max_len).unsqueeze(0).expand(batch_size, -1).to(device)
+    print("ids", ids.device)
+    # print("max_len", max_len.device)
+    print(lengths.device)
+    
+    print("lengths", lengths.device, ids.device)
     mask = ids >= lengths.unsqueeze(1).expand(-1, max_len)
 
     return mask
@@ -324,6 +333,28 @@ def pad_2D(inputs, maxlen=None):
         output = np.stack([pad(x, max_len) for x in inputs])
 
     return output
+
+def pad_inhomogeneous_2D(inputs, PAD=0):
+    def pad_array(array, max_array_length, max_element_length, PAD):
+        padded_array = []
+        for element in array:
+            padded_element = np.pad(
+                element, (0, max_element_length - len(element)), mode="constant", constant_values=PAD
+            )
+            padded_array.append(padded_element)
+        
+        while len(padded_array) < max_array_length:
+            padded_array.append([PAD] * max_element_length)
+        
+        return np.array(padded_array)
+    
+    max_array_length = max(len(array) for array in inputs)
+    max_element_length = max(len(element) for array in inputs for element in array)
+    print("max_array_length", max_array_length)
+    print("max_element_length", max_element_length)
+    padded = np.array([pad_array(array, max_array_length, max_element_length, PAD) for array in inputs])
+    
+    return padded
 
 
 def pad(input_ele, mel_max_length=None):

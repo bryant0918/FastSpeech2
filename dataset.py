@@ -69,7 +69,7 @@ class TrainDataset(Dataset):
         with open(speaker_emb_path, 'rb') as f:
             emb_dict = pickle.load(f)
 
-        embedding = torch.from_numpy(emb_dict["default"]).unsqueeze(0).unsqueeze(0).expand(-1, 19, -1)
+        embedding = torch.from_numpy(emb_dict["default"])
 
         alignments_path = os.path.join(self.preprocessed_path, "alignments", "phone",
                                        "{}-phone_alignment-{}.pkl".format(speaker, basename))
@@ -135,14 +135,9 @@ class TrainDataset(Dataset):
         energies = pad_1D(energies)
         durations = pad_1D(durations)
 
-        # print("translations: ", type(translations), len(translations[0]), type(translations[0]))
         translations = pad_1D(translations)
-
-        
-        # print("alignments", len(alignments), type(alignments), len(alignments[0]), type(alignments[0]), alignments[0])
         alignments = pad_inhomogeneous_2D(alignments)
-        # print("alignments", len(alignments), type(alignments), len(alignments[0]), type(alignments[0]), alignments[0])
-        print("Text_lens", type(text_lens), type(text_lens[0]), text_lens[0])
+
         return (ids, raw_texts, raw_translations, speakers, texts, text_lens, max(text_lens), mels, mel_lens,
                 max(mel_lens), translations, translation_lens, speaker_embeddings, alignments, pitches, energies,
                 durations)

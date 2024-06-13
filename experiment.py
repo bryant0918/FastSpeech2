@@ -28,8 +28,8 @@ model_config = "config/LJSpeech/model.yaml"
 preprocess_config = yaml.load(open(preprocess_config, "r"), Loader=yaml.FullLoader)
 model_config = yaml.load(open(model_config, "r"), Loader=yaml.FullLoader)
 
-"""Debug segmentatin fault"""
-seg_fault = True
+"""Debug segmentatin fault"""  # Fixed by export LD_LIBRARY_PATH=""
+seg_fault = False
 if seg_fault:
     import torch.nn as nn
 
@@ -62,11 +62,10 @@ if seg_fault:
     except Exception as e:
         print("Error during forward pass:", e)
 
-
 """Test phoneme realignment"""
 # Switch phone embeddings order to match target language through alignment model
 # aligned_split_phones = split_phones * alignments
-phone_realignment = False
+phone_realignment = True
 if phone_realignment:
     import epitran
     phone_alignment_path = "preprocessed_data/LJSpeech/alignments/phone/LJSpeech-phone_alignment-LJ001-0048.pkl"
@@ -111,11 +110,11 @@ if phone_realignment:
         print("e_src shape: ", e_src.size())
         # Split phone embeddings by phone
         # [batch_size (list), phoneme_sequence_length (list), melspec H (tensor), melspec W (tensor), 128 (tensor)]
-        split_phones = prosody_extractor.split_phones(e_src, d_targets, 'mps')
+        split_phones = prosody_extractor.split_phones(e_src, d_targets, device)
 
         print("split_phones", len(split_phones))
         torch.save(split_phones, "preprocessed_data/Bryant/split_phones.pt")
-
+        split_src_phones = split_phones
     else:
         split_src_phones = torch.load("preprocessed_data/Bryant/split_phones.pt")
 
@@ -127,37 +126,54 @@ if phone_realignment:
 
     # Get prosody prediction  ( I may want 256 output to be able to concat)
     prosody_predictor = ProsodyPredictor(256, 128, 4, 8).to(device)
-    h_si = torch.rand([1, 88, 256], device=device)
-    h_sd = torch.rand([1, 88, 256], device=device)
+    h_si = torch.rand([2, 88, 256], device=device)
+    h_sd = torch.rand([2, 88, 256], device=device)
 
     e = prosody_predictor(h_sd, h_si)
     tgt_samp = prosody_predictor.sample2(e)
     print("Target Sample shape: ", tgt_samp.size())
+    # print(tgt_samp[0, 61])
+    # print(tgt_samp[0, 87])
 
     beta = 0.1
-    new_e = torch.zeros(1, 88, 128, device=device)
-    sum_results = torch.zeros(1, 88, 128, device=device)  # Tensor to accumulate results
-    counts = torch.zeros(88, device=device)  # Tensor to keep count of how many times each index is updated
+    new_e = torch.zeros(2, 88, 128, device=device)
+    sum_results = torch.zeros(2, 88, 128, device=device)  # Tensor to accumulate results
+    counts = torch.zeros(2, 88, device=device)  # Tensor to keep count of how many times each index is updated
 
-    for j in range(len(phone_alignments)):
-        for i in phone_alignments[j]:
-            # Reshape B to be broadcastable to A's shape
-            B_broadcasted = tgt_samp[0][j].unsqueeze(0).unsqueeze(0)
+    # print("Phone aligments", len(phone_alignments), phone_alignments[0])
 
-            # Compute the weighted combination
-            result = (1 - beta) * B_broadcasted + beta * split_src_phones[0][i]
-            new_mean = result.mean(dim=(0, 1))  # [128]
+    from utils.tools import pad_inhomogeneous_2D
+    phone_alignments2 = phone_alignments[:50]
 
-            # Accumulate the new_mean for each index
-            sum_results[:, i] += new_mean
-            counts[i] += 1
+    phone_alignments = pad_inhomogeneous_2D([phone_alignments, phone_alignments2])
+    phone_alignments = torch.from_numpy(phone_alignments).int().to(device)
+    print("Phone aligments", phone_alignments.shape)
+    print(len(split_src_phones))
+    split_src_phones = [split_src_phones[0], split_src_phones[0]]
 
-    # Average the accumulated results
-    for i in range(88):
-        if counts[i] > 0:
-            new_e[:, i] = sum_results[:, i] / counts[i]
+    
+    print("phone_alignments", phone_alignments.shape)
+    for b in range(len(phone_alignments)):
+        for j in range(len(phone_alignments[b])):
+            for i in phone_alignments[b][j]:
+                # Reshape B to be broadcastable to A's shape
+                B_broadcasted = tgt_samp[b][j].unsqueeze(0).unsqueeze(0)
 
-    print("New e shape: ", new_e.size())
+                # Compute the weighted combination
+                result = (1 - beta) * B_broadcasted + beta * split_src_phones[b][i]
+                new_mean = result.mean(dim=(0, 1))  # [128]
+
+                # Accumulate the new_mean for each index
+                # sum_results[b][:, i] += new_mean
+                new_e[b, i] += new_mean
+                counts[b, i] += 1
+
+        # Average the accumulated results
+        for i in range(88):
+            if counts[b][i] > 0:
+                new_e[b, i] /= counts[b][i]
+    print("New e shape: ", new_e[0, 61])
+    print("New e shape: ", new_e.size(), new_e[0, 84])
 
     print(len(phone_alignments), phone_alignments)
     print()
@@ -501,16 +517,16 @@ if test_extractor:
 
         melspec = torch.from_numpy(melspec).to(device)
     else:
-        mel_path = "preprocessed_data/LJSpeech2/mel/LJSpeech-mel-LJ001-0002.npy"
-        text_grid_path = "preprocessed_data/LJSpeech2/TextGrid/LJSpeech/LJ001-0002.TextGrid"
+        mel_path = "preprocessed_data/LJSpeech/mel/LJSpeech-mel-LJ001-0002.npy"
+        text_grid_path = "preprocessed_data/LJSpeech/TextGrid/LJSpeech/LJ001-0002.TextGrid"
 
         melspec = torch.from_numpy(np.load(mel_path)).to(device)
 
-    melspec = melspec.unsqueeze(0).unsqueeze(0)   # To get dimension [1,1,H:80,W:462]
+    melspec = melspec.unsqueeze(0).unsqueeze(0)   # To get dimension [1,1,W:X, H:80]
     print("Mel shape: ", melspec.size())
 
     e = model(melspec)
-    print("e shape: ", e.size())
+    print("e shape: ", e.size())  # [1, W:80, H:X, 128]
     print("shape of e after view", e.view(e.size()[0], 80, -1, e.size()[-1]).size())
     e = e.view(e.size()[0], 80, -1, e.size()[-1])
 

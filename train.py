@@ -99,9 +99,7 @@ def main(args, configs):
                 batch = to_device(batch, device)
 
                 # Forward
-                print("batch", batch[8], batch[9])
                 input = batch[3:]
-                print("input[2] src_lens:", input[2].device)
                 output = model(*(batch[3:]))
 
                 # Cal Loss

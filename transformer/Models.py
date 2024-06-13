@@ -79,13 +79,10 @@ class Encoder(nn.Module):
         )
 
     def forward(self, src_seq, mask, return_attns=False):
-        print("Encoder forward function.")
         enc_slf_attn_list = []
         batch_size, max_len = src_seq.shape[0], src_seq.shape[1]
-        print("Encoder forward function.")
         # -- Prepare masks
         slf_attn_mask = mask.unsqueeze(1).expand(-1, max_len, -1)
-        print("Masks prepared")
         # -- Forward
         if not self.training and src_seq.shape[1] > self.max_seq_len:
             enc_output = self.src_word_emb(src_seq) + get_sinusoid_encoding_table(
@@ -99,16 +96,10 @@ class Encoder(nn.Module):
                                                       :, :max_len, :
                                                       ].expand(batch_size, -1, -1)
 
-        print("Before for in Encoder forward function.")
         for enc_layer in self.layer_stack:
-            print("Enc_layer", enc_layer)
-            for name, param in enc_layer.named_parameters():
-                print(f"Parameter: {name}, Device: {param.device}, dtype: {param.dtype}")
             enc_output, enc_slf_attn = enc_layer(enc_output, mask=mask, slf_attn_mask=slf_attn_mask)
-            print("Enc_output", enc_output)
             if return_attns:
                 enc_slf_attn_list += [enc_slf_attn]
-        print("Returning from Encoder forward function.")
         return enc_output
 
 
@@ -212,7 +203,6 @@ class ProsodyExtractor(nn.Module):
         x = self.cnn(x)
 
         x = x.permute(0, 2, 1)  # Permute to [batch_size, height*width, 8] (N,L,H_in)
-        print("x.size:", x.size())
 
         # Apply Bi-GRU layer
         x, _ = self.gru(x)  # [batch_size, melspec H * melspec W, 128]
@@ -399,27 +389,44 @@ class ProsodyPredictor(nn.Module):
 
     def prosody_realigner(self, phone_alignments, tgt_samp, e_k_src):
         beta = 0.1
-        new_e = torch.zeros(1, 88, 128, device=device)
-        counts = torch.zeros(88, device=device)  # Tensor to keep count of how many times each index is updated
+        batch_size = len(phone_alignments)
+        seq_length = tgt_samp.shape[1]
+        print("tgt samp shape", tgt_samp.shape)
+        new_e = torch.zeros(batch_size, seq_length, tgt_samp.shape[2], device=device)
+        counts = torch.zeros(batch_size, seq_length, device=device)  # Tensor to keep count of how many times each index is updated
 
-        for j in range(len(phone_alignments)):
-            for i in phone_alignments[j]:
-                # Reshape B to be broadcastable to A's shape
-                B_broadcasted = tgt_samp[0][j].unsqueeze(0).unsqueeze(0)
+        print("e_k_src", type(e_k_src), len(e_k_src), len(e_k_src[0]))
 
-                # Compute the weighted combination
-                result = (1 - beta) * B_broadcasted + beta * e_k_src[0][i]
-                new_mean = result.mean(dim=(0, 1))  # [128]
+        # Works for when target sentence is longer
 
-                # Accumulate the new_mean for each index
-                new_e[:, i] += new_mean
-                counts[i] += 1
 
-        # Average the accumulated results
-        for i in range(88):
-            if counts[i] > 0:
-                new_e[:, i] /= counts[i]
+        for b in range(batch_size):
+            for j in range(len(phone_alignments[b])):
+                if j >= tgt_samp[b].shape[0]:
+                        continue
+                for i in phone_alignments[b][j]:
+                    
+                    # Reshape B to be broadcastable to A's shape
+                    try:
+                        B_broadcasted = tgt_samp[b][j].unsqueeze(0).unsqueeze(0)
+                    except:
+                        print("tgt_samp[b].shape", tgt_samp[b].shape, b,j, len(phone_alignments[b]))
+                        print(phone_alignments[b][j])
+                        raise ValueError("Error")
+                    # Compute the weighted combination
+                    result = (1 - beta) * B_broadcasted + beta * e_k_src[b][i]
+                    new_mean = result.mean(dim=(0, 1))  # [256]
 
+                    # Accumulate the new_mean for each index
+                    # sum_results[b][:, i] += new_mean
+                    new_e[b, i] += new_mean
+                    counts[b, i] += 1
+
+            # Average the accumulated results
+            for i in range(seq_length):
+                if counts[b][i] > 0:
+                    new_e[b, i] /= counts[b][i]
+            
         return new_e
 
 

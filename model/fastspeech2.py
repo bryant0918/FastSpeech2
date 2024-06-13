@@ -48,28 +48,24 @@ class FastSpeech2Pros(nn.Module):
         #                 durations)
 
         # Get masks
-        print("src_lens: ", src_lens.device)
         src_masks = get_mask_from_lengths(src_lens, max_src_len)
-        print("Got masks from lengths.")
         mel_masks = (get_mask_from_lengths(mel_lens, max_mel_len) if mel_lens is not None else None)
-        print("Got mel masks from lengths.")
-
-        texts = texts.to(device)
-        src_masks = src_masks.to(device)
-        self.encoder = self.encoder.to(device)
         
         output = self.encoder(texts, src_masks)  # torch.Size([Batch, seq_len, 256])
-        print("output of encoder shape: ", output.shape)
 
+        speaker_embs = speaker_embs.unsqueeze(1).expand(-1, output.size()[1], -1)
         h_sd = output + speaker_embs  # torch.Size([Batch, seq_len, 256])
-        print("output of encoder shape: ", h_sd.shape)
+        print("Output shape: ", h_sd.shape)
 
         h_si = output
         prosody_predictor = ProsodyPredictor(256, 256, 4, 8).to(device)
         e_tgt = prosody_predictor(h_sd, h_si, prev_e)
-
+        print("e_tgt shape: ", e_tgt[0].shape)
+        
         # prosody extractor
-        prosody_extractor = ProsodyExtractor(1, 128, 8).to(device)
+        prosody_extractor = ProsodyExtractor(1, 256, 8).to(device)
+        
+        mels = mels.unsqueeze(1) # mels shape is [batch_size, 1, melspec W, melspec H]
         e_src = prosody_extractor(mels)   # e is [batch_size, melspec H, melspec W, 128]
         
         # Split phone pros embeddings by phone duration
@@ -77,12 +73,15 @@ class FastSpeech2Pros(nn.Module):
         e_k_src = prosody_extractor.split_phones(e_src, d_targets)
 
         tgt_samp = prosody_predictor.sample2(e_tgt)
+        print("tgt_samp shape: ", tgt_samp.shape) # Correct
+        print("e_k_src shape: ", len(e_k_src))
 
         print("alignments shape: ", alignments.shape)  # TODO: unpad alignments for realigner otherwise everything mapped to 0.
         e = prosody_predictor.prosody_realigner(alignments, tgt_samp, e_k_src)
 
         # Concat
         output = h_sd + e
+        print("Output shape after prosody: ", output.shape)
 
         (output, p_predictions, e_predictions, log_d_predictions, d_rounded, mel_lens, mel_masks,) = \
             self.variance_adaptor(output, src_masks, mel_masks, max_mel_len, p_targets, e_targets, d_targets, p_control,

@@ -28,17 +28,15 @@ def to_device(data, device):
         speakers = torch.from_numpy(speakers).long().to(device)
         texts = torch.from_numpy(texts).long().to(device)
         src_lens = torch.from_numpy(text_lens).to(device)
-        print("Src_lens:", src_lens.device)
         mels = torch.from_numpy(mels).float().to(device)
         mel_lens = torch.from_numpy(mel_lens).to(device)
         translations = torch.from_numpy(translations).long().to(device)
         translation_lens = torch.from_numpy(translation_lens).to(device)
 
-        print("Speaker Embeddings: ", type(speaker_embeddings), len(speaker_embeddings), speaker_embeddings[0])
         speaker_embeddings = np.array(speaker_embeddings)
         speaker_embeddings = torch.from_numpy(speaker_embeddings).to(device)
 
-        alignments = torch.from_numpy(alignments).float().to(device)
+        alignments = torch.from_numpy(alignments).int().to(device)
         pitches = torch.from_numpy(pitches).float().to(device)
         energies = torch.from_numpy(energies).to(device)
         durations = torch.from_numpy(durations).long().to(device)
@@ -124,11 +122,7 @@ def get_mask_from_lengths(lengths, max_len=None):
         max_len = torch.max(lengths).item()
 
     ids = torch.arange(0, max_len).unsqueeze(0).expand(batch_size, -1).to(device)
-    print("ids", ids.device)
-    # print("max_len", max_len.device)
-    print(lengths.device)
     
-    print("lengths", lengths.device, ids.device)
     mask = ids >= lengths.unsqueeze(1).expand(-1, max_len)
 
     return mask

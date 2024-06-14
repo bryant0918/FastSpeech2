@@ -149,7 +149,7 @@ class Preprocessor:
 
         random.shuffle(out)
         out = [r for r in out if r is not None]
-        print("Length of out: ", len(out), out)
+        print("Length of out: ", len(out))
 
         # Write metadata
         with open(os.path.join(self.out_dir, "train.txt"), "w", encoding="utf-8") as f:
@@ -314,42 +314,32 @@ class Preprocessor:
 
         for t in phones_tier._objects:
             s, e, p = t.start_time, t.end_time, t.text
+            # print(p, s, e)
+            # print("Word_idx", word_idx, words_tier.intervals[word_idx].text, word_end_times[word_idx], words_tier.intervals[word_idx].end_time)
 
             # Trim leading silences
-            if all_phones == [] and word_phones == []:
+            if not all_phones and not word_phones:
                 if p in sil_phones:
+                    print("Continuing")
                     continue
                 else:
                     start_time = s
 
             if p not in sil_phones:
                 if p == "spn" and words_tier.intervals[word_idx].text == "<unk>":
-                    # For spoken noise
                     word_phones.append(p)
                     num_phones += 1
-                    if all_phones:
-                        if not isinstance(all_phones[-1], list):
-                            if word_end_times[word_idx] == e:
-                                all_phones[-1] = word_phones
-                                word_phones = []
-                                end_time = e
-                                end_idx = num_phones
+                    if all_phones[-1][0] in sil_phones if all_phones else False:
+                        if word_end_times[word_idx] == e:
+                            all_phones[-1] = word_phones
+                            word_phones = []
+                            end_time = e
+                            end_idx = num_phones
+                            end_word = num_words
 
-                                if word_idx == len(words_tier.intervals) - 1:  # That was the last word
-                                    break
-                                word_idx += 1
-                        else:
-                            if word_end_times[word_idx] == e:
-                                all_phones.append(word_phones)
-                                word_phones = []
-                                end_time = e
-                                end_idx = num_phones
-                                num_words += 1
-
-                                if word_idx == len(words_tier.intervals) - 1:  # That was the last word
-                                    break
-                                word_idx += 1
-
+                            if word_idx == len(words_tier.intervals) - 1:  # That was the last word
+                                break
+                            word_idx += 1
                     else:
                         if word_end_times[word_idx] == e:
                             all_phones.append(word_phones)
@@ -357,23 +347,21 @@ class Preprocessor:
                             end_time = e
                             end_idx = num_phones
                             num_words += 1
+                            end_word = num_words
 
                             if word_idx == len(words_tier.intervals) - 1:  # That was the last word
                                 break
                             word_idx += 1
 
                 elif p == "spn" and words_tier.intervals[word_idx].text != "<unk>":
-                    if all_phones:
-                        if not isinstance(all_phones[-1], list):
-                            all_phones[-1] = [p]
-                        else:
-                            all_phones.append([p])
+                    if all_phones[-1][0] in sil_phones if all_phones else False:
+                        all_phones[-1] = [p]
+                        print("Here")
                     else:
                         all_phones.append([p])
                     num_phones += 1
                     num_words += 1
 
-                # For ordinary phones
                 else:
                     word_phones.append(p)
                     num_phones += 1
@@ -384,9 +372,11 @@ class Preprocessor:
                         end_time = e
                         end_idx = num_phones
                         num_words += 1
+                        end_word = num_words
 
                         if word_idx == len(words_tier.intervals) - 1:  # That was the last word
                             break
+
                         word_idx += 1
 
             else:  # For silent phones

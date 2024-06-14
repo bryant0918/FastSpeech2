@@ -83,6 +83,8 @@ class FastSpeech2Pros(nn.Module):
         output = h_sd + e
         print("Output shape after prosody: ", output.shape)
 
+        # Now double check that durations and pitch etc are same as seq_length
+
         (output, p_predictions, e_predictions, log_d_predictions, d_rounded, mel_lens, mel_masks,) = \
             self.variance_adaptor(output, src_masks, mel_masks, max_mel_len, p_targets, e_targets, d_targets, p_control,
                                   e_control, d_control, )

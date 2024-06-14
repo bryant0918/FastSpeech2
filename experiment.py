@@ -309,8 +309,8 @@ if test_textgrid:
 
     for t in phones_tier._objects:
         s, e, p = t.start_time, t.end_time, t.text
-        print(p, s, e)
-        print("Word_idx", word_idx, words_tier.intervals[word_idx].text, word_end_times[word_idx], words_tier.intervals[word_idx].end_time)
+        # print(p, s, e)
+        # print("Word_idx", word_idx, words_tier.intervals[word_idx].text, word_end_times[word_idx], words_tier.intervals[word_idx].end_time)
 
         # Trim leading silences
         if not all_phones and not word_phones:
@@ -324,12 +324,13 @@ if test_textgrid:
             if p == "spn" and words_tier.intervals[word_idx].text == "<unk>":
                 word_phones.append(p)
                 num_phones += 1
-                if not isinstance(all_phones[-1], list) if all_phones else False:
+                if all_phones[-1][0] in sil_phones if all_phones else False:
                     if word_end_times[word_idx] == e:
                         all_phones[-1] = word_phones
                         word_phones = []
                         end_time = e
                         end_idx = num_phones
+                        end_word = num_words
 
                         if word_idx == len(words_tier.intervals) - 1:  # That was the last word
                             break
@@ -341,16 +342,18 @@ if test_textgrid:
                         end_time = e
                         end_idx = num_phones
                         num_words += 1
+                        end_word = num_words
 
                         if word_idx == len(words_tier.intervals) - 1:  # That was the last word
                             break
                         word_idx += 1
 
             elif p == "spn" and words_tier.intervals[word_idx].text != "<unk>":
-                if not isinstance(all_phones[-1], list) if all_phones else False:
-                    all_phones[-1] = p
+                if all_phones[-1][0] in sil_phones if all_phones else False:
+                    all_phones[-1] = [p]
+                    print("Here")
                 else:
-                    all_phones.append(p)
+                    all_phones.append([p])
                 num_phones += 1
                 num_words += 1
 
@@ -364,6 +367,7 @@ if test_textgrid:
                     end_time = e
                     end_idx = num_phones
                     num_words += 1
+                    end_word = num_words
 
                     if word_idx == len(words_tier.intervals) - 1:  # That was the last word
                         break
@@ -371,7 +375,7 @@ if test_textgrid:
                     word_idx += 1
 
         else:  # For silent phones
-            all_phones.append(p)
+            all_phones.append([p])
             num_phones += 1
             num_words += 1
 
@@ -381,12 +385,14 @@ if test_textgrid:
     print(len(all_phones), word_idx, num_words)
 
     # Trim tailing silences
-    phones = all_phones[:num_words]
+    phones = all_phones[:end_word]
     durations = durations[:end_idx]
 
     flat_phones = list(chain.from_iterable(phones))
     print("flat_phones: ", len(flat_phones), flat_phones)
     print("Durations: ", len(durations))
+
+    print(end_idx, num_words, end_word, word_idx)
 
     # return phones, durations, start_time, end_time
 

@@ -396,42 +396,10 @@ def flip_mapping(tgt_to_src_mappings):
                 
         return src_to_tgt_mappings_padded
 
-def p_e_d_realigner(alignments, batched_sequences):
-    """
-    Realigns and batched_sequences of pitch, energy, and duration
-    alignments: tgt -> src
-    batched_sequences: (src)
 
-    return: realigned batched_sequences: (tgt)
-    """
-    
-    batch_size = len(alignments)
-    seq_length = batched_sequences[0].shape[0]
-
-    sum_tgt = torch.zeros(batch_size, len(alignments[0]), device=device)
-    new_seq = torch.zeros(batch_size, len(alignments[0]), device=device)
-    counts = torch.zeros(batch_size, seq_length, device=device)  # Tensor to keep count of how many times each index is updated
-
-    print("batched_sequences", type(batched_sequences), len(batched_sequences), len(batched_sequences[0]), len(batched_sequences[1]))
-    print("alignments", alignments.shape, len(alignments[0]), len(alignments[1]))
-    # print(alignments)
-    print()
-    # Works for when target sentence is longer
-
-    for b in range(batch_size):
-        for j in range(len(alignments[b])):
-            
-            for i in alignments[b][j]:
-                
-                # Compute the weighted combination
-                result = batched_sequences[b][i]
-
-                sum_tgt[b, j] += result
-                counts[b, j] += 1
-        
-        mask = counts > 0
-        new_seq[mask] = sum_tgt[mask] / counts[mask].unsqueeze(-1)
-
-        print("new_seq", new_seq.shape)
-        
-    return new_seq
+def realign_p_e_d(alignments, p_e_d):
+        new_ped = torch.zeros(p_e_d.size(0), len(alignments[0]), device=p_e_d.device)
+        for b, alignment in enumerate(alignments):
+            for j, src_indices in enumerate(alignment):
+                new_ped[b][j] = torch.mean(torch.tensor([p_e_d[b][i] for i in src_indices], dtype=torch.float32))
+        return new_ped

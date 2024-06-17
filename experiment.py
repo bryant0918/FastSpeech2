@@ -917,3 +917,24 @@ if test_phone_alignment:
     phone_alignment = get_phoneme_alignment(word_alignments, phones, phones_by_word)
 
     print("Flat Phone alignment", len(phone_alignment), phone_alignment)
+
+    src_pitch = np.load("preprocessed_data/LJSpeech/pitch/LJSpeech-pitch-LJ050-0116.npy")
+
+
+"""Test realign p_e_d"""
+test_realign_p_e_d = True
+if test_realign_p_e_d:
+    src_pitch = np.load("preprocessed_data/LJSpeech/pitch/LJSpeech-pitch-LJ050-0116.npy")
+    src_pitch = torch.from_numpy(src_pitch).to(device).unsqueeze(0)
+    print("src_pitch", src_pitch.shape, src_pitch)
+
+    def realign_p_e_d(alignments, p_e_d):
+        new_pitch = torch.zeros(p_e_d.size(0), len(alignments[0]), device=p_e_d.device)
+        for b, alignment in enumerate(alignments):
+            for j, src_indices in enumerate(alignment):
+                new_pitch[b][j] = torch.mean(torch.tensor([p_e_d[b][i] for i in src_indices]))
+        return new_pitch
+    
+    new_pitch = realign_p_e_d([phone_alignment], src_pitch)
+
+    print("New pitch", new_pitch.shape, new_pitch)

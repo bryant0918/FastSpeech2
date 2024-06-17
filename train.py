@@ -10,7 +10,7 @@ from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm
 
 from utils.model import get_model, get_vocoder, get_param_num
-from utils.tools import to_device, log, synth_one_sample, flip_mapping, p_e_d_realigner
+from utils.tools import to_device, log, synth_one_sample, flip_mapping, realign_p_e_d
 from model import FastSpeech2Loss
 from dataset import Dataset, TrainDataset
 
@@ -125,8 +125,13 @@ def main(args, configs):
 
                 # flip mapping
                 # realign pitch energy and duration here for target use batched for source below
-                realigned_p = p_e_d_realigner(batch[14], batch[15])
+                realigned_p = realign_p_e_d(batch[14], batch[15])
+                realigned_e = realign_p_e_d(batch[14], batch[16])
+                realigned_d = realign_p_e_d(batch[14], batch[17])
                 print("Realigned pitches: ", realigned_p.shape)
+                print("Realigned energies: ", realigned_e.shape)
+                print("Realigned durations: ", realigned_d.shape)
+
 
                 # Forward
                 if batch is None:

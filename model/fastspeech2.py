@@ -39,8 +39,8 @@ class FastSpeech2Pros(nn.Module):
         with open(os.path.join(preprocess_config["path"]["preprocessed_path"], "speakers.json"), "r") as f:
             self.speakers_json = json.load(f)
 
-    def forward(self, speakers, texts, src_lens, max_src_len, mels=None, mel_lens=None, max_mel_len=None,
-                translations=None, translation_lens=None, max_translation_len=None, speaker_embs=None,
+    def forward(self, texts, src_lens, max_src_len, mels=None, mel_lens=None, max_mel_len=None,
+                speaker_embs=None,
                 alignments=None, p_targets=None, e_targets=None, d_targets=None, prev_e=None, p_control=1.0,
                 e_control=1.0, d_control=1.0,):
         # batch = (ids, raw_texts, raw_translations, speakers, texts, src_lens, max_text_lens, mels, mel_lens,
@@ -48,10 +48,12 @@ class FastSpeech2Pros(nn.Module):
         #          alignments, pitches, energies, durations)
 
         # Get masks
-        src_masks = get_mask_from_lengths(src_lens, max_src_len)
+        tgt_masks = get_mask_from_lengths(src_lens, max_src_len)
+        
         mel_masks = (get_mask_from_lengths(mel_lens, max_mel_len) if mel_lens is not None else None)
         
-        output = self.encoder(texts, src_masks)  # torch.Size([Batch, seq_len, 256])
+        # This should be tgt translations not src texts
+        output = self.encoder(texts, tgt_masks)  # torch.Size([Batch, seq_len, 256])
 
         speaker_embs = speaker_embs.unsqueeze(1).expand(-1, output.size()[1], -1)
         h_sd = output + speaker_embs  # torch.Size([Batch, seq_len, 256])
@@ -73,9 +75,6 @@ class FastSpeech2Pros(nn.Module):
         e_k_src = prosody_extractor.split_phones(e_src, d_targets)
 
         tgt_samp = prosody_predictor.sample2(e_tgt)
-        print("tgt_samp shape: ", tgt_samp.shape) # Correct
-        print("e_k_src shape: ", len(e_k_src))
-
         
         print("alignments shape: ", alignments.shape)  # TODO: unpad alignments for realigner otherwise everything mapped to 0.
         adjusted_e_tgt = prosody_predictor.prosody_realigner(alignments, tgt_samp, e_k_src)
@@ -87,8 +86,14 @@ class FastSpeech2Pros(nn.Module):
         # Now double check that durations and pitch etc are same as seq_length
 
         (output, p_predictions, e_predictions, log_d_predictions, d_rounded, mel_lens, mel_masks,) = \
-            self.variance_adaptor(output, src_masks, mel_masks, max_mel_len, p_targets, e_targets, d_targets, p_control,
+            self.variance_adaptor(output, tgt_masks, mel_masks, max_mel_len, p_targets, e_targets, d_targets, p_control,
                                   e_control, d_control, )
+
+        print("d_rounded shape: ", d_rounded.shape)
+        print("mel_lens shape: ", mel_lens.shape)
+        print("mel_masks shape: ", mel_masks.shape)
+        # Remap p_predictions, e_predictions, log_d_predictions to tgt size
+
 
         output, mel_masks = self.decoder(output, mel_masks)
 
@@ -99,7 +104,7 @@ class FastSpeech2Pros(nn.Module):
         # For calculating Lpp loss:
         # y_e_tgt = prosody_extractor.prosody_realigner(alignments, e_k_src)
 
-        return (output, postnet_output, p_predictions, e_predictions, log_d_predictions, d_rounded, src_masks,
+        return (output, postnet_output, p_predictions, e_predictions, log_d_predictions, d_rounded, tgt_masks,
                 mel_masks, src_lens, mel_lens, adjusted_e_tgt, )
 
 

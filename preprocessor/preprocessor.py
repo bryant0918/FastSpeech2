@@ -365,25 +365,29 @@ class Preprocessor:
         # print("word_alignments", word_alignments)
         # print("cumsums", np.cumsum([len(src_phone) for src_phone in src_phones]))
         src_phone_cumsums = np.cumsum([len(src_phone) for src_phone in src_phones])
-        # print("cumsums", np.cumsum(tgt_phones))
+        # print("cumsums", np.cumsum([len(tgt_phone) for tgt_phone in tgt_phones]))
+        tgt_phone_cumsums = np.cumsum([len(tgt_phone) for tgt_phone in tgt_phones])
         # To flatten phones
         flat_src_phones = list(chain.from_iterable(src_phones))
         flat_tgt_phones = list(chain.from_iterable(tgt_phones))
+        # print("Flat tgt phones length", len(flat_tgt_phones))
 
         flat_phone_alignments = []
+        flat_phone_alignments = [[] for _ in range(len(flat_tgt_phones))]
 
         for word_alignment in word_alignments:
             i, j = word_alignment[0], word_alignment[1]
 
             if i == 0:
                 flat_src_phones_idx = 0
+            
             else:
                 flat_src_phones_idx = src_phone_cumsums[i-1]
 
             if j == 0:
                 flat_tgt_phones_idx = 0
             else:
-                flat_tgt_phones_idx = len(tgt_phones[j-1])
+                flat_tgt_phones_idx = tgt_phone_cumsums[j-1]
 
             try:
                 src_word_phones = src_phones[i]
@@ -404,6 +408,7 @@ class Preprocessor:
             tgt_phone = 0
             the_word = []
 
+            # print("len of tgt_wrd_phones", len(tgt_word_phones))
             while tgt_phone < len(tgt_word_phones):
                 if (1-phone_accumulations) > phone_weight:   # Use all of the phone_weight left
                     phone_accumulations += phone_weight
@@ -413,9 +418,12 @@ class Preprocessor:
                     # Reset
                     phone_weight = len(src_word_phones) / len(tgt_word_phones)
                     tgt_phone += 1
-                    flat_tgt_phones_idx += 1
+                    
                     the_word.append(phone_alignment)
-                    flat_phone_alignments.append(flat_phone_alignment)
+                    
+                    flat_phone_alignments[flat_tgt_phones_idx].extend(flat_phone_alignment)
+                                        
+                    flat_tgt_phones_idx += 1
                     phone_alignment = []
                     flat_phone_alignment = []
 
@@ -426,10 +434,13 @@ class Preprocessor:
                     current_src_phone += 1
                     flat_src_phones_idx += 1
                     tgt_phone += 1
-                    flat_tgt_phones_idx += 1
+                    
                     phone_weight = len(src_word_phones) / len(tgt_word_phones)
                     the_word.append(phone_alignment)
-                    flat_phone_alignments.append(flat_phone_alignment)
+                    
+                    flat_phone_alignments[flat_tgt_phones_idx].extend(flat_phone_alignment)
+                    
+                    flat_tgt_phones_idx += 1
                     phone_alignment = []
                     flat_phone_alignment = []
 
@@ -447,9 +458,19 @@ class Preprocessor:
             if j not in phone_alignments[i]:
                 phone_alignments[i][j] = {}
 
-            phone_alignments[i][j] = {k: corresponding_tgt_phones for k, corresponding_tgt_phones in enumerate(the_word)}
+            if j in phone_alignments[i] and phone_alignments[i][j]:
+                # Append the_word to existing alignments
+                for k, corresponding_tgt_phones in enumerate(the_word):
+                    if k in phone_alignments[i][j]:
+                        phone_alignments[i][j][k].extend(corresponding_tgt_phones)
+                    else:
+                        phone_alignments[i][j][k] = corresponding_tgt_phones
+            else:
+                phone_alignments[i][j] = {k: corresponding_tgt_phones for k, corresponding_tgt_phones in enumerate(the_word)}
 
         # TODO: Get rid of phone_alignments?
+        # print("Phone alignments", phone_alignments)
+        # print()
 
         return flat_phone_alignments
 

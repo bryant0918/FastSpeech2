@@ -441,7 +441,7 @@ class ProsodyPredictor(nn.Module):
         new_e = torch.zeros(batch_size, seq_length, tgt_samp.shape[2], device=device)
         counts = torch.zeros(batch_size, seq_length, device=device)  # Tensor to keep count of how many times each index is updated
 
-        print("e_k_src", type(e_k_src), len(e_k_src), len(e_k_src[0]))
+        print("e_k_src", type(e_k_src), len(e_k_src), len(e_k_src[0]), len(e_k_src[1]))
 
         # Works for when target sentence is longer
 

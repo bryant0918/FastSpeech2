@@ -31,6 +31,7 @@ class TrainDataset(Dataset):
 
     def __getitem__(self, idx):
         basename = self.basename[idx]
+        print("BASENAME", basename)
         speaker = self.speaker[idx]
         speaker_id = self.speaker_map[speaker]
         raw_text = self.raw_text[idx]
@@ -39,6 +40,9 @@ class TrainDataset(Dataset):
         src_phone = np.array(text_to_sequence(self.text[idx], self.cleaners))
         tgt_phone = np.array(text_to_sequence(self.translation[idx], self.cleaners)) # TODO: Cleaners here?
 
+        print("len(src_phone)", len(src_phone))
+        print("len(tgt_phone)", len(tgt_phone))
+        
         mel_path = os.path.join(
             self.preprocessed_path,
             "mel",
@@ -137,6 +141,11 @@ class TrainDataset(Dataset):
 
         translations = pad_1D(translations)
         alignments = pad_inhomogeneous_2D(alignments)
+
+        print("Shape of alignments", np.shape(alignments))
+        print("Shape of texts", np.shape(texts))
+        print("Shape of translations", np.shape(translations))
+        print()
 
         return (ids, raw_texts, raw_translations, speakers, texts, text_lens, max(text_lens), mels, mel_lens,
                 max(mel_lens), translations, translation_lens, max(translation_lens), speaker_embeddings, alignments, pitches, energies,

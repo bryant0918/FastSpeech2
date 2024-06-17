@@ -20,10 +20,11 @@ else:
 
 
 def to_device(data, device):
-    if len(data) == 17:
+    # For Pros training
+    if len(data) == 18:
         (ids, raw_texts, raw_translations, speakers, texts, text_lens, max_text_lens, mels, mel_lens,
-        max_mel_lens, translations, translation_lens, speaker_embeddings, alignments, pitches, energies,
-        durations) = data
+        max_mel_lens, translations, translation_lens, max_translation_len, speaker_embeddings, alignments, 
+        pitches, energies, durations) = data
 
         speakers = torch.from_numpy(speakers).long().to(device)
         texts = torch.from_numpy(texts).long().to(device)
@@ -42,8 +43,8 @@ def to_device(data, device):
         durations = torch.from_numpy(durations).long().to(device)
 
         return (ids, raw_texts, raw_translations, speakers, texts, src_lens, max_text_lens, mels, mel_lens,
-                max_mel_lens, translations, translation_lens, speaker_embeddings, alignments, pitches, energies,
-                durations)
+                max_mel_lens, translations, translation_lens, max_translation_len, speaker_embeddings, alignments, 
+                pitches, energies, durations)
 
     if len(data) == 12:
         (ids, raw_texts, speakers, texts, src_lens, max_src_len, mels, mel_lens, max_mel_len, pitches, energies,
@@ -73,6 +74,7 @@ def to_device(data, device):
 
         return ids, raw_texts, speakers, texts, src_lens, max_src_len
 
+    # For Pros Synth
     if len(data) == 8:
         (ids, raw_texts, speakers, texts, src_lens, max_src_len, speaker_embs, mels) = data
 
@@ -328,6 +330,7 @@ def pad_2D(inputs, maxlen=None):
 
     return output
 
+
 def pad_inhomogeneous_2D(inputs, PAD=0):
     def pad_array(array, max_array_length, max_element_length, PAD):
         padded_array = []
@@ -344,8 +347,7 @@ def pad_inhomogeneous_2D(inputs, PAD=0):
     
     max_array_length = max(len(array) for array in inputs)
     max_element_length = max(len(element) for array in inputs for element in array)
-    print("max_array_length", max_array_length)
-    print("max_element_length", max_element_length)
+    
     padded = np.array([pad_array(array, max_array_length, max_element_length, PAD) for array in inputs])
     
     return padded
@@ -370,3 +372,66 @@ def pad(input_ele, mel_max_length=None):
         out_list.append(one_batch_padded)
     out_padded = torch.stack(out_list)
     return out_padded
+
+
+def flip_mapping(tgt_to_src_mappings):
+        # Find the maximum target index to determine the size of the new mapping
+        max_src_idx = int(tgt_to_src_mappings.max())
+
+        batch = []
+        for tgt_to_src_mapping in tgt_to_src_mappings:
+            # Initialize a list of lists to store the target to source mappings
+            src_to_tgt_mapping = [[] for _ in range(max_src_idx + 1)]
+            
+            # Iterate through each source index and its corresponding target indices
+            for tgt_idx, src_indices in enumerate(tgt_to_src_mapping):
+                for src_idx in src_indices:
+                    if src_idx > 0:
+                        src_to_tgt_mapping[src_idx].append(tgt_idx)
+
+            batch.append(src_to_tgt_mapping)
+
+        src_to_tgt_mappings_padded = pad_inhomogeneous_2D(batch)
+        src_to_tgt_mappings_padded = torch.from_numpy(src_to_tgt_mappings_padded).int().to(device)
+                
+        return src_to_tgt_mappings_padded
+
+def p_e_d_realigner(alignments, batched_sequences):
+    """
+    Realigns and batched_sequences of pitch, energy, and duration
+    alignments: tgt -> src
+    batched_sequences: (src)
+
+    return: realigned batched_sequences: (tgt)
+    """
+    
+    batch_size = len(alignments)
+    seq_length = batched_sequences[0].shape[0]
+
+    sum_tgt = torch.zeros(batch_size, len(alignments[0]), device=device)
+    new_seq = torch.zeros(batch_size, len(alignments[0]), device=device)
+    counts = torch.zeros(batch_size, seq_length, device=device)  # Tensor to keep count of how many times each index is updated
+
+    print("batched_sequences", type(batched_sequences), len(batched_sequences), len(batched_sequences[0]), len(batched_sequences[1]))
+    print("alignments", alignments.shape, len(alignments[0]), len(alignments[1]))
+    # print(alignments)
+    print()
+    # Works for when target sentence is longer
+
+    for b in range(batch_size):
+        for j in range(len(alignments[b])):
+            
+            for i in alignments[b][j]:
+                
+                # Compute the weighted combination
+                result = batched_sequences[b][i]
+
+                sum_tgt[b, j] += result
+                counts[b, j] += 1
+        
+        mask = counts > 0
+        new_seq[mask] = sum_tgt[mask] / counts[mask].unsqueeze(-1)
+
+        print("new_seq", new_seq.shape)
+        
+    return new_seq

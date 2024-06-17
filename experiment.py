@@ -28,6 +28,38 @@ model_config = "config/LJSpeech/model.yaml"
 preprocess_config = yaml.load(open(preprocess_config, "r"), Loader=yaml.FullLoader)
 model_config = yaml.load(open(model_config, "r"), Loader=yaml.FullLoader)
 
+"""Test reverse alignment"""
+test_reverse_alignment = False
+if test_reverse_alignment:
+    def flip_mapping(src_to_tgt_mapping):
+        # Find the maximum target index to determine the size of the new mapping
+        max_tgt_idx = int(src_to_tgt_mapping.max())
+        
+        # Initialize a list of lists to store the target to source mappings
+        tgt_to_src_mapping = [[] for _ in range(max_tgt_idx + 1)]
+        
+        # Iterate through each source index and its corresponding target indices
+        for src_idx, tgt_indices in enumerate(src_to_tgt_mapping):
+            for tgt_idx in tgt_indices:
+                if tgt_idx > 0:
+                    tgt_to_src_mapping[tgt_idx].append(src_idx)
+        
+        # Convert lists to tensors and pad to have uniform shape
+        max_len = max(len(tgt_indices) for tgt_indices in tgt_to_src_mapping)
+        tgt_to_src_mapping_padded = torch.zeros((len(tgt_to_src_mapping), max_len), dtype=torch.long)
+        for i, tgt_indices in enumerate(tgt_to_src_mapping):
+            tgt_to_src_mapping_padded[i, :len(tgt_indices)] = torch.tensor(tgt_indices, dtype=torch.long)
+        
+        return tgt_to_src_mapping_padded
+
+    # Example tensor
+    src_to_tgt_mapping = torch.tensor([[0,0,0],[1,2,0],[0,3,4],[0,0,0]])
+
+    # Flip the mapping
+    tgt_to_src_mapping = flip_mapping(src_to_tgt_mapping)
+
+    print(tgt_to_src_mapping)
+
 """Test Whisper AI for ASR"""
 test_whisper = False
 if test_whisper: 
@@ -375,113 +407,11 @@ if test_textgrid:
     # tg_path = "preprocessed_data/LJSpeech/TextGrid/LJSpeech/LJ001-0002.TextGrid"
     # tg_path = "preprocessed_data/LJSpeech/TextGrid/LJSpeech/LJ032-0007.TextGrid"
     # tg_path = "preprocessed_data/LJSpeech/TextGrid/LJSpeech/LJ036-0179.TextGrid"
-    tg_path = "preprocessed_data/LJSpeech/TextGrid/LJSpeech/LJ030-0041.TextGrid"
+    # tg_path = "preprocessed_data/LJSpeech/TextGrid/LJSpeech/LJ030-0041.TextGrid"
+    tg_path = "preprocessed_data/LJSpeech/TextGrid/LJSpeech/LJ050-0116.TextGrid"
 
     # Get src time alignments
     textgrid = tgt.io.read_textgrid(tg_path)
-
-    # phones_tier = textgrid.get_tier_by_name("phones")
-    # words_tier = textgrid.get_tier_by_name("words")
-    # word_end_times = [w.end_time for w in words_tier._objects]
-
-    # sil_phones = ["sil", "sp"]   # Not 'spn'
-
-    # all_phones, word_phones, durations = [], [], []
-    # start_time, end_time = 0, 0
-    # end_idx, word_idx = 0, 0
-    # num_phones, num_words = 0, 0
-
-    # for t in phones_tier._objects:
-    #     s, e, p = t.start_time, t.end_time, t.text
-    #     print(p,s,e)
-    #     print("Word_idx", word_idx, words_tier.intervals[word_idx].text, word_end_times[word_idx], words_tier.intervals[word_idx].end_time)
-
-    #     # Trim leading silences
-    #     if all_phones == [] and word_phones == []:
-    #         if p in sil_phones:
-    #             print("Continuing")
-    #             continue
-    #         else:
-    #             start_time = s
-
-    #     if p not in sil_phones:
-    #         if p == "spn" and words_tier.intervals[word_idx].text == "<unk>":
-    #             # For spoken noise
-    #             word_phones.append(p)
-    #             num_phones += 1
-    #             if not isinstance(all_phones[-1], list):
-    #                 if word_end_times[word_idx] == e:
-    #                     all_phones[-1] = word_phones
-    #                     word_phones = []
-    #                     end_time = e
-    #                     end_idx = num_phones
-
-    #                     if word_idx == len(words_tier.intervals) - 1:  # That was the last word
-    #                         break
-    #                     word_idx += 1
-    #             else:
-    #                 if word_end_times[word_idx] == e:
-    #                     all_phones.append(word_phones)
-    #                     word_phones = []
-    #                     end_time = e
-    #                     end_idx = num_phones
-    #                     num_words += 1
-
-    #                     if word_idx == len(words_tier.intervals) - 1:  # That was the last word
-    #                         break
-    #                     word_idx += 1
-
-
-    #         elif p == "spn" and words_tier.intervals[word_idx].text != "<unk>":
-    #             if not isinstance(all_phones[-1], list):
-    #                 all_phones[-1] = p
-    #             else:
-    #                 all_phones.append(p)
-    #             num_phones += 1
-    #             num_words += 1
-
-    #         # For ordinary phones
-    #         else:
-    #             word_phones.append(p)
-    #             num_phones += 1
-
-    #             if word_end_times[word_idx] == e:
-    #                 all_phones.append(word_phones)
-    #                 word_phones = []
-    #                 end_time = e
-    #                 end_idx = num_phones
-    #                 num_words += 1
-
-    #                 if word_idx == len(words_tier.intervals)-1:  # That was the last word
-    #                     break
-
-    #                 word_idx += 1
-
-
-    #     else:  # For silent phones
-    #         all_phones.append(p)
-    #         num_phones += 1
-    #         num_words += 1
-
-    #         # ending number of words will not be the same as word index since words_tier excludes silent phones
-    #         # but we will keep them. I am getting word alignment assuming praat gets all the words. However,
-    #         # there are <unk> words so I need to append ['spn'] when there is an <unk> word for my alignment.
-    #         # Maybe I can check my lexicon for a pronounciation as well. I should also account for this in the duration,
-    #         # pitch and energy as well.
-
-    #     # durations.append(int(np.round(e * self.sampling_rate / self.hop_length) -
-    #     #                      np.round(s * self.sampling_rate / self.hop_length)))
-    #     durations.append(int(np.round(e * 22050 / 256) - np.round(s * 22050 / 256)))
-
-    # print("Phones: ", all_phones)
-    # print(len(all_phones), word_idx, num_words)
-    # # Trim tailing silences
-    # phones = all_phones[:num_words]
-    # durations = durations[:end_idx]
-
-    # print("Phones: ", phones)
-
-    # # return phones, durations, start_time, end_time
 
     phones_tier = textgrid.get_tier_by_name("phones")
     words_tier = textgrid.get_tier_by_name("words")
@@ -617,12 +547,13 @@ if test_word_alignment:
     # phone_alignment = np.load(pth, allow_pickle=True)
     # print(phone_alignment)
 
-    pth = "preprocessed_data/Bryant/alignments/phone/Bryant-phone_alignment-LJ001-0002.npy.pkl"
+    pth = "preprocessed_data/LJSpeech/alignments/phone/LJSpeech-phone_alignment-LJ001-0002.pkl"
     # Loading the dictionary
     with open(pth, 'rb') as f:
         phone_alignments = pickle.load(f)
 
     print(phone_alignments)
+    print(len(phone_alignments))
 
 """Test Sentence Aligner"""
 test_aligner = False
@@ -654,13 +585,18 @@ if test_aligner:
         print(matching_method, ":", alignments[matching_method])
 
     src = "motorcycles. -- dallas police motorcycles preceded the pilot car."
+    src = "in being comparatively modern"
     tgt = "motocicletas. -- las motocicletas de la policia de dallas precedieron al coche del piloto."
+    tgt = "en ser comparativamente moderno"
 
     alignments = myaligner.get_word_aligns(src.split(), tgt.split())
     print("Src.split(): ", src.split())
     print("Tgt.split(): ", tgt.split())
     print(alignments)
 
+    tgt = "d i n e ɾ o k e m o i s e s a b j a ɾ e s i b i d o e l p o l b o d e o ɾ o ɾ o b a d o d e l s w e ɡ ɾ o d e m o s s , d a b i s o i s a a k s , k j e n n u n k a f w e a r e s t a d o ."
+    src = "IH1 T M AH1 S T HH AE1 V AH0 P IH1 R D T UW1 HH IH1 M sp DH AH0 T HH IY1 W AH0 Z sp AH0 N EY1 B AH0 L T AH0 K AH0 M AE1 N D sp IY1 V IH0 N DH IY0 AH0 T EH1 N SH AH0 N AH0 V HH IH1 Z F AE1 M L IY0"
+    print(len(tgt.split()), len(src.split()))
 
 """Get different speaker embedding"""
 test_embedding = False
@@ -823,3 +759,161 @@ if test_predictor:
     # sample = model.sample(h_sd, h_si)
     # print("Sample shape: ", sample.size())
 
+"""Test phone alignment"""
+test_phone_alignment = True
+if test_phone_alignment:
+    from itertools import chain
+    def get_phoneme_alignment(word_alignments, src_phones, tgt_phones):
+        phone_alignments = {}
+
+        print("src_phones", src_phones)
+        print("tgt_phones", tgt_phones)
+        print("word_alignments", word_alignments)
+        print("cumsums", np.cumsum([len(src_phone) for src_phone in src_phones]))
+        src_phone_cumsums = np.cumsum([len(src_phone) for src_phone in src_phones])
+        print("cumsums", np.cumsum([len(tgt_phone) for tgt_phone in tgt_phones]))
+        tgt_phone_cumsums = np.cumsum([len(tgt_phone) for tgt_phone in tgt_phones])
+        # To flatten phones
+        flat_src_phones = list(chain.from_iterable(src_phones))
+        flat_tgt_phones = list(chain.from_iterable(tgt_phones))
+        print("Flat tgt phones length", len(flat_tgt_phones))
+
+        flat_phone_alignments = []
+        flat_phone_alignments = [[] for _ in range(len(flat_tgt_phones))]
+
+        for word_alignment in word_alignments:
+            i, j = word_alignment[0], word_alignment[1]
+
+            if i == 0:
+                flat_src_phones_idx = 0
+            
+            else:
+                flat_src_phones_idx = src_phone_cumsums[i-1]
+
+            if j == 0:
+                flat_tgt_phones_idx = 0
+            else:
+                flat_tgt_phones_idx = tgt_phone_cumsums[j-1]
+
+            try:
+                src_word_phones = src_phones[i]
+                tgt_word_phones = tgt_phones[j]
+            except IndexError:
+                print("src_phones", src_phones)
+                print("tgt_phones", tgt_phones)
+                print("word_alignment", word_alignment)
+                print("Word alignments", word_alignments)
+                print("i, j", i, j)
+
+                return IndexError
+
+            phone_weight = len(src_word_phones) / len(tgt_word_phones)
+            phone_alignment, flat_phone_alignment = [], []
+            current_src_phone = 0
+            phone_accumulations = 0
+            tgt_phone = 0
+            the_word = []
+
+            print("len of tgt_wrd_phones", len(tgt_word_phones))
+            while tgt_phone < len(tgt_word_phones):
+                if (1-phone_accumulations) > phone_weight:   # Use all of the phone_weight left
+                    phone_accumulations += phone_weight
+                    if current_src_phone not in phone_alignment:
+                        phone_alignment.append(current_src_phone)
+                        flat_phone_alignment.append(flat_src_phones_idx)
+                    # Reset
+                    phone_weight = len(src_word_phones) / len(tgt_word_phones)
+                    tgt_phone += 1
+                    
+                    the_word.append(phone_alignment)
+                    
+                    flat_phone_alignments[flat_tgt_phones_idx].extend(flat_phone_alignment)
+                                        
+                    flat_tgt_phones_idx += 1
+                    phone_alignment = []
+                    flat_phone_alignment = []
+
+                elif phone_weight == (1-phone_accumulations):   # Use all of the phone_weight left
+                    phone_alignment.append(current_src_phone)
+                    flat_phone_alignment.append(flat_src_phones_idx)
+                    phone_accumulations = 0
+                    current_src_phone += 1
+                    flat_src_phones_idx += 1
+                    tgt_phone += 1
+                    
+                    phone_weight = len(src_word_phones) / len(tgt_word_phones)
+                    the_word.append(phone_alignment)
+                    
+                    flat_phone_alignments[flat_tgt_phones_idx].extend(flat_phone_alignment)
+                    
+                    flat_tgt_phones_idx += 1
+                    phone_alignment = []
+                    flat_phone_alignment = []
+
+                else:   # Phone weight > what's available --> Use part of the phone_weight
+                    phone_alignment.append(current_src_phone)
+                    flat_phone_alignment.append(flat_src_phones_idx)
+                    current_src_phone += 1
+                    flat_src_phones_idx += 1
+                    phone_weight = phone_weight - (1 - phone_accumulations)
+                    phone_accumulations = 0
+
+            if i not in phone_alignments:
+                phone_alignments[i] = {}
+
+            if j not in phone_alignments[i]:
+                phone_alignments[i][j] = {}
+
+            if j in phone_alignments[i] and phone_alignments[i][j]:
+                # Append the_word to existing alignments
+                for k, corresponding_tgt_phones in enumerate(the_word):
+                    if k in phone_alignments[i][j]:
+                        phone_alignments[i][j][k].extend(corresponding_tgt_phones)
+                    else:
+                        phone_alignments[i][j][k] = corresponding_tgt_phones
+            else:
+                phone_alignments[i][j] = {k: corresponding_tgt_phones for k, corresponding_tgt_phones in enumerate(the_word)}
+
+        # TODO: Get rid of phone_alignments?
+        print("Phone alignments", phone_alignments)
+        print()
+
+        return flat_phone_alignments
+
+    pth = "preprocessed_data/LJSpeech/alignments/word/LJSpeech-word_alignment-LJ050-0116.npy"
+    # Loading the dictionary
+    # with open(pth, 'rb') as f:
+    #     word_alignments = pickle.load(f)
+    word_alignments = np.load(pth)
+    print("Word alignments", word_alignments)
+
+    import epitran
+    from string import punctuation
+    import re
+
+    epi = epitran.Epitran("spa-Latn")
+
+    new_punc = "¡!\"#$%&'()*+,-./:;<=>¿?@[\]^_`{|}~"
+
+    text = "que tienen la responsabilidad principal de suministrar informacion sobre amenazas potenciales,"
+    test_str = text.translate(str.maketrans('', '', new_punc))
+
+    res = re.sub(r'[^\w\s]', '', text)  # Remove all non word or space characters
+
+    my_phones = epi.transliterate(test_str)
+
+    phones_by_word = my_phones.split()
+    # for word in phones_by_word:
+    #     for char in word:
+    #         print(char, db[char]['unicode'], db[char]['id'])
+
+    phones_by_word = [[char for char in word] for word in phones_by_word]
+    print(phones_by_word)
+
+    src_phones = "W IH1 CH K EH1 R IY0 DH AH0 M EY1 JH ER0 R IY0 S P AA2 N S AH0 B IH1 L AH0 T IY0 sp F R ER0 S AH0 P L AY1 IH0 NG IH2 N F ER0 M EY1 SH AH0 N AH0 B AW1 T P AH0 T EH1 N CH AH0 L TH R EH1 T S"
+    tgt_phones = "k e t j e n e n l a ɾ e s p o n s a b i l i d a d p ɾ i n s i p a l d e s u m i n i s t ɾ a ɾ i n f o ɾ m a s i o n s o b ɾ e a m e n a s a s p o t e n s i a l e s ,"
+
+    print(len(src_phones.split()), len(tgt_phones.split()))
+    phone_alignment = get_phoneme_alignment(word_alignments, phones, phones_by_word)
+
+    print("Flat Phone alignment", len(phone_alignment), phone_alignment)

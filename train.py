@@ -1,6 +1,7 @@
 import argparse
 import os
 
+import numpy as np
 import torch
 import yaml
 import torch.nn as nn
@@ -9,7 +10,7 @@ from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm
 
 from utils.model import get_model, get_vocoder, get_param_num
-from utils.tools import to_device, log, synth_one_sample
+from utils.tools import to_device, log, synth_one_sample, flip_mapping, p_e_d_realigner
 from model import FastSpeech2Loss
 from dataset import Dataset, TrainDataset
 
@@ -105,9 +106,35 @@ def main(args, configs):
 
                 if step == 4:
                     raise NotImplementedError
+                print()
+                print(f"texts shape: {batch[4].shape}")
+                print(f"src_lens shape: {batch[5].shape}")
+                print(f"max_src_len: {batch[6]}{type(batch[6])}")
+                print(f"mels shape: {batch[7].shape}")
+                print(f"mel_lens shape: {batch[8].shape}")
+                print(f"max_mel_len: {batch[9]}{type(batch[9])}")
+                print(f"translations shape: {batch[10].shape}")
+                print(f"translation_lens shape: {batch[11].shape}{batch[11]}")
+                print(f"max_translation_len: {batch[12]}{type(batch[12])}")
+                print(f"speaker_embs shape: {batch[13].shape}")
+                print(f"alignments shape: {batch[14].shape}")
+                print(f"pitches shape: {batch[15].shape}")   
+                print(f"energies shape: {batch[16].shape}")
+                print(f"durations shape: {batch[17].shape}")
+                print()
+
+                # flip mapping
+                # realign pitch energy and duration here for target use batched for source below
+                realigned_p = p_e_d_realigner(batch[14], batch[15])
+                print("Realigned pitches: ", realigned_p.shape)
 
                 # Forward
-                input = batch[3:]
+                if batch is None:
+                    print("Batch is None")
+                    
+                input = batch[10:13] + batch[7:10] + batch[13:]
+                # input = batch[4:10] + batch[13:]
+
                 # try:
                 #     output = model(*(batch[3:]))
                 #     print("Good")
@@ -138,25 +165,44 @@ def main(args, configs):
                 # alignments=None, p_targets=None, e_targets=None, d_targets=None, prev_e=None, p_control=1.0,
                 # e_control=1.0, d_control=1.0,)
                 # I'll do:
-                # mel_lens = output_tgt[9] 
-                # mels_tgt = output_tgt[1][0, :mel_len].detach().transpose(0, 1) # But for whole batch
-                # alignments = reverse_alignments(output_tgt[10][0], mel_lens)
+                # mel_lens = output_tgt[9]
+                # max_mel_len = max(mel_lens)  # TODO: this is only for batch though...
+                # mels_tgt = output_tgt[1]
+                # alignments = reverse_alignments()
                 # (speakers=batch[3], texts=translations, src_lens=translation_lens, max_src_len=max_translation_len,
                 #  mels=mels_tgt, mel_lens=mel_lens, max_mel_len=max(mel_lens),
                 #  translations=None, translation_lens=None, max_translation_lens=None, speaker_embs=batch[13],
                 #  alignments=alignments, p_targets=output_tgt[2], e_targets=output_tgt[3], d_targets=output_tgt[4],
                 #  prev_e=None, p_control=1.0, e_control=1.0, d_control=1.0,)
                 
-                mel_lens = output_tgt[9]
-                max_mel_len = max(mel_lens)  # TODO: this is only for batch though...
-                mels_tgt = output_tgt[1]
-                # alignments = reverse_alignments(output_tgt[10][0], mel_lens)
+                alignments = flip_mapping(batch[14])
 
-                reverse_input = (batch[3], batch[10], batch[11], batch[12], output_tgt[1], output_tgt[9], max(output_tgt[9]),
-                                 None, None, None, batch[13], alignments, output_tgt[2], output_tgt[3], output_tgt[4], None, 1.0, 1.0, 1.0)
+                # reverse_input = (batch[3], batch[10], batch[11], batch[12], output_tgt[1], output_tgt[9], max(output_tgt[9]),
+                                #  None, None, None, batch[13], alignments, output_tgt[2], output_tgt[3], output_tgt[4], None, 1.0, 1.0, 1.0)
+                
+                max_mel_len = np.int64(max(output_tgt[9]).cpu().numpy())
+
+                print()
+                print(f"texts shape: {batch[4].shape}")
+                print(f"src_lens shape: {batch[5].shape}")
+                print(f"max_src_len: {batch[6]}{type(batch[12])}")
+                print(f"mels shape: {output_tgt[1].shape}")
+                print(f"mel_lens shape: {output_tgt[9].shape}")
+                print(f"max_mel_len: {max_mel_len}{type(max_mel_len)}")
+                print(f"speaker_embs shape: {batch[13].shape}")
+                print(f"alignments shape: {alignments.shape}")
+                print(f"p_targets shape: {output_tgt[2].shape}")  # Pitches energies and durations should be same size as texts
+                print(f"e_targets shape: {output_tgt[3].shape}")
+                print(f"d_targets shape: {output_tgt[4].shape}")
+                print()
+
+                print("Pitches: ", batch[15])
 
                 # # Forward pass: Tgt to Src
-                output_src = model(reverse_input)
+                output_src = model(texts=batch[4], src_lens=batch[5], max_src_len=batch[6],
+                                   mels=output_tgt[1], mel_lens=output_tgt[9], max_mel_len=max_mel_len,
+                                   speaker_embs=batch[13],
+                                   alignments=alignments, p_targets=output_tgt[2], e_targets=output_tgt[3], d_targets=output_tgt[4])
                 
                 # # Calculate loss for Tgt to Src
                 losses_tgt_to_src = Loss(batch, output_src)

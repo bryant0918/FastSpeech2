@@ -91,20 +91,83 @@ def main(args, configs):
     outer_bar.n = args.restore_step
     outer_bar.update()
 
+    torch.autograd.set_detect_anomaly(True)
+
     while True:
         inner_bar = tqdm(total=len(loader), desc="Epoch {}".format(epoch), position=1)
 
         for batches in loader:
             for batch in batches:
                 batch = to_device(batch, device)
+                # batch = (ids, raw_texts, raw_translations, speakers, texts, src_lens, max_text_lens, mels, mel_lens,
+                #          max_mel_lens, translations, translation_lens, max(translation_lens), speaker_embeddings, alignments, pitches, energies,
+                #          durations)
+
+                if step == 4:
+                    raise NotImplementedError
 
                 # Forward
                 input = batch[3:]
-                output = model(*(batch[3:]))
+                # try:
+                #     output = model(*(batch[3:]))
+                #     print("Good")
+                #     if step == 5:
+                #         raise NotImplementedError
+                # except:
+                #     print("Bad")
+                #     print(batch[1])
+                #     step += 1
+                #     if step >= 5:
+                #         raise NotImplementedError
+                #     continue
 
-                # Cal Loss
-                losses = Loss(batch, output)
-                total_loss = losses[0]
+                # Forward pass: Src to Tgt
+                # input_english = batch['english_audio']
+                output_tgt = model(*(input))
+                
+                # Calculate loss for Src to Tgt
+                losses_src_to_tgt = Loss(batch, output_tgt)
+                total_loss_src_to_tgt = losses_src_to_tgt[0]
+
+
+                # output_tgt = (output, postnet_output, p_predictions, e_predictions, log_d_predictions, d_rounded, src_masks,
+                #               mel_masks, src_lens, mel_lens, adjusted_e_tgt, )
+                # We need:
+                # (speakers, texts, src_lens, max_src_len, mels=None, mel_lens=None, max_mel_len=None,
+                # translations=None, translation_lens=None, max_translation_len=None, speaker_embs=None,
+                # alignments=None, p_targets=None, e_targets=None, d_targets=None, prev_e=None, p_control=1.0,
+                # e_control=1.0, d_control=1.0,)
+                # I'll do:
+                # mel_lens = output_tgt[9] 
+                # mels_tgt = output_tgt[1][0, :mel_len].detach().transpose(0, 1) # But for whole batch
+                # alignments = reverse_alignments(output_tgt[10][0], mel_lens)
+                # (speakers=batch[3], texts=translations, src_lens=translation_lens, max_src_len=max_translation_len,
+                #  mels=mels_tgt, mel_lens=mel_lens, max_mel_len=max(mel_lens),
+                #  translations=None, translation_lens=None, max_translation_lens=None, speaker_embs=batch[13],
+                #  alignments=alignments, p_targets=output_tgt[2], e_targets=output_tgt[3], d_targets=output_tgt[4],
+                #  prev_e=None, p_control=1.0, e_control=1.0, d_control=1.0,)
+                
+                mel_lens = output_tgt[9]
+                max_mel_len = max(mel_lens)  # TODO: this is only for batch though...
+                mels_tgt = output_tgt[1]
+                # alignments = reverse_alignments(output_tgt[10][0], mel_lens)
+
+                reverse_input = (batch[3], batch[10], batch[11], batch[12], output_tgt[1], output_tgt[9], max(output_tgt[9]),
+                                 None, None, None, batch[13], alignments, output_tgt[2], output_tgt[3], output_tgt[4], None, 1.0, 1.0, 1.0)
+
+                # # Forward pass: Tgt to Src
+                output_src = model(reverse_input)
+                
+                # # Calculate loss for Tgt to Src
+                losses_tgt_to_src = Loss(batch, output_src)
+                total_loss_tgt_to_src = losses_tgt_to_src[0]
+
+                # Combine the losses
+                total_loss = (total_loss_src_to_tgt + total_loss_tgt_to_src) / 2
+
+                # # Cal Loss
+                # losses = Loss(batch, output)
+                # total_loss = losses[0]
 
                 # Backward
                 total_loss = total_loss / grad_acc_step

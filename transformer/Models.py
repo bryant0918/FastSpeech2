@@ -245,6 +245,47 @@ class ProsodyExtractor(nn.Module):
             batch_phone_emb_chunks.append(sample_phone_emb_chunks)
 
         return batch_phone_emb_chunks
+    
+    # def prosody_realigner(self, phone_alignments, e_k_src):
+    #     """
+    #     Realigns e_k_src to tgt phoneme sequence without shifting distribution
+    #     """
+        
+    #     # TODO!!!
+    #     batch_size = len(phone_alignments)
+    #     seq_length = tgt_samp.shape[1]
+    #     print("tgt samp shape", tgt_samp.shape)
+    #     new_e = torch.zeros(batch_size, seq_length, tgt_samp.shape[2], device=device)
+    #     counts = torch.zeros(batch_size, seq_length, device=device)  # Tensor to keep count of how many times each index is updated
+
+    #     print("e_k_src", type(e_k_src), len(e_k_src), len(e_k_src[0]))
+
+    #     # Works for when target sentence is longer
+
+    #     for b in range(batch_size):
+    #         for j in range(len(phone_alignments[b])):
+
+    #             # Account for size mismatch without having tgt_samp (0's in phone alignment)
+    #             if j >= tgt_samp[b].shape[0]:
+    #                     continue
+                
+    #             for i in phone_alignments[b][j]:
+    #                 # Compute the weighted combination
+    #                 result = e_k_src[b][i]
+    #                 new_mean = result.mean(dim=(0, 1))  # [256]
+
+    #                 # Accumulate the new_mean for each index
+    #                 # sum_results[b][:, i] += new_mean
+    #                 new_e[b, i] += new_mean
+    #                 counts[b, i] += 1
+
+    #         # Average the accumulated results
+    #         for i in range(seq_length):
+    #             if counts[b][i] > 0:
+    #                 new_e[b, i] /= counts[b][i]
+            
+    #     return new_e
+
 
 
 class ProsodyPredictor(nn.Module):
@@ -388,17 +429,21 @@ class ProsodyPredictor(nn.Module):
         return sample
 
     def prosody_realigner(self, phone_alignments, tgt_samp, e_k_src):
+        """
+        Realigns and shifts tgt_samp distribution by e_k_src
+        """
+        
         beta = 0.1
         batch_size = len(phone_alignments)
         seq_length = tgt_samp.shape[1]
         print("tgt samp shape", tgt_samp.shape)
+        sum_e = torch.zeros(batch_size, seq_length, tgt_samp.shape[2], device=device)
         new_e = torch.zeros(batch_size, seq_length, tgt_samp.shape[2], device=device)
         counts = torch.zeros(batch_size, seq_length, device=device)  # Tensor to keep count of how many times each index is updated
 
         print("e_k_src", type(e_k_src), len(e_k_src), len(e_k_src[0]))
 
         # Works for when target sentence is longer
-
 
         for b in range(batch_size):
             for j in range(len(phone_alignments[b])):
@@ -419,13 +464,16 @@ class ProsodyPredictor(nn.Module):
 
                     # Accumulate the new_mean for each index
                     # sum_results[b][:, i] += new_mean
-                    new_e[b, i] += new_mean
+                    sum_e[b, i] += new_mean
                     counts[b, i] += 1
 
             # Average the accumulated results
-            for i in range(seq_length):
-                if counts[b][i] > 0:
-                    new_e[b, i] /= counts[b][i]
+            # for i in range(seq_length):
+            #     if counts[b][i] > 0:
+            #         new_e[b, i] /= counts[b][i]
+            
+            mask = counts > 0
+            new_e[mask] = sum_e[mask] / counts[mask].unsqueeze(-1)
             
         return new_e
 

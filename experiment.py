@@ -28,6 +28,193 @@ model_config = "config/LJSpeech/model.yaml"
 preprocess_config = yaml.load(open(preprocess_config, "r"), Loader=yaml.FullLoader)
 model_config = yaml.load(open(model_config, "r"), Loader=yaml.FullLoader)
 
+"""Test Whisper AI for ASR"""
+test_whisper = False
+if test_whisper: 
+    import whisper
+    import torch.nn.functional as F
+    import torchaudio.functional as audio_F
+
+    model = whisper.load_model("base")
+
+    audio = whisper.load_audio("raw_data/LJSpeech/LJSpeech/LJ001-0004.wav")
+    audio = whisper.pad_or_trim(audio)
+    mel = whisper.log_mel_spectrogram(audio).to(model.device)
+    
+    print("Their Mel shape: ", mel.size())  # Requires [80, 3000]
+
+    # detect the spoken language
+    _, probs = model.detect_language(mel)
+    print(f"Detected language: {max(probs, key=probs.get)}")
+
+    options = whisper.DecodingOptions()
+    result = whisper.decode(model, mel, options)
+    print("Result: ", result.text)
+
+    mel_path = "preprocessed_data/LJSpeech/mel/LJSpeech-mel-LJ001-0004.npy"
+    melspec = torch.from_numpy(np.load(mel_path)).to(device)
+
+    # melspec = melspec.unsqueeze(0).unsqueeze(0)   # To get dimension [1,1,W:X, H:80]
+    print("Mel shape: ", melspec.size())
+
+    melspec = melspec.permute(1,0)
+    print("Mel shape: ", melspec.size())
+
+    # Padding to achieve size [80, 3000]
+    target_size = 3000
+    current_size = melspec.size(1)  # Size of the second dimension (145)
+    padding_size = target_size - current_size  # Padding needed (3000 - 145)
+
+    # Apply padding
+    padded_tensor = F.pad(melspec, (0, padding_size))
+
+    # Compute the Log-Mel Spectrogram
+    # log_mel_spectrogram = torch.log(padded_tensor + 1e-9)  # Adding a small value to avoid log(0)
+    # Whisper transform (uses base 10 and normalizes)
+    log_spec = torch.clamp(padded_tensor, min=1e-10).log10()
+    log_spec = torch.maximum(log_spec, log_spec.max() - 8.0)
+    log_spec = (log_spec + 4.0) / 4.0
+
+    # Verify the size
+    print(log_spec.size())  # Should print torch.Size([80, 3000])
+
+
+    # detect the spoken language
+    _, probs = model.detect_language(log_spec)
+    print(f"Detected language: {max(probs, key=probs.get)}")
+
+    options = whisper.DecodingOptions()
+    result = whisper.decode(model, log_spec, options)
+
+    # print the recognized text
+    print(result.text)
+
+    print("options: ", options)
+
+    get_mel = True
+    if get_mel:
+        config = preprocess_config
+        print()
+        STFT = Audio.stft.TacotronSTFT(
+            400, #n_fft
+            160, #hop_length
+            400, #win_length
+            config["preprocessing"]["mel"]["n_mel_channels"],
+            1600, #sampling_rate
+            config["preprocessing"]["mel"]["mel_fmin"],
+            config["preprocessing"]["mel"]["mel_fmax"],
+        )
+
+        wav_path = "raw_data/LJSpeech/LJSpeech/LJ001-0004.wav"
+        sampling_rate = 1600
+
+        # Read and trim wav files
+        wav, _ = librosa.load(wav_path)
+        wav = torch.from_numpy(wav.astype(np.float32)).to(device)
+
+        # melspec, energy = get_mel_from_wav(wav, STFT)
+
+        N_FFT = 400
+        HOP_LENGTH = 160
+        n_mels = 80
+
+        # mel_spec = librosa.feature.melspectrogram(
+        #     y=wav,
+        #     sr=sampling_rate,
+        #     n_fft=N_FFT,
+        #     hop_length=HOP_LENGTH,
+        #     n_mels=n_mels
+        # )
+        # print("Mel shape: ", np.shape(mel_spec))
+
+        window = torch.hann_window(N_FFT).to(device)
+        stft = torch.stft(wav, N_FFT, HOP_LENGTH, window=window, return_complex=True)
+        magnitudes = stft[..., :-1].abs() ** 2
+        
+        # import os
+        # filters_path = os.path.join(os.path.dirname(__file__), "assets", "mel_filters.npz")
+        # with np.load(filters_path, allow_pickle=False) as f:
+        #     filters = torch.from_numpy(f[f"mel_{n_mels}"]).to(device)
+        # filters = mel_filters(wav.device, n_mels)
+
+        mel_filters_librosa = librosa.filters.mel(
+            sr=sampling_rate,
+            n_fft=N_FFT,
+            n_mels=n_mels,
+            fmin=0.0,
+            fmax=sampling_rate / 2.0,
+            norm="slaney",
+            htk=True,
+        )
+
+        mel_filters = audio_F.melscale_fbanks(
+            int(N_FFT // 2 + 1),
+            n_mels=n_mels,
+            f_min=0.0,
+            f_max=sampling_rate / 2.0,
+            sample_rate=sampling_rate,
+            norm="slaney",
+        ).to(device).T
+
+        mel_filters_librosa = torch.from_numpy(mel_filters_librosa).to(device)
+        
+        mel_spec = mel_filters @ magnitudes
+
+        log_spec = torch.clamp(mel_spec, min=1e-10).log10()
+        log_spec = torch.maximum(log_spec, log_spec.max() - 8.0)
+        log_spec = (log_spec + 4.0) / 4.0
+
+        # log_spec = torch.from_numpy(log_spec).to(device)
+
+        print("log_spec shape: ", log_spec.size())
+
+        # melspec = melspec.permute(1,0)
+        # print("Mel shape: ", melspec.size())
+
+        # # Padding to achieve size [80, 3000]
+        # target_size = 3000
+        # current_size = np.shape(mel_spec)[1]  # Size of the second dimension (145)
+        # padding_size = target_size - current_size  # Padding needed (3000 - 145)
+
+        # # Apply padding
+        # padded_tensor = np.pad(mel_spec, ((0, 0), (0, padding_size)), mode='constant')
+        # Padding to achieve size [80, 3000]
+        target_size = 3000
+        current_size = log_spec.size(1)  # Size of the second dimension (145)
+        padding_size = target_size - current_size  # Padding needed (3000 - 145)
+
+        # Apply padding
+        padded_tensor = F.pad(log_spec, (0, padding_size))
+        # Convert to log scale (dB)
+        # log_mel_spec = librosa.power_to_db(padded_tensor, ref=np.max)
+        # print("Log Mel shape: ", log_mel_spec.shape)
+
+        # Compute the Log-Mel Spectrogram
+        # log_mel_spectrogram = torch.log(padded_tensor + 1e-9)  # Adding a small value to avoid log(0)
+        # Whisper transform (uses base 10 and normalizes)
+        # padded_tensor = torch.from_numpy(padded_tensor).to(device)
+        log_spec = torch.clamp(padded_tensor, min=1e-10).log10()
+        log_spec = torch.maximum(log_spec, log_spec.max() - 8.0)
+        log_spec = (log_spec + 4.0) / 4.0
+
+        # Verify the size
+        # log_mel_spec = torch.from_numpy(log_mel_spec).to(device)
+        print(log_spec.size())  # Should print torch.Size([80, 3000])
+
+
+        # detect the spoken language
+        _, probs = model.detect_language(log_spec)
+        print(f"Detected language: {max(probs, key=probs.get)}")
+
+        options = whisper.DecodingOptions()
+        result = whisper.decode(model, log_spec, options)
+
+        # print the recognized text
+        print(result.text)
+
+        print("options: ", options)
+
+
 """Debug segmentatin fault"""  # Fixed by export LD_LIBRARY_PATH=""
 seg_fault = False
 if seg_fault:
@@ -185,9 +372,9 @@ if test_textgrid:
     from itertools import chain
     import os
     tg_path = os.path.join("preprocessed_data/Bryant", "TextGrid", "Bryant", "{}.TextGrid".format("LJ001-002"))
-    tg_path = "preprocessed_data/Bryant/TextGrid/Bryant/LJ001-0002.TextGrid"
-    tg_path = "preprocessed_data/LJSpeech/TextGrid/LJSpeech/LJ032-0007.TextGrid"
-    tg_path = "preprocessed_data/LJSpeech/TextGrid/LJSpeech/LJ036-0179.TextGrid"
+    # tg_path = "preprocessed_data/LJSpeech/TextGrid/LJSpeech/LJ001-0002.TextGrid"
+    # tg_path = "preprocessed_data/LJSpeech/TextGrid/LJSpeech/LJ032-0007.TextGrid"
+    # tg_path = "preprocessed_data/LJSpeech/TextGrid/LJSpeech/LJ036-0179.TextGrid"
     tg_path = "preprocessed_data/LJSpeech/TextGrid/LJSpeech/LJ030-0041.TextGrid"
 
     # Get src time alignments
@@ -315,64 +502,26 @@ if test_textgrid:
         # Trim leading silences
         if not all_phones and not word_phones:
             if p in sil_phones:
-                print("Continuing")
                 continue
             else:
                 start_time = s
 
         if p not in sil_phones:
-            if p == "spn" and words_tier.intervals[word_idx].text == "<unk>":
-                word_phones.append(p)
-                num_phones += 1
-                if all_phones[-1][0] in sil_phones if all_phones else False:
-                    if word_end_times[word_idx] == e:
-                        all_phones[-1] = word_phones
-                        word_phones = []
-                        end_time = e
-                        end_idx = num_phones
-                        end_word = num_words
+            word_phones.append(p)
+            num_phones += 1
 
-                        if word_idx == len(words_tier.intervals) - 1:  # That was the last word
-                            break
-                        word_idx += 1
-                else:
-                    if word_end_times[word_idx] == e:
-                        all_phones.append(word_phones)
-                        word_phones = []
-                        end_time = e
-                        end_idx = num_phones
-                        num_words += 1
-                        end_word = num_words
-
-                        if word_idx == len(words_tier.intervals) - 1:  # That was the last word
-                            break
-                        word_idx += 1
-
-            elif p == "spn" and words_tier.intervals[word_idx].text != "<unk>":
-                if all_phones[-1][0] in sil_phones if all_phones else False:
-                    all_phones[-1] = [p]
-                    print("Here")
-                else:
-                    all_phones.append([p])
-                num_phones += 1
+            if word_end_times[word_idx] == e:
+                all_phones.append(word_phones)
+                word_phones = []
+                end_time = e
+                end_idx = num_phones
                 num_words += 1
+                end_word = num_words
 
-            else:
-                word_phones.append(p)
-                num_phones += 1
-
-                if word_end_times[word_idx] == e:
-                    all_phones.append(word_phones)
-                    word_phones = []
-                    end_time = e
-                    end_idx = num_phones
-                    num_words += 1
-                    end_word = num_words
-
-                    if word_idx == len(words_tier.intervals) - 1:  # That was the last word
-                        break
-
-                    word_idx += 1
+                if word_idx == len(words_tier.intervals) - 1:  # That was the last word
+                    durations.append(int(np.round(e * 22050 / 256) - np.round(s * 22050 / 256)))
+                    break
+                word_idx += 1
 
         else:  # For silent phones
             all_phones.append([p])
@@ -383,6 +532,7 @@ if test_textgrid:
 
     print("Phones: ", all_phones)
     print(len(all_phones), word_idx, num_words)
+    print('length of durations pre slice', len(durations))
 
     # Trim tailing silences
     phones = all_phones[:end_word]
@@ -455,6 +605,7 @@ if test_epitran:
 
     print(phones_by_word)
 
+
 """Go through word_alignment"""
 test_word_alignment = False
 if test_word_alignment:
@@ -496,6 +647,7 @@ if test_aligner:
 
     # The output is a dictionary with different matching methods.
     # Each method has a list of pairs indicating the indexes of aligned words (The alignments are zero-indexed).
+
     alignments = myaligner.get_word_aligns(src_sentence, trg_sentence)
 
     for matching_method in alignments:
@@ -508,6 +660,7 @@ if test_aligner:
     print("Src.split(): ", src.split())
     print("Tgt.split(): ", tgt.split())
     print(alignments)
+
 
 """Get different speaker embedding"""
 test_embedding = False
@@ -599,6 +752,7 @@ if test_extractor:
     total_len = sum([phone_emb_chunk.size()[2] for phone_emb_chunk in phone_emb_chunks])
     print(total_len)
 
+
 """Test Prosody Predictor"""
 test_predictor = False
 if test_predictor:
@@ -644,6 +798,7 @@ if test_predictor:
     # # print("Embedding shape: ", embedding.size())
     #
     # # Adding new dimensions to tensor_2
+    
     # embedding = embedding.unsqueeze(0).unsqueeze(0).expand(-1, 19, -1)
     #
     # h_sd = h_si + embedding
@@ -667,3 +822,4 @@ if test_predictor:
 
     # sample = model.sample(h_sd, h_si)
     # print("Sample shape: ", sample.size())
+

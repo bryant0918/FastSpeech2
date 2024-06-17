@@ -122,3 +122,6 @@ duration/
 energy/
 pitch/
 speaker_emb/
+
+# logs
+nohup.out

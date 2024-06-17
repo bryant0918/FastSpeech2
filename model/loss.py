@@ -17,14 +17,17 @@ class FastSpeech2Loss(nn.Module):
         self.mae_loss = nn.L1Loss()
 
     def forward(self, inputs, predictions):
+        # batch = (ids, raw_texts, raw_translations, speakers, texts, src_lens, max_text_lens, mels, mel_lens,
+        #          max_mel_lens, translations, translation_lens, max_translation_len, speaker_embeddings, alignments, 
+        #          pitches, energies, durations)
+
         (
             mel_targets,
-            _,
-            _,
+            _, _, _, _, _, _, _,
             pitch_targets,
             energy_targets,
             duration_targets,
-        ) = inputs[6:]
+        ) = inputs[7:]
         (
             mel_predictions,
             postnet_mel_predictions,
@@ -36,6 +39,7 @@ class FastSpeech2Loss(nn.Module):
             mel_masks,
             _,
             _,
+            e,
         ) = predictions
         src_masks = ~src_masks
         mel_masks = ~mel_masks
@@ -78,8 +82,16 @@ class FastSpeech2Loss(nn.Module):
         energy_loss = self.mse_loss(energy_predictions, energy_targets)
         duration_loss = self.mse_loss(log_duration_predictions, log_duration_targets)
 
+        # Prosody Loss
+        # pros_loss = self.pros_loss(e)  # Make sure to account for realignment in foreign language
+        # print("Prosody Loss: ", pros_loss, pros_loss.shape) # Should be [Batch, 1] or [Batch]
+
+        # # Phone Loss  (Requires extracting predicted phonemes from mel Spectrogram)
+        # phone_loss = self.phone_loss()
+
         total_loss = (
             mel_loss + postnet_mel_loss + duration_loss + pitch_loss + energy_loss
+            # + pros_loss
         )
 
         return (
@@ -89,4 +101,30 @@ class FastSpeech2Loss(nn.Module):
             pitch_loss,
             energy_loss,
             duration_loss,
+            # pros_loss,
         )
+    
+    def pros_loss(self, x, y):
+        """
+        Calculate the negative log-likelihood of the phone sequence given the prosody features
+        Input:
+            x: (h_sd, h_si, prev_e)
+            y: prosody embeddings e_k from prosody extractor
+        Output:
+            -loglik: Negative log-likelihood of the phone sequence given the prosody features
+        """
+        log_pi, mu, sigma = x
+        z_score = (y.unsqueeze(1) - mu) / sigma
+        normal_loglik = (
+                -0.5 * torch.einsum("bij,bij->bi", z_score, z_score)
+                - torch.sum(torch.log(sigma), dim=-1)
+        )
+        loglik = torch.logsumexp(log_pi + normal_loglik, dim=-1)
+        return -loglik  # Sum over all phones for total loss (L_pp)
+
+    def phone_loss(self, x, y):
+        """
+        Calculates the phone loss
+        """
+        return None
+

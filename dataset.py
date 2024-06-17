@@ -139,7 +139,7 @@ class TrainDataset(Dataset):
         alignments = pad_inhomogeneous_2D(alignments)
 
         return (ids, raw_texts, raw_translations, speakers, texts, text_lens, max(text_lens), mels, mel_lens,
-                max(mel_lens), translations, translation_lens, speaker_embeddings, alignments, pitches, energies,
+                max(mel_lens), translations, translation_lens, max(translation_lens), speaker_embeddings, alignments, pitches, energies,
                 durations)
 
     def collate_fn(self, data):

@@ -40,12 +40,12 @@ class FastSpeech2Pros(nn.Module):
             self.speakers_json = json.load(f)
 
     def forward(self, speakers, texts, src_lens, max_src_len, mels=None, mel_lens=None, max_mel_len=None,
-                translations=None, translation_lens=None, speaker_embs=None,
+                translations=None, translation_lens=None, max_translation_len=None, speaker_embs=None,
                 alignments=None, p_targets=None, e_targets=None, d_targets=None, prev_e=None, p_control=1.0,
                 e_control=1.0, d_control=1.0,):
         # batch = (ids, raw_texts, raw_translations, speakers, texts, src_lens, max_text_lens, mels, mel_lens,
-        #                 max_mel_lens, translations, translation_lens, speaker_embeddings, alignments, pitches, energies,
-        #                 durations)
+        #          max_mel_lens, translations, translation_lens, max(translation_lens), speaker_embeddings, 
+        #          alignments, pitches, energies, durations)
 
         # Get masks
         src_masks = get_mask_from_lengths(src_lens, max_src_len)
@@ -59,7 +59,7 @@ class FastSpeech2Pros(nn.Module):
 
         h_si = output
         prosody_predictor = ProsodyPredictor(256, 256, 4, 8).to(device)
-        e_tgt = prosody_predictor(h_sd, h_si, prev_e)
+        e_tgt = prosody_predictor(h_sd, h_si, prev_e)  # TODO: prev_e here doesn't make sense.
         print("e_tgt shape: ", e_tgt[0].shape)
         
         # prosody extractor
@@ -76,11 +76,12 @@ class FastSpeech2Pros(nn.Module):
         print("tgt_samp shape: ", tgt_samp.shape) # Correct
         print("e_k_src shape: ", len(e_k_src))
 
+        
         print("alignments shape: ", alignments.shape)  # TODO: unpad alignments for realigner otherwise everything mapped to 0.
-        e = prosody_predictor.prosody_realigner(alignments, tgt_samp, e_k_src)
+        adjusted_e_tgt = prosody_predictor.prosody_realigner(alignments, tgt_samp, e_k_src)
 
         # Concat
-        output = h_sd + e
+        output = h_sd + adjusted_e_tgt
         print("Output shape after prosody: ", output.shape)
 
         # Now double check that durations and pitch etc are same as seq_length
@@ -95,8 +96,11 @@ class FastSpeech2Pros(nn.Module):
 
         postnet_output = self.postnet(output) + output
 
+        # For calculating Lpp loss:
+        # y_e_tgt = prosody_extractor.prosody_realigner(alignments, e_k_src)
+
         return (output, postnet_output, p_predictions, e_predictions, log_d_predictions, d_rounded, src_masks,
-                mel_masks, src_lens, mel_lens,)
+                mel_masks, src_lens, mel_lens, adjusted_e_tgt, )
 
 
 class FastSpeech2(nn.Module):

@@ -14,7 +14,7 @@ _id_to_symbol = {i: s for i, s in enumerate(symbols)}
 _curly_re = re.compile(r"(.*?)\{(.+?)\}(.*)")
 
 
-def text_to_sequence(text, cleaner_names):
+def text_to_sequence(text, cleaner_names, language):
     """Converts a string of text to a sequence of IDs corresponding to the symbols in the text.
 
     The text can optionally have ARPAbet sequences enclosed in curly braces embedded
@@ -36,13 +36,19 @@ def text_to_sequence(text, cleaner_names):
         if not m:
             sequence += _symbols_to_sequence(_clean_text(text, cleaner_names))
             break
+
+        print("In text_to_sequence: ", text, len(text), "group1", m.group(1), "group2", m.group(2), "group3", m.group(3))
         sequence += _symbols_to_sequence(_clean_text(m.group(1), cleaner_names))
-        sequence += _arpabet_to_sequence(m.group(2))
+        if language == 'en':
+            sequence += _arpabet_to_sequence(m.group(2))
+        elif language == 'es':
+            sequence += _ipa_to_sequence(m.group(2))
         text = m.group(3)
 
     return sequence
 
 
+# Not used right now but would be interesting to look at text during training
 def sequence_to_text(sequence):
     """Converts a sequence of IDs back to a string"""
     result = ""
@@ -53,6 +59,9 @@ def sequence_to_text(sequence):
             if len(s) > 1 and s[0] == "@":
                 s = "{%s}" % s[1:]
             result += s
+            # Encluse IPA back in curly braces:
+            if len(s) > 1 and s[0] == "$":
+                s = "{%s}" % s[1:]
     return result.replace("}{", " ")
 
 
@@ -71,6 +80,9 @@ def _symbols_to_sequence(symbols):
 
 def _arpabet_to_sequence(text):
     return _symbols_to_sequence(["@" + s for s in text.split()])
+
+def _ipa_to_sequence(text):
+    return _symbols_to_sequence(["$" + s for s in text.split()])
 
 
 def _should_keep_symbol(s):

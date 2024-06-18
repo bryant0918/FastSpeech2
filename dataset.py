@@ -37,8 +37,9 @@ class TrainDataset(Dataset):
         raw_text = self.raw_text[idx]
         raw_translation = self.raw_translation[idx]
 
-        src_phone = np.array(text_to_sequence(self.text[idx], self.cleaners))
-        tgt_phone = np.array(text_to_sequence(self.translation[idx], self.cleaners)) # TODO: Cleaners here?
+        # TODO: Don't hardcode Language code here (cmudict vs. ipa) eventually all ipa so language agnostic
+        src_phone = np.array(text_to_sequence(self.text[idx], self.cleaners, 'en'))
+        tgt_phone = np.array(text_to_sequence(self.translation[idx], self.cleaners, 'es')) # TODO: Cleaners here?
 
         print("len(src_phone)", len(src_phone))
         print("len(tgt_phone)", len(tgt_phone))

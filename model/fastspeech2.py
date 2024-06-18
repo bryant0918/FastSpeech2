@@ -48,6 +48,8 @@ class FastSpeech2Pros(nn.Module):
         #          alignments, pitches, energies, durations)
 
         # Get masks
+        batch_size = texts.size(0)
+
         tgt_masks = get_mask_from_lengths(src_lens, max_src_len)
         
         mel_masks = (get_mask_from_lengths(mel_lens, max_mel_len) if mel_lens is not None else None)
@@ -57,12 +59,27 @@ class FastSpeech2Pros(nn.Module):
 
         speaker_embs = speaker_embs.unsqueeze(1).expand(-1, output.size()[1], -1)
         h_sd = output + speaker_embs  # torch.Size([Batch, seq_len, 256])
-        print("Output shape: ", h_sd.shape)
+        print("h_sd shape: ", h_sd.shape)
 
         h_si = output
         prosody_predictor = ProsodyPredictor(256, 256, 4, 8).to(device)
-        e_tgt = prosody_predictor(h_sd, h_si, prev_e)  # TODO: prev_e here doesn't make sense.
-        print("e_tgt shape: ", e_tgt[0].shape)
+
+        # Test this loop
+        prev_prosody = torch.zeros(batch_size, 1, 256).to(device)
+        prosodies = []
+        for i in range(output.size()[1]):
+            h_sd_t = h_sd[:, i, :]
+            h_si_t = h_si[:, i, :]
+            print("h_sd_t shape: ", h_sd_t.shape)
+            out = prosody_predictor(h_sd_t, h_si_t, prev_prosody)
+            prosodies.append(out)
+            prev_prosody = out
+        predicted_prosodies_tgt = torch.stack(prosodies, dim=1)
+        print("predicted_prosodies_tgt shape: ", predicted_prosodies_tgt.shape)
+
+        # e_tgt = prosody_predictor(h_sd, h_si, prev_e)  # TODO: prev_e here doesn't make sense.
+        # print("e_tgt shape: ", e_tgt[0].shape)
+        
         
         # prosody extractor
         prosody_extractor = ProsodyExtractor(1, 256, 8).to(device)
@@ -74,7 +91,8 @@ class FastSpeech2Pros(nn.Module):
         # [batch_size (list), phoneme_sequence_length (list), melspec H (tensor), melspec W (tensor), 128 (tensor)]
         e_k_src = prosody_extractor.split_phones(e_src, d_targets)
 
-        tgt_samp = prosody_predictor.sample2(e_tgt)
+        # TODO: Allow for new predicted_prosodies_tgt shape
+        tgt_samp = prosody_predictor.sample2(predicted_prosodies_tgt)
         
         print("alignments shape: ", alignments.shape)  # TODO: unpad alignments for realigner otherwise everything mapped to 0.
         adjusted_e_tgt = prosody_predictor.prosody_realigner(alignments, tgt_samp, e_k_src)

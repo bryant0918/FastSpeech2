@@ -6,6 +6,7 @@ from scipy.io import wavfile
 from tqdm import tqdm
 
 from text import _clean_text
+from text.cleaners import remove_punctuation
 
 from deep_translator import GoogleTranslator
 from simalign import SentenceAligner
@@ -28,17 +29,14 @@ def prepare_align(config):
         for line in tqdm(f):
             parts = line.strip().split("|")
             base_name = parts[0]
-
             out_translation_path = os.path.join(out_dir, speaker, "{}_tgt.lab".format(base_name))
-            if os.path.exists(out_translation_path):
-                continue
 
             text = parts[2]
             text = _clean_text(text, cleaners)
 
             # TODO: Get cleaners for translation language also (and handle api connection errors)
             translation = GoogleTranslator(source='auto', target='es').translate(text)
-            # translation = _clean_text(translation, cleaners)
+            translation = remove_punctuation(translation)
 
             wav_path = os.path.join(in_dir, "wavs", "{}.wav".format(base_name))
             if os.path.exists(wav_path):
@@ -65,3 +63,5 @@ def prepare_align(config):
 
                 with open(os.path.join(preprocessed_dir, "alignments", "word", "{}-word_alignment-{}.npy".format(speaker, base_name)), "wb") as f1:
                     np.save(f1, np.array(alignment))
+            
+            

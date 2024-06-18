@@ -108,15 +108,15 @@ def main(args, configs):
                     raise NotImplementedError
                 print()
                 print(f"texts shape: {batch[4].shape}")
-                print(f"src_lens shape: {batch[5].shape}")
-                print(f"max_src_len: {batch[6]}{type(batch[6])}")
-                print(f"mels shape: {batch[7].shape}")
-                print(f"mel_lens shape: {batch[8].shape}")
-                print(f"max_mel_len: {batch[9]}{type(batch[9])}")
+                # print(f"src_lens shape: {batch[5].shape}")
+                # print(f"max_src_len: {batch[6]}{type(batch[6])}")
+                # print(f"mels shape: {batch[7].shape}")
+                # print(f"mel_lens shape: {batch[8].shape}")
+                # print(f"max_mel_len: {batch[9]}{type(batch[9])}")
                 print(f"translations shape: {batch[10].shape}")
-                print(f"translation_lens shape: {batch[11].shape}{batch[11]}")
-                print(f"max_translation_len: {batch[12]}{type(batch[12])}")
-                print(f"speaker_embs shape: {batch[13].shape}")
+                # print(f"translation_lens shape: {batch[11].shape}{batch[11]}")
+                # print(f"max_translation_len: {batch[12]}{type(batch[12])}")
+                # print(f"speaker_embs shape: {batch[13].shape}")
                 print(f"alignments shape: {batch[14].shape}")
                 print(f"pitches shape: {batch[15].shape}")   
                 print(f"energies shape: {batch[16].shape}")
@@ -131,6 +131,8 @@ def main(args, configs):
                 print("Realigned pitches: ", realigned_p.shape)
                 print("Realigned energies: ", realigned_e.shape)
                 print("Realigned durations: ", realigned_d.shape)
+
+                print("PITCH", realigned_p)
 
 
                 # Forward
@@ -189,12 +191,12 @@ def main(args, configs):
 
                 print()
                 print(f"texts shape: {batch[4].shape}")
-                print(f"src_lens shape: {batch[5].shape}")
-                print(f"max_src_len: {batch[6]}{type(batch[12])}")
-                print(f"mels shape: {output_tgt[1].shape}")
-                print(f"mel_lens shape: {output_tgt[9].shape}")
-                print(f"max_mel_len: {max_mel_len}{type(max_mel_len)}")
-                print(f"speaker_embs shape: {batch[13].shape}")
+                # print(f"src_lens shape: {batch[5].shape}")
+                # print(f"max_src_len: {batch[6]}{type(batch[12])}")
+                # print(f"mels shape: {output_tgt[1].shape}")
+                # print(f"mel_lens shape: {output_tgt[9].shape}")
+                # print(f"max_mel_len: {max_mel_len}{type(max_mel_len)}")
+                # print(f"speaker_embs shape: {batch[13].shape}")
                 print(f"alignments shape: {alignments.shape}")
                 print(f"p_targets shape: {output_tgt[2].shape}")  # Pitches energies and durations should be same size as texts
                 print(f"e_targets shape: {output_tgt[3].shape}")

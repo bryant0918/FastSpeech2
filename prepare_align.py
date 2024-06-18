@@ -23,3 +23,5 @@ if __name__ == "__main__":
 
     config = yaml.load(open(args.config, "r"), Loader=yaml.FullLoader)
     main(config)
+
+    print("Done.")

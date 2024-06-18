@@ -328,6 +328,7 @@ class ProsodyPredictor(nn.Module):
 
         # Run Speaker Dependent features through the base network
         # Permute the input tensor batch, sentence_length, embedding_dim = 20, 19, 10
+        
         h_sd = h_sd.permute(0, 2, 1)  # Changes shape to (Batch_size, 256, Sequence_length) for conv layer
         h_sd = self.relu(self.conv1(h_sd))
         h_sd = h_sd.permute(0, 2, 1)  # Changes shape back to (Batch_size, sequence_length, channels) for layernorm
@@ -337,10 +338,19 @@ class ProsodyPredictor(nn.Module):
         h_sd = h_sd.permute(0, 2, 1)  # Changes shape back to (Batch_size, sequence_length, channels) for layernorm
         h_sd = self.dropout(self.layernorm(h_sd))
 
-        if prev_e:
-            h_sd, _ = self.gru(h_sd, prev_e)
-        else:
-            h_sd, _ = self.gru(h_sd)
+        # # TODO: for loop here ranging in sequence length
+        # out = 
+        # for i in range(h_sd.size(1)):
+        #     out = self.gru(out, h_sd)
+
+        h_sd = torch.cat((h_sd, prev_e), dim=-1) 
+        h_sd, _ = self.gru(h_sd)
+
+        # if prev_e:
+        #     h_sd, _ = self.gru(h_sd, prev_e)
+        # else:
+        #     h_sd, _ = self.gru(h_sd)
+
         h_sd = self.normal_linear(h_sd)
 
         # Separate Transformation Parameters

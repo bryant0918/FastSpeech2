@@ -95,3 +95,12 @@ def english_cleaners(text):
     text = collapse_whitespace(text)
     text = remove_punctuation(text)
     return text
+
+
+def spanish_cleaners(text):
+    '''Pipeline for Spanish text, including number and abbreviation expansion.'''
+    text = convert_to_ascii(text)
+    text = lowercase(text)
+    text = remove_punctuation(text)
+    return text
+

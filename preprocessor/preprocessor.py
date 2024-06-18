@@ -219,11 +219,22 @@ class Preprocessor:
         with open(text_path, "r") as f:
             raw_text = f.readline().strip("\n")
         if phone_alignments is IndexError:
+            # print(text_path)
+            # print("raw text", raw_text)
+            # print("raw translation", raw_translation)  # right here on motorcycle
+            # print(epi.transliterate(raw_translation).split())
+            # print("tgt_phones", len(tgt_phones), tgt_phones)
+            return None
+
+        if phone_alignments is "weird error":
             print(text_path)
             print("raw text", raw_text)
             print("raw translation", raw_translation)  # right here on motorcycle
             print(epi.transliterate(raw_translation).split())
-            return None
+            print("tgt_phones", len(tgt_phones), tgt_phones)
+
+            
+            raise IndexError
 
         # Compute fundamental frequency
         pitch, t = pw.dio(
@@ -387,17 +398,24 @@ class Preprocessor:
             if j == 0:
                 flat_tgt_phones_idx = 0
             else:
-                flat_tgt_phones_idx = tgt_phone_cumsums[j-1]
+                try:
+                    flat_tgt_phones_idx = tgt_phone_cumsums[j-1]
+                except IndexError:
+                    print("tgt_phone_cumsums", j, len(tgt_phone_cumsums), tgt_phone_cumsums)
+                    print("src_phones", len(src_phones), src_phones)
+                    print("tgt_phones", len(tgt_phones), tgt_phones)
+                    print("word_alignments", word_alignments)
+                    return "weird error"
 
             try:
                 src_word_phones = src_phones[i]
                 tgt_word_phones = tgt_phones[j]
             except IndexError:
-                print("src_phones", src_phones)
-                print("tgt_phones", tgt_phones)
-                print("word_alignment", word_alignment)
-                print("Word alignments", word_alignments)
-                print("i, j", i, j)
+                # print("src_phones", len(src_phones), src_phones)
+                # print("tgt_phones", len(tgt_phones), tgt_phones)
+                # print("word_alignment", word_alignment)
+                # print("Word alignments", word_alignments)
+                # print("i, j", i, j)
 
                 return IndexError
 

@@ -35,6 +35,9 @@ if __name__ == "__main__":
     print(db['ʂ'])
     print(db['ʒ'])
     print(db['ʤ'])
-    print(db['t͡ʂ'])
+#     print(db['t͡ʂ'])
+
+    print(len(db))
+    print(valid_symbols)
 
     pass

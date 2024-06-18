@@ -80,7 +80,6 @@ class FastSpeech2Pros(nn.Module):
         # e_tgt = prosody_predictor(h_sd, h_si, prev_e)  # TODO: prev_e here doesn't make sense.
         # print("e_tgt shape: ", e_tgt[0].shape)
         
-        
         # prosody extractor
         prosody_extractor = ProsodyExtractor(1, 256, 8).to(device)
         

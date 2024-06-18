@@ -16,7 +16,7 @@ class FastSpeech2Loss(nn.Module):
         self.mse_loss = nn.MSELoss()
         self.mae_loss = nn.L1Loss()
 
-    def forward(self, inputs, predictions):
+    def forward(self, inputs, predictions, direction="to_tgt"):
         # batch = (ids, raw_texts, raw_translations, speakers, texts, src_lens, max_text_lens, mels, mel_lens,
         #          max_mel_lens, translations, translation_lens, max_translation_len, speaker_embeddings, alignments, 
         #          pitches, energies, durations)
@@ -69,14 +69,17 @@ class FastSpeech2Loss(nn.Module):
         log_duration_predictions = log_duration_predictions.masked_select(src_masks)
         log_duration_targets = log_duration_targets.masked_select(src_masks)
 
-        mel_predictions = mel_predictions.masked_select(mel_masks.unsqueeze(-1))
-        postnet_mel_predictions = postnet_mel_predictions.masked_select(
-            mel_masks.unsqueeze(-1)
-        )
-        mel_targets = mel_targets.masked_select(mel_masks.unsqueeze(-1))
+        # Calculate mel loss only in reverse direction
+        if direction == "to_src":
+            mel_predictions = mel_predictions.masked_select(mel_masks.unsqueeze(-1))
+            postnet_mel_predictions = postnet_mel_predictions.masked_select(
+                mel_masks.unsqueeze(-1)
+            )
+            mel_targets = mel_targets.masked_select(mel_masks.unsqueeze(-1))
 
-        mel_loss = self.mae_loss(mel_predictions, mel_targets)
-        postnet_mel_loss = self.mae_loss(postnet_mel_predictions, mel_targets)
+            mel_loss = self.mae_loss(mel_predictions, mel_targets)
+            postnet_mel_loss = self.mae_loss(postnet_mel_predictions, mel_targets)
+
 
         pitch_loss = self.mse_loss(pitch_predictions, pitch_targets)
         energy_loss = self.mse_loss(energy_predictions, energy_targets)
@@ -86,12 +89,12 @@ class FastSpeech2Loss(nn.Module):
         # pros_loss = self.pros_loss(e)  # Make sure to account for realignment in foreign language
         # print("Prosody Loss: ", pros_loss, pros_loss.shape) # Should be [Batch, 1] or [Batch]
 
-        # # Phone Loss  (Requires extracting predicted phonemes from mel Spectrogram)
+        # # phone Loss  (Requires extracting predicted phonemes from mel Spectrogram) whisper
         # phone_loss = self.phone_loss()
 
         total_loss = (
             mel_loss + postnet_mel_loss + duration_loss + pitch_loss + energy_loss
-            # + pros_loss
+            # + pros_loss + phone_loss
         )
 
         return (

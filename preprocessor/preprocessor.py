@@ -71,7 +71,7 @@ class Preprocessor:
         speakers = {}
         for i, speaker in enumerate(tqdm(os.listdir(self.in_dir))):
             speakers[speaker] = i
-            for j, wav_name in enumerate(os.listdir(os.path.join(self.in_dir, speaker))):
+            for j, wav_name in enumerate(tqdm(os.listdir(os.path.join(self.in_dir, speaker)))):
                 if ".wav" not in wav_name:
                     continue
 
@@ -219,11 +219,11 @@ class Preprocessor:
         with open(text_path, "r") as f:
             raw_text = f.readline().strip("\n")
         if phone_alignments is IndexError:
-            # print(text_path)
-            # print("raw text", raw_text)
-            # print("raw translation", raw_translation)  # right here on motorcycle
-            # print(epi.transliterate(raw_translation).split())
-            # print("tgt_phones", len(tgt_phones), tgt_phones)
+            print(text_path)
+            print("raw text", raw_text)
+            print("raw translation", raw_translation)  # right here on motorcycle
+            print(epi.transliterate(raw_translation).split())
+            print("tgt_phones", len(tgt_phones), tgt_phones)
             return None
 
         if phone_alignments is "weird error":
@@ -232,8 +232,6 @@ class Preprocessor:
             print("raw translation", raw_translation)  # right here on motorcycle
             print(epi.transliterate(raw_translation).split())
             print("tgt_phones", len(tgt_phones), tgt_phones)
-
-            
             raise IndexError
 
         # Compute fundamental frequency

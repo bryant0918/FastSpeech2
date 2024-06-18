@@ -160,7 +160,7 @@ def main(args, configs):
                 output_tgt = model(*(input))
                 
                 # Calculate loss for Src to Tgt
-                losses_src_to_tgt = Loss(batch, output_tgt)
+                losses_src_to_tgt = Loss(batch, output_tgt, "to_tgt")
                 total_loss_src_to_tgt = losses_src_to_tgt[0]
 
 
@@ -212,7 +212,7 @@ def main(args, configs):
                                    alignments=alignments, p_targets=output_tgt[2], e_targets=output_tgt[3], d_targets=output_tgt[4])
                 
                 # # Calculate loss for Tgt to Src
-                losses_tgt_to_src = Loss(batch, output_src)
+                losses_tgt_to_src = Loss(batch, output_src, "to_src")
                 total_loss_tgt_to_src = losses_tgt_to_src[0]
 
                 # Combine the losses

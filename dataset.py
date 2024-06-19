@@ -8,7 +8,7 @@ import torch
 from torch.utils.data import Dataset
 
 from text import text_to_sequence
-from utils.tools import pad_1D, pad_2D, pad_inhomogeneous_2D
+from utils.tools import pad_1D, pad_2D, pad_inhomogeneous_2D, flip_mapping
 
 
 class TrainDataset(Dataset):
@@ -143,10 +143,15 @@ class TrainDataset(Dataset):
         translations = pad_1D(translations)
         alignments = pad_inhomogeneous_2D(alignments)
 
+        # Debugging
+        reverse_alignments = flip_mapping(torch.from_numpy(alignments).int())
         print("Shape of alignments", np.shape(alignments))
         print("Shape of texts", np.shape(texts))
         print("Shape of translations", np.shape(translations))
-        print()
+        print("Shape of reverse_alignments", reverse_alignments.shape)
+        if np.shape(alignments)[1] != np.shape(translations)[1] or reverse_alignments.shape[1] != np.shape(texts)[1]:
+            raise ValueError("Alignments and Texts must have the same length")
+            
 
         return (ids, raw_texts, raw_translations, speakers, texts, text_lens, max(text_lens), mels, mel_lens,
                 max(mel_lens), translations, translation_lens, max(translation_lens), speaker_embeddings, alignments, pitches, energies,

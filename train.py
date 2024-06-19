@@ -192,6 +192,9 @@ def main(args, configs):
                                 #  None, None, None, batch[13], alignments, output_tgt[2], output_tgt[3], output_tgt[4], None, 1.0, 1.0, 1.0)
                 
                 max_mel_len = np.int64(max(output_tgt[9]).cpu().numpy())
+                
+                # output_tgt[4] is log_d_predictions
+                d_src = torch.clamp(torch.round(torch.exp(output_tgt[4] - 1)).long(), min=0)
 
                 print()
                 print(f"texts shape: {batch[4].shape}")
@@ -205,6 +208,7 @@ def main(args, configs):
                 print(f"p_targets shape: {output_tgt[2].shape}")  # Pitches energies and durations should be same size as texts
                 print(f"e_targets shape: {output_tgt[3].shape}")
                 print(f"d_targets shape: {output_tgt[4].shape}")
+                print(f"d_src shape: {d_src.shape}")
                 # print()
                 # print("Pitches: ", batch[15])
 
@@ -212,16 +216,20 @@ def main(args, configs):
                 realigned_p = realign_p_e_d(alignments, output_tgt[2])
                 realigned_e = realign_p_e_d(alignments, output_tgt[3])
                 realigned_d = realign_p_e_d(alignments, output_tgt[4])
+                realigned_d_src = realign_p_e_d(alignments, d_src)
+
                 print("Realigned pitches: ", realigned_p.shape)
                 print("Realigned energies: ", realigned_e.shape)
                 print("Realigned durations: ", realigned_d.shape)
+                print("Realigned durations src: ", realigned_d_src.shape)
                 print()
 
                 # # Forward pass: Tgt to Src (so tgt is now src and src is now tgt)
+                print("\nFORWARD PASS: TGT to SRC")
                 output_src = model(texts=batch[4], src_lens=batch[5], max_src_len=batch[6],
                                    mels=output_tgt[1], mel_lens=output_tgt[9], max_mel_len=max_mel_len,
                                    speaker_embs=batch[13], alignments=alignments, p_targets=realigned_p, 
-                                   e_targets=realigned_e, d_targets=realigned_d, d_src=output_tgt[4])
+                                   e_targets=realigned_e, d_targets=realigned_d_src, d_src=d_src)
                 
                 # # Calculate loss for Tgt to Src
                 print("\nCalculating Loss for TGT to SRC")

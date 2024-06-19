@@ -451,7 +451,7 @@ if test_textgrid:
             durations.append(int(np.round(e * 22050 / 256) - np.round(s * 22050 / 256)))
 
         print("Phones: ", all_phones)
-        print(len(all_phones), word_idx, num_words)
+        print(len(all_phones), word_idx, num_words, end_idx)
         print('length of durations pre slice', len(durations))
 
         # Trim tailing silences
@@ -471,8 +471,8 @@ if test_textgrid:
     # tg_path = "preprocessed_data/LJSpeech/TextGrid/LJSpeech/LJ032-0007.TextGrid"
     # tg_path = "preprocessed_data/LJSpeech/TextGrid/LJSpeech/LJ036-0179.TextGrid"
     # tg_path = "preprocessed_data/LJSpeech/TextGrid/LJSpeech/LJ030-0041.TextGrid"
-    # tg_path = "preprocessed_data/LJSpeech/TextGrid/LJSpeech/LJ050-0116.TextGrid"
-    tg_path = "preprocessed_data/LJSpeech/TextGrid/LJSpeech/LJ015-0071.TextGrid"
+    # tg_path = "preprocessed_data/LJSpeech/TextGrid/LJSpeech/LJ002-0298.TextGrid"
+    tg_path = "preprocessed_data/LJSpeech/TextGrid/LJSpeech/LJ048-0270.TextGrid"
     textgrid = tgt.io.read_textgrid(tg_path)
 
     phones, durations, start, end = get_alignment(textgrid)
@@ -546,7 +546,7 @@ if test_word_alignment:
     print(len(phone_alignments))
 
 """Test Sentence Aligner"""
-test_aligner = True
+test_aligner = False
 if test_aligner:
     from simalign import SentenceAligner
     # making an instance of our model.
@@ -763,8 +763,8 @@ if test_phone_alignment:
         """
         phone_alignments = {}
 
-        print("src_phones", src_phones)
-        print("tgt_phones", tgt_phones)
+        print("src_phones", len(src_phones), src_phones)
+        print("tgt_phones", len(tgt_phones), tgt_phones)
         # print("word_alignments", word_alignments)
         
         src_phone_cumsums = np.cumsum([len(src_phone) for src_phone in src_phones])
@@ -817,11 +817,16 @@ if test_phone_alignment:
 
             # print("len of tgt_wrd_phones", len(tgt_word_phones))
             while tgt_phone < len(tgt_word_phones):
+                if flat_src_phones_idx == len(flat_src_phones):
+                    flat_src_phones_idx -= 1
+                    current_src_phone -= 1
+                
                 if (1-phone_accumulations) > phone_weight:   # Use all of the phone_weight left
                     phone_accumulations += phone_weight
                     if current_src_phone not in phone_alignment:
                         phone_alignment.append(current_src_phone)
                         flat_phone_alignment.append(flat_src_phones_idx)
+                        
                     # Reset
                     phone_weight = len(src_word_phones) / len(tgt_word_phones)
                     tgt_phone += 1
@@ -881,7 +886,7 @@ if test_phone_alignment:
 
         return flat_phone_alignments
 
-    pth = "preprocessed_data/LJSpeech/alignments/word/LJSpeech-word_alignment-LJ015-0071.npy"
+    pth = "preprocessed_data/LJSpeech/alignments/word/LJSpeech-word_alignment-LJ048-0270.npy"
     # Loading the dictionary
     # with open(pth, 'rb') as f:
     #     word_alignments = pickle.load(f)
@@ -897,7 +902,7 @@ if test_phone_alignment:
     new_punc = "¡!\"#$%&'()*+,-./:;<=>¿?@[\]^_`{|}~"
 
     # text = "que tienen la responsabilidad principal de suministrar informacion sobre amenazas potenciales,"
-    pth = "raw_data/LJSpeech/LJSpeech/LJ015-0071_tgt.lab"
+    pth = "raw_data/LJSpeech/LJSpeech/LJ048-0270_tgt.lab"
     with open(pth, 'r') as f:
         text = f.read()
     print("Tgt text: ", text)

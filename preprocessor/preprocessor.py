@@ -438,6 +438,10 @@ class Preprocessor:
 
             # print("len of tgt_wrd_phones", len(tgt_word_phones))
             while tgt_phone < len(tgt_word_phones):
+                if flat_src_phones_idx == len(flat_src_phones):
+                    flat_src_phones_idx -= 1
+                    current_src_phone -= 1
+                
                 if (1-phone_accumulations) > phone_weight:   # Use all of the phone_weight left
                     phone_accumulations += phone_weight
                     if current_src_phone not in phone_alignment:

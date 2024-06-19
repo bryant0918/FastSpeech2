@@ -89,9 +89,11 @@ class FastSpeech2Pros(nn.Module):
         # Split phone pros embeddings by phone duration
         # [batch_size (list), phoneme_sequence_length (list), melspec H (tensor), melspec W (tensor), 128 (tensor)]
         e_k_src = prosody_extractor.split_phones(e_src, d_src)
+        print("e_k_src shape: ", len(e_k_src), len(e_k_src[0]), e_k_src[0][0].shape)
 
         # TODO: Allow for new predicted_prosodies_tgt shape
         tgt_samp = prosody_predictor.sample2(e_tgt)
+        print("tgt_samp shape: ", tgt_samp.shape)  
         
         # print("alignments shape: ", alignments.shape)  # TODO: unpad alignments for realigner otherwise everything mapped to 0.
         adjusted_e_tgt = prosody_predictor.prosody_realigner(alignments, tgt_samp, e_k_src)

@@ -224,9 +224,11 @@ class ProsodyExtractor(nn.Module):
         zeros = torch.zeros((durations.shape[0], 1), dtype=torch.int).to(device)
         # print("zeros.size:", zeros.size())
         # print("durations.size:", durations.size())
+        # print(durations)
 
         concated = torch.cat([zeros, durations], dim=1)
         cumulative_durations = torch.cumsum(concated, dim=1)
+        # print("Cumulative durations", cumulative_durations)
 
         start_frames = cumulative_durations[:, :-1]
         end_frames = cumulative_durations[:, 1:]

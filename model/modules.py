@@ -108,15 +108,11 @@ class VarianceAdaptor(nn.Module):
                 e_control=1.0, d_control=1.0):
 
         log_duration_prediction = self.duration_predictor(x, src_mask)
+        
         if self.pitch_feature_level == "phoneme_level":
             pitch_prediction, pitch_embedding = self.get_pitch_embedding(
                 x, pitch_target, src_mask, p_control
             )
-            print()
-            print("pitch_target: ", pitch_target.shape)
-            print("pitch_embedding: ", pitch_embedding.shape)
-            print("src_mask: ", src_mask.shape)
-            print("x: ", x.shape)
             x = x + pitch_embedding    # (durations and targets mismatch)
         if self.energy_feature_level == "phoneme_level":
             energy_prediction, energy_embedding = self.get_energy_embedding(

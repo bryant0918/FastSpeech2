@@ -118,7 +118,7 @@ def log(
 
 
 def get_mask_from_lengths(lengths, max_len=None):
-    print("Lengths,", lengths)
+    # print("Lengths,", lengths)
     batch_size = lengths.shape[0]
     if max_len is None:
         max_len = torch.max(lengths).item()
@@ -377,6 +377,10 @@ def pad(input_ele, mel_max_length=None):
 def flip_mapping(tgt_to_src_mappings):
         # Find the maximum target index to determine the size of the new mapping
         max_src_idx = int(tgt_to_src_mappings.max())
+        print("\nIN FLIP MAPPING")
+        print("max_src_idx: ", max_src_idx)
+        print("tgt_to_src_mappings: ", tgt_to_src_mappings)
+        print()
 
         batch = []
         for tgt_to_src_mapping in tgt_to_src_mappings:
@@ -393,6 +397,8 @@ def flip_mapping(tgt_to_src_mappings):
 
         src_to_tgt_mappings_padded = pad_inhomogeneous_2D(batch)
         src_to_tgt_mappings_padded = torch.from_numpy(src_to_tgt_mappings_padded).int().to(device)
+
+        print("src_to_tgt_mappings_padded: ", src_to_tgt_mappings_padded.shape)
                 
         return src_to_tgt_mappings_padded
 

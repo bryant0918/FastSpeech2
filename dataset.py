@@ -41,8 +41,8 @@ class TrainDataset(Dataset):
         src_phone = np.array(text_to_sequence(self.text[idx], self.cleaners, 'en'))
         tgt_phone = np.array(text_to_sequence(self.translation[idx], self.cleaners, 'es')) # TODO: Cleaners here?
 
-        print("len(src_phone)", len(src_phone))
-        print("len(tgt_phone)", len(tgt_phone))
+        # print("len(src_phone)", len(src_phone))
+        # print("len(tgt_phone)", len(tgt_phone))
         
         mel_path = os.path.join(
             self.preprocessed_path,

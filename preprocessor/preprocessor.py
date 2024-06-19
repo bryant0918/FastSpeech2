@@ -354,10 +354,8 @@ class Preprocessor:
                         break
                     word_idx += 1
 
-            else:  # For silent phones
-                all_phones.append([p])
-                num_phones += 1
-                num_words += 1
+            else:  # For silent phones (don't need em, don't want em)
+                continue
 
             durations.append(int(np.round(e * self.sampling_rate / self.hop_length) -
                                  np.round(s * self.sampling_rate / self.hop_length)))
@@ -370,6 +368,14 @@ class Preprocessor:
         return phones, durations, start_time, end_time
 
     def get_phoneme_alignment(self, word_alignments, src_phones, tgt_phones):
+        """
+        word_alignments: list of tuples of word alignments [(src_word_idx, tgt_word_idx), ...]
+        src_phones: list of list of phones for each word in src language [[phone1, phone2, ...], ...]
+        tgt_phones: list of list of phones for each word in tgt language [[phone1, phone2, ...], ...]
+        Return:
+        flat_phone_alignments: list of phone alignments for each tgt phone [src_phone_idx, ...]
+        """
+        
         phone_alignments = {}
 
         # print("src_phones", src_phones)

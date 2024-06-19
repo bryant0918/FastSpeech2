@@ -17,17 +17,17 @@ class FastSpeech2Loss(nn.Module):
         self.mae_loss = nn.L1Loss()
 
     def forward(self, inputs, predictions, direction="to_tgt"):
-        # batch = (ids, raw_texts, raw_translations, speakers, texts, src_lens, max_text_lens, mels, mel_lens,
-        #          max_mel_lens, translations, translation_lens, max_translation_len, speaker_embeddings, alignments, 
-        #          pitches, energies, durations)
-
+        """
+        When going to_tgt everything should be in tgt space.
+        When going to_src everything should be in src space.
+        """
         (
-            mel_targets,
-            _, _, _, _, _, _, _,
-            pitch_targets,
-            energy_targets,
+            mel_targets, 
+            pitch_targets, 
+            energy_targets, 
             duration_targets,
-        ) = inputs[7:]
+        ) = inputs
+
         (
             mel_predictions,
             postnet_mel_predictions,
@@ -44,17 +44,17 @@ class FastSpeech2Loss(nn.Module):
         src_masks = ~src_masks
         mel_masks = ~mel_masks
         log_duration_targets = torch.log(duration_targets.float() + 1)
-        mel_targets = mel_targets[:, : mel_masks.shape[1], :]
+        
         mel_masks = mel_masks[:, :mel_masks.shape[1]]
 
         log_duration_targets.requires_grad = False
         pitch_targets.requires_grad = False
         energy_targets.requires_grad = False
-        mel_targets.requires_grad = False
 
-        print("Src_masks ", src_masks.shape)
-        print("Pitch_predictions ", pitch_predictions.shape)
-        print("Pitch_targets ", pitch_targets.shape)
+        # print("Src_masks ", src_masks.shape)
+        # print("Pitch_predictions ", pitch_predictions.shape)
+        # print("Pitch_targets ", pitch_targets.shape)
+
         if self.pitch_feature_level == "phoneme_level":
             pitch_predictions = pitch_predictions.masked_select(src_masks)
             pitch_targets = pitch_targets.masked_select(src_masks)
@@ -73,7 +73,11 @@ class FastSpeech2Loss(nn.Module):
         log_duration_targets = log_duration_targets.masked_select(src_masks)
 
         # Calculate mel loss only in reverse direction
+        mel_loss, postnet_mel_loss = 0, 0
         if direction == "to_src":
+            mel_targets = mel_targets[:, : mel_masks.shape[1], :]
+            mel_targets.requires_grad = False
+
             mel_predictions = mel_predictions.masked_select(mel_masks.unsqueeze(-1))
             postnet_mel_predictions = postnet_mel_predictions.masked_select(
                 mel_masks.unsqueeze(-1)

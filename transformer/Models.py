@@ -222,8 +222,8 @@ class ProsodyExtractor(nn.Module):
         """
 
         zeros = torch.zeros((durations.shape[0], 1), dtype=torch.int).to(device)
-        print("zeros.size:", zeros.size())
-        print("durations.size:", durations.size())
+        # print("zeros.size:", zeros.size())
+        # print("durations.size:", durations.size())
 
         concated = torch.cat([zeros, durations], dim=1)
         cumulative_durations = torch.cumsum(concated, dim=1)
@@ -460,12 +460,12 @@ class ProsodyPredictor(nn.Module):
         beta = 0.1
         batch_size = len(phone_alignments)
         seq_length = tgt_samp.shape[1]
-        print("tgt samp shape", tgt_samp.shape)
+        # print("tgt samp shape", tgt_samp.shape)
         sum_e = torch.zeros(batch_size, seq_length, tgt_samp.shape[2], device=device)
         new_e = torch.zeros(batch_size, seq_length, tgt_samp.shape[2], device=device)
         counts = torch.zeros(batch_size, seq_length, device=device)  # Tensor to keep count of how many times each index is updated
 
-        print("e_k_src", type(e_k_src), len(e_k_src), len(e_k_src[0]), len(e_k_src[1]))
+        # print("e_k_src", type(e_k_src), len(e_k_src), len(e_k_src[0]), len(e_k_src[1]))
 
         # Works for when target sentence is longer
 

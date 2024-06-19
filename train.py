@@ -106,31 +106,31 @@ def main(args, configs):
 
                 if step == 4:
                     raise NotImplementedError
-                print()
-                print(f"texts shape: {batch[4].shape}")
+                # print()
+                # print(f"texts shape: {batch[4].shape}")
                 # print(f"src_lens shape: {batch[5].shape}")
                 # print(f"max_src_len: {batch[6]}{type(batch[6])}")
                 # print(f"mels shape: {batch[7].shape}")
                 # print(f"mel_lens shape: {batch[8].shape}")
                 # print(f"max_mel_len: {batch[9]}{type(batch[9])}")
-                print(f"translations shape: {batch[10].shape}")
+                # print(f"translations shape: {batch[10].shape}")
                 # print(f"translation_lens shape: {batch[11].shape}{batch[11]}")
                 # print(f"max_translation_len: {batch[12]}{type(batch[12])}")
-                print(f"speaker_embs shape: {batch[13].shape}")
-                print(f"alignments shape: {batch[14].shape}")
-                print(f"pitches shape: {batch[15].shape}")   
-                print(f"energies shape: {batch[16].shape}")
-                print(f"durations shape: {batch[17].shape}")
-                print()
+                # print(f"speaker_embs shape: {batch[13].shape}")
+                # print(f"alignments shape: {batch[14].shape}")
+                # print(f"pitches shape: {batch[15].shape}")   
+                # print(f"energies shape: {batch[16].shape}")
+                # print(f"durations shape: {batch[17].shape}")
+                # print()
 
                 # flip mapping
                 # realign pitch energy and duration here for target use batched for source below
                 realigned_p = realign_p_e_d(batch[14], batch[15])
                 realigned_e = realign_p_e_d(batch[14], batch[16])
                 realigned_d = realign_p_e_d(batch[14], batch[17])
-                print("Realigned pitches: ", realigned_p.shape)
-                print("Realigned energies: ", realigned_e.shape)
-                print("Realigned durations: ", realigned_d.shape)
+                # print("Realigned pitches: ", realigned_p.shape)
+                # print("Realigned energies: ", realigned_e.shape)
+                # print("Realigned durations: ", realigned_d.shape)
 
                 # print("PITCH", realigned_p)
 
@@ -162,8 +162,10 @@ def main(args, configs):
                 # Calculate loss for Src to Tgt
                 
                 print("\nCalculating Loss for SRC to TGT")
-                losses_src_to_tgt = Loss(batch, output_tgt, "to_tgt")
+                loss_input = (batch[7],) + (realigned_p, realigned_e, realigned_d)
+                losses_src_to_tgt = Loss(loss_input, output_tgt, "to_tgt")
                 total_loss_src_to_tgt = losses_src_to_tgt[0]
+                print("total_loss_src_to_tgt: ", total_loss_src_to_tgt)
 
 
                 # output_tgt = (output, postnet_output, p_predictions, e_predictions, log_d_predictions, d_rounded, src_masks,
@@ -203,23 +205,32 @@ def main(args, configs):
                 print(f"p_targets shape: {output_tgt[2].shape}")  # Pitches energies and durations should be same size as texts
                 print(f"e_targets shape: {output_tgt[3].shape}")
                 print(f"d_targets shape: {output_tgt[4].shape}")
+                # print()
+                # print("Pitches: ", batch[15])
+
+                # realign p,e,d targets back to src space
+                realigned_p = realign_p_e_d(alignments, output_tgt[2])
+                realigned_e = realign_p_e_d(alignments, output_tgt[3])
+                realigned_d = realign_p_e_d(alignments, output_tgt[4])
+                print("Realigned pitches: ", realigned_p.shape)
+                print("Realigned energies: ", realigned_e.shape)
+                print("Realigned durations: ", realigned_d.shape)
                 print()
 
-                print("Pitches: ", batch[15])
-
-                # # Forward pass: Tgt to Src
+                # # Forward pass: Tgt to Src (so tgt is now src and src is now tgt)
                 output_src = model(texts=batch[4], src_lens=batch[5], max_src_len=batch[6],
                                    mels=output_tgt[1], mel_lens=output_tgt[9], max_mel_len=max_mel_len,
-                                   speaker_embs=batch[13],
-                                   alignments=alignments, p_targets=output_tgt[2], e_targets=output_tgt[3], d_targets=output_tgt[4])
+                                   speaker_embs=batch[13], alignments=alignments, p_targets=realigned_p, 
+                                   e_targets=realigned_e, d_targets=realigned_d, d_src=output_tgt[4])
                 
                 # # Calculate loss for Tgt to Src
+                print("\nCalculating Loss for TGT to SRC")
                 losses_tgt_to_src = Loss(batch, output_src, "to_src")
                 total_loss_tgt_to_src = losses_tgt_to_src[0]
 
                 # Combine the losses
                 total_loss = (total_loss_src_to_tgt + total_loss_tgt_to_src) / 2
-
+                print("Total Loss: ", total_loss)
                 # # Cal Loss
                 # losses = Loss(batch, output)
                 # total_loss = losses[0]

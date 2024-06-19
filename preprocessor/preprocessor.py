@@ -12,8 +12,10 @@ from sklearn.preprocessing import StandardScaler
 from tqdm import tqdm
 import epitran
 from itertools import chain
+from singing_girl import sing
 
 from text.ipadict import db
+from text.tools import split_with_tie_bar
 import audio as Audio
 
 
@@ -198,7 +200,8 @@ class Preprocessor:
                   raw_translation, tgt_phones, "Continuing...")
             return None
 
-        tgt_phones = [[char for char in word] for word in tgt_phones]
+        # tgt_phones = [[char for char in word] for word in tgt_phones]
+        tgt_phones = [split_with_tie_bar(word) for word in tgt_phones]
 
         # Flatten tgt_phones to save to train.txt, val.txt
         flat_phones = list(chain.from_iterable(tgt_phones))
@@ -224,7 +227,7 @@ class Preprocessor:
             print("raw translation", raw_translation)  # right here on motorcycle
             print(epi.transliterate(raw_translation).split())
             print("tgt_phones", len(tgt_phones), tgt_phones)
-            return None
+            return IndexError
 
         if phone_alignments is "weird error":
             print(text_path)
@@ -417,7 +420,10 @@ class Preprocessor:
 
                 return IndexError
 
+            if len(tgt_word_phones) == 0:
+                continue
             phone_weight = len(src_word_phones) / len(tgt_word_phones)
+            
             phone_alignment, flat_phone_alignment = [], []
             current_src_phone = 0
             phone_accumulations = 0

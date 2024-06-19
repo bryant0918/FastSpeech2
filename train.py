@@ -116,7 +116,7 @@ def main(args, configs):
                 print(f"translations shape: {batch[10].shape}")
                 # print(f"translation_lens shape: {batch[11].shape}{batch[11]}")
                 # print(f"max_translation_len: {batch[12]}{type(batch[12])}")
-                # print(f"speaker_embs shape: {batch[13].shape}")
+                print(f"speaker_embs shape: {batch[13].shape}")
                 print(f"alignments shape: {batch[14].shape}")
                 print(f"pitches shape: {batch[15].shape}")   
                 print(f"energies shape: {batch[16].shape}")
@@ -132,14 +132,14 @@ def main(args, configs):
                 print("Realigned energies: ", realigned_e.shape)
                 print("Realigned durations: ", realigned_d.shape)
 
-                print("PITCH", realigned_p)
+                # print("PITCH", realigned_p)
 
 
                 # Forward
                 if batch is None:
                     print("Batch is None")
                     
-                input = batch[10:13] + batch[7:10] + batch[13:]
+                input = batch[10:13] + batch[7:10] + batch[13:15] + (realigned_p, realigned_e, realigned_d, batch[-1])
                 # input = batch[4:10] + batch[13:]
 
                 # try:
@@ -160,6 +160,8 @@ def main(args, configs):
                 output_tgt = model(*(input))
                 
                 # Calculate loss for Src to Tgt
+                
+                print("\nCalculating Loss for SRC to TGT")
                 losses_src_to_tgt = Loss(batch, output_tgt, "to_tgt")
                 total_loss_src_to_tgt = losses_src_to_tgt[0]
 

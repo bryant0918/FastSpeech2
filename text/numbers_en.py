@@ -63,7 +63,7 @@ def _expand_number(m):
         return _inflect.number_to_words(num, andword="")
 
 
-def normalize_numbers(text):
+def normalize_numbers_en(text):
     text = re.sub(_comma_number_re, _remove_commas, text)
     text = re.sub(_pounds_re, r"\1 pounds", text)
     text = re.sub(_dollars_re, _expand_dollars, text)

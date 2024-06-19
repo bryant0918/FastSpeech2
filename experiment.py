@@ -473,14 +473,15 @@ if test_textgrid:
     # tg_path = "preprocessed_data/LJSpeech/TextGrid/LJSpeech/LJ032-0007.TextGrid"
     # tg_path = "preprocessed_data/LJSpeech/TextGrid/LJSpeech/LJ036-0179.TextGrid"
     # tg_path = "preprocessed_data/LJSpeech/TextGrid/LJSpeech/LJ030-0041.TextGrid"
-    tg_path = "preprocessed_data/LJSpeech/TextGrid/LJSpeech/LJ050-0116.TextGrid"
+    # tg_path = "preprocessed_data/LJSpeech/TextGrid/LJSpeech/LJ050-0116.TextGrid"
+    tg_path = "preprocessed_data/LJSpeech/TextGrid/LJSpeech/LJ011-0060.TextGrid"
     textgrid = tgt.io.read_textgrid(tg_path)
 
     phones, durations, start, end = get_alignment(textgrid)
 
 
 """Test Epitran"""
-test_epitran = False
+test_epitran = True
 if test_epitran:
     import epitran
     from text.ipadict import db
@@ -515,27 +516,16 @@ if test_epitran:
     test_str = text.translate(str.maketrans('', '', new_punc))
     epi = epitran.Epitran("pol-Latn")
     phones = epi.transliterate(test_str)
-    print(phones)
+    print("EPITRAN:", phones)
 
     phones_by_word = phones.split()
 
-    def split_with_tie_bar(text):
-        result = []
-        i = 0
-        while i < len(text):
-            if i + 2 < len(text) and text[i + 1] == '͡':
-                # Group the character with the tie bar and the following character
-                result.append(text[i:i + 3])
-                i += 3
-            else:
-                # Just append the single character
-                result.append(text[i])
-                i += 1
-        return result
+    from text.tools import split_with_tie_bar
 
+    print("EPITRAN:", [[char for char in word] for word in phones_by_word])
     phones_by_word = [split_with_tie_bar(word) for word in phones_by_word]
-
-    print(phones_by_word)
+    print("EPITRAN:", phones_by_word)
+    print("EPITRAN: ", list(chain.from_iterable(phones_by_word)))
 
 
 """Go through word_alignment"""
@@ -882,7 +872,7 @@ if test_phone_alignment:
 
         return flat_phone_alignments
 
-    pth = "preprocessed_data/LJSpeech/alignments/word/LJSpeech-word_alignment-LJ050-0116.npy"
+    pth = "preprocessed_data/LJSpeech/alignments/word/LJSpeech-word_alignment-LJ011-0060.npy"
     # Loading the dictionary
     # with open(pth, 'rb') as f:
     #     word_alignments = pickle.load(f)
@@ -897,7 +887,12 @@ if test_phone_alignment:
 
     new_punc = "¡!\"#$%&'()*+,-./:;<=>¿?@[\]^_`{|}~"
 
-    text = "que tienen la responsabilidad principal de suministrar informacion sobre amenazas potenciales,"
+    # text = "que tienen la responsabilidad principal de suministrar informacion sobre amenazas potenciales,"
+    pth = "raw_data/LJSpeech/LJSpeech/LJ011-0060_tgt.lab"
+    with open(pth, 'r') as f:
+        text = f.read()
+    print("Tgt text: ", text)
+
     test_str = text.translate(str.maketrans('', '', new_punc))
 
     res = re.sub(r'[^\w\s]', '', text)  # Remove all non word or space characters
@@ -914,15 +909,15 @@ if test_phone_alignment:
     print("phones", phones)
 
     src_phones = "W IH1 CH K EH1 R IY0 DH AH0 M EY1 JH ER0 R IY0 S P AA2 N S AH0 B IH1 L AH0 T IY0 sp F R ER0 S AH0 P L AY1 IH0 NG IH2 N F ER0 M EY1 SH AH0 N AH0 B AW1 T P AH0 T EH1 N CH AH0 L TH R EH1 T S"
-    tgt_phones = "k e t j e n e n l a ɾ e s p o n s a b i l i d a d p ɾ i n s i p a l d e s u m i n i s t ɾ a ɾ i n f o ɾ m a s i o n s o b ɾ e a m e n a s a s p o t e n s i a l e s ,"
+    tgt_phones = "e s k ɾ i b j o d e s p w e s e n e l s e n t i d o d e k e e n e l m o m e n t o e n k e s e a b j a o f ɾ e s i d o u n a s e s i n o d e s k o n o s i d o b i n o a a s e s t a ɾ l e u n ɡ o l p e"
 
-    print(len(src_phones.split()), len(tgt_phones.split()))
+    print("Length of tgt_phones", len(tgt_phones.split()))
     phone_alignment = get_phoneme_alignment(word_alignments, phones, phones_by_word)
 
     print("Flat Phone alignment", len(phone_alignment), phone_alignment)
 
-    src_pitch = np.load("preprocessed_data/LJSpeech/pitch/LJSpeech-pitch-LJ050-0116.npy")
-
+    # src_pitch = np.load("preprocessed_data/LJSpeech/pitch/LJSpeech-pitch-LJ050-0116.npy")
+    src_pitch = np.load("preprocessed_data/LJSpeech/pitch/LJSpeech-pitch-LJ011-0060.npy")
 
 """Test realign p_e_d"""
 test_realign_p_e_d = True

@@ -16,7 +16,8 @@ hyperparameter. Some cleaners are English-specific. You'll typically want to use
 # Regular expression matching whitespace:
 import re
 from unidecode import unidecode
-from .numbers import normalize_numbers
+from .numbers_en import normalize_numbers_en
+from .numbers_es import normalize_numbers_es
 _whitespace_re = re.compile(r'\s+')
 
 # List of (regular expression, replacement) pairs for abbreviations:
@@ -55,8 +56,11 @@ def expand_abbreviations(text):
     return text
 
 
-def expand_numbers(text):
-    return normalize_numbers(text)
+def expand_numbers_en(text):
+    return normalize_numbers_en(text)
+
+def expand_numbers_es(text):
+    return normalize_numbers_es(text)
 
 
 def lowercase(text):
@@ -90,7 +94,7 @@ def english_cleaners(text):
     '''Pipeline for English text, including number and abbreviation expansion.'''
     text = convert_to_ascii(text)
     text = lowercase(text)
-    text = expand_numbers(text)
+    text = expand_numbers_en(text)
     text = expand_abbreviations(text)
     text = collapse_whitespace(text)
     text = remove_punctuation(text)
@@ -98,9 +102,10 @@ def english_cleaners(text):
 
 
 def spanish_cleaners(text):
-    '''Pipeline for Spanish text, including number and abbreviation expansion.'''
+    '''Pipeline for Spanish text, including number expansion.'''
     text = convert_to_ascii(text)
     text = lowercase(text)
+    text = expand_numbers_es(text)
     text = remove_punctuation(text)
     return text
 

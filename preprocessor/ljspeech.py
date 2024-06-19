@@ -6,7 +6,7 @@ from scipy.io import wavfile
 from tqdm import tqdm
 
 from text import _clean_text
-from text.cleaners import remove_punctuation
+from text.cleaners import spanish_cleaners
 
 from deep_translator import GoogleTranslator
 from simalign import SentenceAligner
@@ -36,7 +36,7 @@ def prepare_align(config):
 
             # TODO: Get cleaners for translation language also (and handle api connection errors)
             translation = GoogleTranslator(source='auto', target='es').translate(text)
-            translation = remove_punctuation(translation)
+            translation = spanish_cleaners(translation)
 
             wav_path = os.path.join(in_dir, "wavs", "{}.wav".format(base_name))
             if os.path.exists(wav_path):

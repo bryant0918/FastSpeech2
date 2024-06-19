@@ -40,9 +40,8 @@ class FastSpeech2Pros(nn.Module):
             self.speakers_json = json.load(f)
 
     def forward(self, texts, src_lens, max_src_len, mels=None, mel_lens=None, max_mel_len=None,
-                speaker_embs=None,
-                alignments=None, p_targets=None, e_targets=None, d_targets=None, prev_e=None, p_control=1.0,
-                e_control=1.0, d_control=1.0,):
+                speaker_embs=None, alignments=None, p_targets=None, e_targets=None, d_targets=None, 
+                d_src=None, p_control=1.0, e_control=1.0, d_control=1.0,):
         # batch = (ids, raw_texts, raw_translations, speakers, texts, src_lens, max_text_lens, mels, mel_lens,
         #          max_mel_lens, translations, translation_lens, max(translation_lens), speaker_embeddings, 
         #          alignments, pitches, energies, durations)
@@ -58,27 +57,28 @@ class FastSpeech2Pros(nn.Module):
         output = self.encoder(texts, tgt_masks)  # torch.Size([Batch, seq_len, 256])
 
         speaker_embs = speaker_embs.unsqueeze(1).expand(-1, output.size()[1], -1)
-        h_sd = output + speaker_embs  # torch.Size([Batch, seq_len, 256])
+        h_sd = output + speaker_embs  # torch.Size([Batch, tgt_seq_len, 256])
         print("h_sd shape: ", h_sd.shape)
 
         h_si = output
         prosody_predictor = ProsodyPredictor(256, 256, 4, 8).to(device)
 
-        # Test this loop
-        prev_prosody = torch.zeros(batch_size, 1, 256).to(device)
-        prosodies = []
-        for i in range(output.size()[1]):
-            h_sd_t = h_sd[:, i, :]
-            h_si_t = h_si[:, i, :]
-            print("h_sd_t shape: ", h_sd_t.shape)
-            out = prosody_predictor(h_sd_t, h_si_t, prev_prosody)
-            prosodies.append(out)
-            prev_prosody = out
-        predicted_prosodies_tgt = torch.stack(prosodies, dim=1)
-        print("predicted_prosodies_tgt shape: ", predicted_prosodies_tgt.shape)
+        # # Test this loop
+        # prev_prosody = torch.zeros(batch_size, 1, 256).to(device)
+        # prosodies = []
+        # for i in range(output.size()[1]):
+        #     h_sd_t = h_sd[:, i, :]
+        #     h_si_t = h_si[:, i, :]
+        #     print("h_sd_t shape: ", h_sd_t.shape)
+        #     out = prosody_predictor(h_sd_t, h_si_t, prev_prosody)
+        #     prosodies.append(out)
+        #     prev_prosody = out
+        # predicted_prosodies_tgt = torch.stack(prosodies, dim=1)
+        # print("predicted_prosodies_tgt shape: ", predicted_prosodies_tgt.shape)
 
-        # e_tgt = prosody_predictor(h_sd, h_si, prev_e)  # TODO: prev_e here doesn't make sense.
-        # print("e_tgt shape: ", e_tgt[0].shape)
+        e_tgt = prosody_predictor(h_sd, h_si)  # TODO: prev_e here doesn't make sense.
+        print("e_tgt[0] (log_pi) shape: ", e_tgt[0].shape)  # torch.Size([Batch, tgt_seq_len, N_Components])
+        print("e_tgt[1] (mu) shape: ", e_tgt[1].shape)
         
         # prosody extractor
         prosody_extractor = ProsodyExtractor(1, 256, 8).to(device)
@@ -88,17 +88,17 @@ class FastSpeech2Pros(nn.Module):
         
         # Split phone pros embeddings by phone duration
         # [batch_size (list), phoneme_sequence_length (list), melspec H (tensor), melspec W (tensor), 128 (tensor)]
-        e_k_src = prosody_extractor.split_phones(e_src, d_targets)
+        e_k_src = prosody_extractor.split_phones(e_src, d_src)
 
         # TODO: Allow for new predicted_prosodies_tgt shape
-        tgt_samp = prosody_predictor.sample2(predicted_prosodies_tgt)
+        tgt_samp = prosody_predictor.sample2(e_tgt)
         
         print("alignments shape: ", alignments.shape)  # TODO: unpad alignments for realigner otherwise everything mapped to 0.
         adjusted_e_tgt = prosody_predictor.prosody_realigner(alignments, tgt_samp, e_k_src)
 
         # Concat
         output = h_sd + adjusted_e_tgt
-        print("Output shape after prosody: ", output.shape)
+        print("Output shape after prosody: ", output.shape)  # torch.Size([Batch, tgt_seq_len, 256])
 
         # Now double check that durations and pitch etc are same as seq_length
 

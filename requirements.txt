@@ -12,6 +12,7 @@ pypinyin>=0.39.0
 PyYAML
 scikit-learn
 scipy
+singing-girl == 0.0.5
 simalign >= 0.4
 soundfile>=0.10.3.post1
 tensorboard >= 2.2.2

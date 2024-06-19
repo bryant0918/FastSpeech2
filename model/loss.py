@@ -52,6 +52,9 @@ class FastSpeech2Loss(nn.Module):
         energy_targets.requires_grad = False
         mel_targets.requires_grad = False
 
+        print("Src_masks ", src_masks.shape)
+        print("Pitch_predictions ", pitch_predictions.shape)
+        print("Pitch_targets ", pitch_targets.shape)
         if self.pitch_feature_level == "phoneme_level":
             pitch_predictions = pitch_predictions.masked_select(src_masks)
             pitch_targets = pitch_targets.masked_select(src_masks)

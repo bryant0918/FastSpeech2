@@ -374,18 +374,18 @@ def pad(input_ele, mel_max_length=None):
     return out_padded
 
 
-def flip_mapping(tgt_to_src_mappings):
+def flip_mapping(tgt_to_src_mappings, src_seq_len):
         # Find the maximum target index to determine the size of the new mapping
-        max_src_idx = int(tgt_to_src_mappings.max())
-        print("\nIN FLIP MAPPING")
-        print("max_src_idx: ", max_src_idx)
-        print("tgt_to_src_mappings: ", tgt_to_src_mappings)
-        print()
+        # max_src_idx = int(tgt_to_src_mappings.max())
+        # print("\nIN FLIP MAPPING")
+        # print("max_src_idx: ", max_src_idx)
+        # print("tgt_to_src_mappings: ", tgt_to_src_mappings)
+        # print()
 
         batch = []
         for tgt_to_src_mapping in tgt_to_src_mappings:
             # Initialize a list of lists to store the target to source mappings
-            src_to_tgt_mapping = [[] for _ in range(max_src_idx + 1)]
+            src_to_tgt_mapping = [[] for _ in range(src_seq_len)]
             
             # Iterate through each source index and its corresponding target indices
             for tgt_idx, src_indices in enumerate(tgt_to_src_mapping):

@@ -144,7 +144,7 @@ class TrainDataset(Dataset):
         alignments = pad_inhomogeneous_2D(alignments)
 
         # Debugging
-        reverse_alignments = flip_mapping(torch.from_numpy(alignments).int())
+        reverse_alignments = flip_mapping(torch.from_numpy(alignments).int(), np.shape(texts)[1])
         print("Shape of alignments", np.shape(alignments))
         print("Shape of texts", np.shape(texts))
         print("Shape of translations", np.shape(translations))

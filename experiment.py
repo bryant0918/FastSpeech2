@@ -28,6 +28,11 @@ model_config = "config/LJSpeech/model.yaml"
 preprocess_config = yaml.load(open(preprocess_config, "r"), Loader=yaml.FullLoader)
 model_config = yaml.load(open(model_config, "r"), Loader=yaml.FullLoader)
 
+# ASENAME LJ016-0008                                                                                                                                                    | 0/6288 [00:00<?, ?it/s]
+# BASENAME LJ007-0050
+basename = "LJ007-0050"
+
+
 """Test reverse alignment"""
 test_reverse_alignment = False
 if test_reverse_alignment:
@@ -403,6 +408,8 @@ if test_textgrid:
     import tgt
     from itertools import chain
     import os
+
+    print("\n TESTING TEXTGRID GET ALIGNMENT")
         
     def get_alignment(textgrid):
         phones_tier = textgrid.get_tier_by_name("phones")
@@ -472,7 +479,7 @@ if test_textgrid:
     # tg_path = "preprocessed_data/LJSpeech/TextGrid/LJSpeech/LJ036-0179.TextGrid"
     # tg_path = "preprocessed_data/LJSpeech/TextGrid/LJSpeech/LJ030-0041.TextGrid"
     # tg_path = "preprocessed_data/LJSpeech/TextGrid/LJSpeech/LJ002-0298.TextGrid"
-    tg_path = "preprocessed_data/LJSpeech/TextGrid/LJSpeech/LJ048-0270.TextGrid"
+    tg_path = f"preprocessed_data/LJSpeech/TextGrid/LJSpeech/{basename}.TextGrid"
     textgrid = tgt.io.read_textgrid(tg_path)
 
     phones, durations, start, end = get_alignment(textgrid)
@@ -546,12 +553,14 @@ if test_word_alignment:
     print(len(phone_alignments))
 
 """Test Sentence Aligner"""
-test_aligner = False
+test_aligner = True
 if test_aligner:
     from simalign import SentenceAligner
     # making an instance of our model.
     # You can specify the embedding model and all alignment settings in the constructor.
     myaligner = SentenceAligner(model="bert", token_type="bpe", matching_methods="m")
+
+    print("\n TESTING SENTENCE ALIGNER")
 
     # The source and target sentences should be tokenized to words.
     src_sentence = ["Hello,", "my", "name", "is", "Ditto", "and", "this", "is", "what", "I", "sound", "like"]
@@ -579,6 +588,17 @@ if test_aligner:
     src = "he now married although his salary was only a pound a week but he soon got on"
     tgt = "ahora se caso aunque su salario era solo de una libra por semana pero pronto consiguio"
 
+    pth = f"raw_data/LJSpeech/LJSpeech/{basename}_src.lab"
+    with open(pth, 'r') as f:
+        src = f.read()
+    print("Src text: ", src)
+
+    # text = "que tienen la responsabilidad principal de suministrar informacion sobre amenazas potenciales,"
+    pth = f"raw_data/LJSpeech/LJSpeech/{basename}_tgt.lab"
+    with open(pth, 'r') as f:
+        tgt = f.read()
+    print("Tgt text: ", tgt)
+    
     alignments = myaligner.get_word_aligns(src.split(), tgt.split())
     print("Src.split(): ", len(src.split()), src.split())
     print("Tgt.split(): ", len(tgt.split()), tgt.split())
@@ -753,6 +773,9 @@ if test_predictor:
 test_phone_alignment = True
 if test_phone_alignment:
     from itertools import chain
+
+    print("\n TESTING PHONEME ALIGNER")
+
     def get_phoneme_alignment(word_alignments, src_phones, tgt_phones):
         """
         word_alignments: list of tuples of word alignments [(src_word_idx, tgt_word_idx), ...]
@@ -886,7 +909,7 @@ if test_phone_alignment:
 
         return flat_phone_alignments
 
-    pth = "preprocessed_data/LJSpeech/alignments/word/LJSpeech-word_alignment-LJ048-0270.npy"
+    pth = f"preprocessed_data/LJSpeech/alignments/word/LJSpeech-word_alignment-{basename}.npy"
     # Loading the dictionary
     # with open(pth, 'rb') as f:
     #     word_alignments = pickle.load(f)
@@ -901,8 +924,13 @@ if test_phone_alignment:
 
     new_punc = "¡!\"#$%&'()*+,-./:;<=>¿?@[\]^_`{|}~"
 
+    pth = f"raw_data/LJSpeech/LJSpeech/{basename}_src.lab"
+    with open(pth, 'r') as f:
+        text = f.read()
+    print("Src text: ", text)
+
     # text = "que tienen la responsabilidad principal de suministrar informacion sobre amenazas potenciales,"
-    pth = "raw_data/LJSpeech/LJSpeech/LJ048-0270_tgt.lab"
+    pth = f"raw_data/LJSpeech/LJSpeech/{basename}_tgt.lab"
     with open(pth, 'r') as f:
         text = f.read()
     print("Tgt text: ", text)
@@ -922,21 +950,28 @@ if test_phone_alignment:
     print("phones_by_word", phones_by_word)
     print("phones", phones)
 
-    src_phones = "W IH1 CH K EH1 R IY0 DH AH0 M EY1 JH ER0 R IY0 S P AA2 N S AH0 B IH1 L AH0 T IY0 sp F R ER0 S AH0 P L AY1 IH0 NG IH2 N F ER0 M EY1 SH AH0 N AH0 B AW1 T P AH0 T EH1 N CH AH0 L TH R EH1 T S"
-    tgt_phones = "e s k ɾ i b j o d e s p w e s e n e l s e n t i d o d e k e e n e l m o m e n t o e n k e s e a b j a o f ɾ e s i d o u n a s e s i n o d e s k o n o s i d o b i n o a a s e s t a ɾ l e u n ɡ o l p e"
+    # src_phones = "W IH1 CH K EH1 R IY0 DH AH0 M EY1 JH ER0 R IY0 S P AA2 N S AH0 B IH1 L AH0 T IY0 sp F R ER0 S AH0 P L AY1 IH0 NG IH2 N F ER0 M EY1 SH AH0 N AH0 B AW1 T P AH0 T EH1 N CH AH0 L TH R EH1 T S"
+    # tgt_phones = "e s k ɾ i b j o d e s p w e s e n e l s e n t i d o d e k e e n e l m o m e n t o e n k e s e a b j a o f ɾ e s i d o u n a s e s i n o d e s k o n o s i d o b i n o a a s e s t a ɾ l e u n ɡ o l p e"
 
     # print("Length of tgt_phones", len(tgt_phones.split()))
     phone_alignment = get_phoneme_alignment(word_alignments, phones, phones_by_word)
 
     print("Flat Phone alignment", len(phone_alignment), phone_alignment)
 
-    from utils.tools import pad_inhomogeneous_2D
+    from utils.tools import pad_inhomogeneous_2D, flip_mapping
     alignments = torch.from_numpy(pad_inhomogeneous_2D([phone_alignment, phone_alignment[:26]])).int().to(device)
 
     print("Alignments", alignments.shape, alignments.max().item())
 
+    max_src_idx=len(list(chain.from_iterable(phones)))
+    print("Max src idx", max_src_idx)
+
+    reverse_alignments = flip_mapping(alignments, src_seq_len=max_src_idx)
+    print("Reverse Alignments", reverse_alignments.shape, reverse_alignments.max().item())
+    print(reverse_alignments[0])
+
     # src_pitch = np.load("preprocessed_data/LJSpeech/pitch/LJSpeech-pitch-LJ050-0116.npy")
-    src_pitch = np.load("preprocessed_data/LJSpeech/pitch/LJSpeech-pitch-LJ011-0060.npy")
+    src_pitch = np.load(f"preprocessed_data/LJSpeech/pitch/LJSpeech-pitch-{basename}.npy")
 
 """Test realign p_e_d"""
 test_realign_p_e_d = False

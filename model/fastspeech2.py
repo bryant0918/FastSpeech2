@@ -84,12 +84,15 @@ class FastSpeech2Pros(nn.Module):
         prosody_extractor = ProsodyExtractor(1, 256, 8).to(device)
         
         mels = mels.unsqueeze(1) # mels shape is [batch_size, 1, melspec W, melspec H]
+        print("mels shape: ", mels.shape)
         e_src = prosody_extractor(mels)   # e is [batch_size, melspec H, melspec W, 128]
+        print("e_src shape: ", e_src.shape)
         
         # Split phone pros embeddings by phone duration
-        # [batch_size (list), phoneme_sequence_length (list), melspec H (tensor), melspec W (tensor), 128 (tensor)]
+        # [batch_size (list), phoneme_sequence_length (list), melspec H (tensor), melspec W (tensor), 128 (tensor)]        
         e_k_src = prosody_extractor.split_phones(e_src, d_src)
         print("e_k_src shape: ", len(e_k_src), len(e_k_src[0]), e_k_src[0][0].shape)
+        print("d_src[0][0]", d_src[0][0])
 
         # TODO: Allow for new predicted_prosodies_tgt shape
         tgt_samp = prosody_predictor.sample2(e_tgt)

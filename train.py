@@ -186,7 +186,7 @@ def main(args, configs):
                 #  alignments=alignments, p_targets=output_tgt[2], e_targets=output_tgt[3], d_targets=output_tgt[4],
                 #  prev_e=None, p_control=1.0, e_control=1.0, d_control=1.0,)
                 
-                alignments = flip_mapping(batch[14])
+                alignments = flip_mapping(batch[14], batch[4].shape[1])
 
                 # reverse_input = (batch[3], batch[10], batch[11], batch[12], output_tgt[1], output_tgt[9], max(output_tgt[9]),
                                 #  None, None, None, batch[13], alignments, output_tgt[2], output_tgt[3], output_tgt[4], None, 1.0, 1.0, 1.0)
@@ -223,6 +223,8 @@ def main(args, configs):
                 print("Realigned durations: ", realigned_d.shape)
                 print("Realigned durations src: ", realigned_d_src.shape)
                 print()
+
+                # TODO: Do I need to realign mels?
 
                 # # Forward pass: Tgt to Src (so tgt is now src and src is now tgt)
                 print("\nFORWARD PASS: TGT to SRC")

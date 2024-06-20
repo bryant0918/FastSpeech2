@@ -110,9 +110,9 @@ def main(args, configs):
                 # print(f"texts shape: {batch[4].shape}")
                 # print(f"src_lens shape: {batch[5].shape}")
                 # print(f"max_src_len: {batch[6]}{type(batch[6])}")
-                # print(f"mels shape: {batch[7].shape}")
-                # print(f"mel_lens shape: {batch[8].shape}")
-                # print(f"max_mel_len: {batch[9]}{type(batch[9])}")
+                print(f"mels shape: {batch[7].shape}")
+                print(f"mel_lens shape: {batch[8].shape}")
+                print(f"max_mel_len: {batch[9]}{type(batch[9])}")
                 # print(f"translations shape: {batch[10].shape}")
                 # print(f"translation_lens shape: {batch[11].shape}{batch[11]}")
                 # print(f"max_translation_len: {batch[12]}{type(batch[12])}")
@@ -137,7 +137,7 @@ def main(args, configs):
 
                 # Forward
                 if batch is None:
-                    print("Batch is None")
+                    raise ValueError("Batch is None")
                     
                 input = batch[10:13] + batch[7:10] + batch[13:15] + (realigned_p, realigned_e, realigned_d, batch[-1])
                 # input = batch[4:10] + batch[13:]
@@ -157,6 +157,7 @@ def main(args, configs):
 
                 # Forward pass: Src to Tgt
                 # input_english = batch['english_audio']
+                print("\nFORWARD PASS: SRC to TGT")
                 output_tgt = model(*(input))
                 
                 # Calculate loss for Src to Tgt
@@ -197,18 +198,18 @@ def main(args, configs):
                 d_src = torch.clamp(torch.round(torch.exp(output_tgt[4] - 1)).long(), min=0)
 
                 print()
-                print(f"texts shape: {batch[4].shape}")
+                # print(f"texts shape: {batch[4].shape}")
                 # print(f"src_lens shape: {batch[5].shape}")
                 # print(f"max_src_len: {batch[6]}{type(batch[12])}")
-                # print(f"mels shape: {output_tgt[1].shape}")
-                # print(f"mel_lens shape: {output_tgt[9].shape}")
-                # print(f"max_mel_len: {max_mel_len}{type(max_mel_len)}")
+                print(f"mels shape: {output_tgt[1].shape}")
+                print(f"mel_lens: {output_tgt[9]}")
+                print(f"max_mel_len: {max_mel_len}{type(max_mel_len)}")
                 # print(f"speaker_embs shape: {batch[13].shape}")
-                print(f"alignments shape: {alignments.shape}")
-                print(f"p_targets shape: {output_tgt[2].shape}")  # Pitches energies and durations should be same size as texts
-                print(f"e_targets shape: {output_tgt[3].shape}")
-                print(f"d_targets shape: {output_tgt[4].shape}")
-                print(f"d_src shape: {d_src.shape}")
+                # print(f"alignments shape: {alignments.shape}")
+                # print(f"p_targets shape: {output_tgt[2].shape}")  # Pitches energies and durations should be same size as texts
+                # print(f"e_targets shape: {output_tgt[3].shape}")
+                # print(f"d_targets shape: {output_tgt[4].shape}")
+                # print(f"d_src shape: {d_src.shape}")
                 # print()
                 # print("Pitches: ", batch[15])
 
@@ -218,21 +219,27 @@ def main(args, configs):
                 realigned_d = realign_p_e_d(alignments, output_tgt[4])
                 realigned_d_src = realign_p_e_d(alignments, d_src)
 
-                print("Realigned pitches: ", realigned_p.shape)
-                print("Realigned energies: ", realigned_e.shape)
-                print("Realigned durations: ", realigned_d.shape)
-                print("Realigned durations src: ", realigned_d_src.shape)
-                print()
+                # print("Realigned pitches: ", realigned_p.shape)
+                # print("Realigned energies: ", realigned_e.shape)
+                # print("Realigned durations: ", realigned_d.shape)
+                # print("Realigned durations src: ", realigned_d_src.shape)
+                # print()
 
                 # TODO: Do I need to realign mels?
 
                 # # Forward pass: Tgt to Src (so tgt is now src and src is now tgt)
                 print("\nFORWARD PASS: TGT to SRC")
                 output_src = model(texts=batch[4], src_lens=batch[5], max_src_len=batch[6],
-                                   mels=output_tgt[1], mel_lens=output_tgt[9], max_mel_len=max_mel_len,
+                                   mels=output_tgt[1], mel_lens=output_tgt[9], max_mel_len=batch[9],
                                    speaker_embs=batch[13], alignments=alignments, p_targets=realigned_p, 
                                    e_targets=realigned_e, d_targets=realigned_d_src, d_src=d_src)
-                
+
+                max_mel_len = np.int64(max(output_tgt[9]).cpu().numpy())
+                print()
+                print(f"mels shape: {output_src[1].shape}")
+                print(f"mel_lens shape: {output_src[9].shape}")
+                print(f"max_mel_len: {max_mel_len}{type(max_mel_len)}")
+
                 # # Calculate loss for Tgt to Src
                 print("\nCalculating Loss for TGT to SRC")
                 loss_inputs = (batch[7],) + (realigned_p, realigned_e, realigned_d_src)

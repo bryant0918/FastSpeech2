@@ -143,12 +143,8 @@ class TrainDataset(Dataset):
         translations = pad_1D(translations)
         alignments = pad_inhomogeneous_2D(alignments)
 
-        # Debugging
+        # Debugging but maybe add reverse_alignments to dataset
         reverse_alignments = flip_mapping(torch.from_numpy(alignments).int(), np.shape(texts)[1])
-        print("Shape of alignments", np.shape(alignments))
-        print("Shape of texts", np.shape(texts))
-        print("Shape of translations", np.shape(translations))
-        print("Shape of reverse_alignments", reverse_alignments.shape)
         if np.shape(alignments)[1] != np.shape(translations)[1] or reverse_alignments.shape[1] != np.shape(texts)[1]:
             raise ValueError("Alignments and Texts must have the same length")
             

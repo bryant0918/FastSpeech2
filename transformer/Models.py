@@ -458,7 +458,7 @@ class ProsodyPredictor(nn.Module):
         """
         Realigns and shifts tgt_samp distribution by e_k_src
         """
-        print("phone_alignments", phone_alignments.shape)
+        # print("phone_alignments", phone_alignments.shape)
         beta = 0.1
         batch_size = len(phone_alignments)
         seq_length = tgt_samp.shape[1]
@@ -467,7 +467,7 @@ class ProsodyPredictor(nn.Module):
         new_e = torch.zeros(batch_size, seq_length, tgt_samp.shape[2], device=device)
         counts = torch.zeros(batch_size, seq_length, device=device)  # Tensor to keep count of how many times each index is updated
 
-        print("Sum_e", sum_e.shape)
+        # print("Sum_e", sum_e.shape)
         # print("e_k_src", type(e_k_src), len(e_k_src), len(e_k_src[0]), len(e_k_src[1]))
 
         # Works for when target sentence is longer
@@ -517,19 +517,8 @@ class ProsodyPredictor(nn.Module):
                         print(B_broadcasted) 
                         print(e_k_src[b][i])
                         raise ValueError("Nan in new_mean")
-                    print("Counts", b,j,i.item(),counts[b][j].item())
-                    
-
-            # Average the accumulated results
-            # for i in range(seq_length):
-            #     if counts[b][i] > 0:
-            #         new_e[b, i] /= counts[b][i]
             
         mask = counts > 0
-
-        print("Counts", counts)
-        print("Mask", mask)
-        print("Counts[mask]", counts[mask])
         new_e[mask] = sum_e[mask] / counts[mask].unsqueeze(-1)
             
         return new_e

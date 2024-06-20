@@ -235,8 +235,10 @@ def main(args, configs):
                 
                 # # Calculate loss for Tgt to Src
                 print("\nCalculating Loss for TGT to SRC")
-                losses_tgt_to_src = Loss(batch, output_src, "to_src")
+                loss_inputs = (batch[7],) + (realigned_p, realigned_e, realigned_d_src)
+                losses_tgt_to_src = Loss(loss_inputs, output_src, "to_src")
                 total_loss_tgt_to_src = losses_tgt_to_src[0]
+                print("total_loss_tgt_to_src: ", total_loss_tgt_to_src)
 
                 # Combine the losses
                 total_loss = (total_loss_src_to_tgt + total_loss_tgt_to_src) / 2

@@ -58,7 +58,7 @@ class FastSpeech2Pros(nn.Module):
 
         speaker_embs = speaker_embs.unsqueeze(1).expand(-1, output.size()[1], -1)
         h_sd = output + speaker_embs  # torch.Size([Batch, tgt_seq_len, 256])
-        print("h_sd shape: ", h_sd.shape)
+        print("h_sd shape: ", h_sd.shape, torch.isnan(h_sd).any())
 
         h_si = output
         prosody_predictor = ProsodyPredictor(256, 256, 4, 8).to(device)
@@ -86,24 +86,31 @@ class FastSpeech2Pros(nn.Module):
         mels = mels.unsqueeze(1) # mels shape is [batch_size, 1, melspec W, melspec H]
         print("mels shape: ", mels.shape)
         e_src = prosody_extractor(mels)   # e is [batch_size, melspec H, melspec W, 128]
-        print("e_src shape: ", e_src.shape)
+        print("e_src shape: ", e_src.shape, torch.isnan(e_src).any())
         
         # Split phone pros embeddings by phone duration
         # [batch_size (list), phoneme_sequence_length (list), melspec H (tensor), melspec W (tensor), 128 (tensor)]        
         e_k_src = prosody_extractor.split_phones(e_src, d_src)
-        print("e_k_src shape: ", len(e_k_src), len(e_k_src[0]), e_k_src[0][0].shape)
-        print("d_src[0][0]", d_src[0][0])
+        print("e_k_src shape: ", len(e_k_src), len(e_k_src[0]), e_k_src[0][0].shape, torch.isnan(e_k_src[0][0]).any())
+        print("d_src[0][0]", d_src[0][0], torch.isnan(d_src).any())
+
+        for b in range(len(e_k_src)):
+            for k in range(len(e_k_src[b])):
+                if torch.isnan(e_k_src[b][k]).any():
+                    print("e_k_src nan: ", b, k)
 
         # TODO: Allow for new predicted_prosodies_tgt shape
         tgt_samp = prosody_predictor.sample2(e_tgt)
-        print("tgt_samp shape: ", tgt_samp.shape)  
+        print("tgt_samp shape: ", tgt_samp.shape, torch.isnan(tgt_samp).any())  
         
         # print("alignments shape: ", alignments.shape)  # TODO: unpad alignments for realigner otherwise everything mapped to 0.
         adjusted_e_tgt = prosody_predictor.prosody_realigner(alignments, tgt_samp, e_k_src)
+        print("alignments nan", torch.isnan(alignments).any())
+        print("adjusted_e_tgt nan: ", torch.isnan(adjusted_e_tgt).any())
 
         # Concat
         output = h_sd + adjusted_e_tgt
-        print("Output shape after prosody: ", output.shape)  # torch.Size([Batch, tgt_seq_len, 256])
+        print("Output shape after prosody: ", output.shape, torch.isnan(output).any())  # torch.Size([Batch, tgt_seq_len, 256])
 
         # Now double check that durations and pitch etc are same as seq_length
 

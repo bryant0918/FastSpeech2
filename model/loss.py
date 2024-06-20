@@ -53,6 +53,7 @@ class FastSpeech2Loss(nn.Module):
 
         # print("Src_masks ", src_masks.shape)
         # print("Pitch_predictions ", pitch_predictions.shape)
+        print("is nan pitch_predictions: ", torch.isnan(pitch_predictions).any())
         # print("Pitch_targets ", pitch_targets.shape)
 
         if self.pitch_feature_level == "phoneme_level":
@@ -71,7 +72,7 @@ class FastSpeech2Loss(nn.Module):
 
         log_duration_predictions = log_duration_predictions.masked_select(src_masks)
         log_duration_targets = log_duration_targets.masked_select(src_masks)
-
+                
         # Calculate mel loss only in reverse direction
         mel_loss, postnet_mel_loss = 0, 0
         if direction == "to_src":
@@ -82,12 +83,15 @@ class FastSpeech2Loss(nn.Module):
             postnet_mel_predictions = postnet_mel_predictions.masked_select(
                 mel_masks.unsqueeze(-1)
             )
+
+            print("mel targets: ", mel_targets.shape)
+            print("mel_masks: ", mel_masks.shape)
             mel_targets = mel_targets.masked_select(mel_masks.unsqueeze(-1))
 
             mel_loss = self.mae_loss(mel_predictions, mel_targets)
             postnet_mel_loss = self.mae_loss(postnet_mel_predictions, mel_targets)
 
-
+        
         pitch_loss = self.mse_loss(pitch_predictions, pitch_targets)
         energy_loss = self.mse_loss(energy_predictions, energy_targets)
         duration_loss = self.mse_loss(log_duration_predictions, log_duration_targets)
@@ -98,6 +102,12 @@ class FastSpeech2Loss(nn.Module):
 
         # # phone Loss  (Requires extracting predicted phonemes from mel Spectrogram) whisper
         # phone_loss = self.phone_loss()
+
+        print("Mel Loss: ", mel_loss)
+        print("Postnet Mel Loss: ", postnet_mel_loss)
+        print("Pitch Loss: ", pitch_loss)
+        print("Energy Loss: ", energy_loss)
+        print("Duration Loss: ", duration_loss)
 
         total_loss = (
             mel_loss + postnet_mel_loss + duration_loss + pitch_loss + energy_loss

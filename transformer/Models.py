@@ -477,7 +477,17 @@ class ProsodyPredictor(nn.Module):
                 if j >= tgt_samp[b].shape[0]:
                         print("CONTINUING IN PROSODY REALIGNER")
                         continue
-                for i in phone_alignments[b][j]:
+                
+                # Skip padded entries in second dimension
+                if j != 0 and torch.all(phone_alignments[b][j] == 0):
+                    continue
+
+                for idx, i in enumerate(phone_alignments[b][j]):
+
+                    # Skip padded entries in third dimension
+                    if idx != 0 and i == 0:
+                        continue
+
                     # Reshape B to be broadcastable to A's shape
                     try:
                         B_broadcasted = tgt_samp[b][j].unsqueeze(0).unsqueeze(0)
@@ -486,7 +496,10 @@ class ProsodyPredictor(nn.Module):
                         print(phone_alignments[b][j])
                         raise ValueError("Error")
                     # Compute the weighted combination
-                    result = (1 - beta) * B_broadcasted + beta * e_k_src[b][i]
+                    if e_k_src[b][i].numel() == 0:
+                        result = B_broadcasted
+                    else:
+                        result = (1 - beta) * B_broadcasted + beta * e_k_src[b][i]
                     new_mean = result.mean(dim=(0, 1))  # [256]
 
                     # Accumulate the new_mean for each index
@@ -499,13 +512,25 @@ class ProsodyPredictor(nn.Module):
                         raise IndexError("Error")
                     counts[b, j] += 1
 
+                    if torch.isnan(new_mean).any():
+                        print('NAN', result)
+                        print(B_broadcasted) 
+                        print(e_k_src[b][i])
+                        raise ValueError("Nan in new_mean")
+                    print("Counts", b,j,i.item(),counts[b][j].item())
+                    
+
             # Average the accumulated results
             # for i in range(seq_length):
             #     if counts[b][i] > 0:
             #         new_e[b, i] /= counts[b][i]
             
-            mask = counts > 0
-            new_e[mask] = sum_e[mask] / counts[mask].unsqueeze(-1)
+        mask = counts > 0
+
+        print("Counts", counts)
+        print("Mask", mask)
+        print("Counts[mask]", counts[mask])
+        new_e[mask] = sum_e[mask] / counts[mask].unsqueeze(-1)
             
         return new_e
 

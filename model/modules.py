@@ -113,6 +113,8 @@ class VarianceAdaptor(nn.Module):
             pitch_prediction, pitch_embedding = self.get_pitch_embedding(
                 x, pitch_target, src_mask, p_control
             )
+
+            print("x is nan: ", torch.isnan(x).any())
             x = x + pitch_embedding    # (durations and targets mismatch)
         if self.energy_feature_level == "phoneme_level":
             energy_prediction, energy_embedding = self.get_energy_embedding(

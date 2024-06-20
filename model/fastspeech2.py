@@ -50,13 +50,13 @@ class FastSpeech2Pros(nn.Module):
         batch_size = texts.size(0)
 
         tgt_masks = get_mask_from_lengths(src_lens, max_src_len)
-        print("Tgt masks shape: ", tgt_masks.shape)
+        # print("Tgt masks shape: ", tgt_masks.shape)
         
         # Mel Mask changes in reverse direction
-        print("Max mel len: ", max_mel_len)
-        print("Mel lens: ", mel_lens)
+        # print("Max mel len: ", max_mel_len)
+        # print("Mel lens: ", mel_lens)
         mel_masks = (get_mask_from_lengths(mel_lens, max_mel_len) if mel_lens is not None else None)
-        print("Mel masks shape: ", mel_masks.shape)
+        # print("Mel masks shape: ", mel_masks.shape)
         
         # This should be tgt translations not src texts
         output = self.encoder(texts, tgt_masks)  # torch.Size([Batch, seq_len, 256])
@@ -89,7 +89,6 @@ class FastSpeech2Pros(nn.Module):
         prosody_extractor = ProsodyExtractor(1, 256, 8).to(device)
         
         mels = mels.unsqueeze(1) # mels shape is [batch_size, 1, melspec W, melspec H]
-        print("mels shape: ", mels.shape)
         e_src = prosody_extractor(mels)   # e is [batch_size, melspec H, melspec W, 128]
         # print("e_src shape: ", e_src.shape, torch.isnan(e_src).any())
         
@@ -118,21 +117,21 @@ class FastSpeech2Pros(nn.Module):
         # print("Output shape after prosody: ", output.shape, torch.isnan(output).any())  # torch.Size([Batch, tgt_seq_len, 256])
 
         # Now double check that durations and pitch etc are same as seq_length
-        print("Input mel_masks shape: ", mel_masks.shape)
-        print("Mel masks", mel_masks)
+        # print("Input mel_masks shape: ", mel_masks.shape)
+        # print("Mel masks", mel_masks)
 
         (output, p_predictions, e_predictions, log_d_predictions, d_rounded, mel_lens, mel_masks,) = \
             self.variance_adaptor(output, tgt_masks, mel_masks, max_mel_len, p_targets, e_targets, d_targets, p_control,
                                   e_control, d_control, )
 
         # print("d_rounded shape: ", d_rounded.shape)
-        print("mel_lens shape: ", mel_lens)
-        print("predicted mel_masks shape: ", mel_masks.shape)
+        # print("mel_lens shape: ", mel_lens)
+        # print("predicted mel_masks shape: ", mel_masks.shape)
         # Remap p_predictions, e_predictions, log_d_predictions to tgt size
 
 
         output, mel_masks = self.decoder(output, mel_masks)
-        print("output mel_masks shape: ", mel_masks.shape)
+        # print("output mel_masks shape: ", mel_masks.shape)
 
         output = self.mel_linear(output)
 

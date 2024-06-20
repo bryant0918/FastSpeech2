@@ -73,9 +73,9 @@ class FastSpeech2Loss(nn.Module):
         log_duration_predictions = log_duration_predictions.masked_select(src_masks)
         log_duration_targets = log_duration_targets.masked_select(src_masks)
 
-        print("mel_masks: ", mel_masks.shape)
-        print("mel targets: ", mel_targets.shape)
-        print("mel_predictions before: ", mel_predictions.shape)
+        # print("mel_masks: ", mel_masks.shape)
+        # print("mel targets: ", mel_targets.shape)
+        # print("mel_predictions before: ", mel_predictions.shape)
                 
         # Calculate mel loss only in reverse direction
         mel_loss, postnet_mel_loss = 0, 0
@@ -83,15 +83,15 @@ class FastSpeech2Loss(nn.Module):
             mel_targets = mel_targets[:, : mel_masks.shape[1], :]
             mel_targets.requires_grad = False
 
-            print("mel_predictions before: ", mel_predictions.shape)
+            # print("mel_predictions before: ", mel_predictions.shape)
             mel_predictions = mel_predictions.masked_select(mel_masks.unsqueeze(-1))
             
             postnet_mel_predictions = postnet_mel_predictions.masked_select(
                 mel_masks.unsqueeze(-1)
             )
-            print("mel_predictions after: ", mel_predictions.shape)
-            print("mel targets: ", mel_targets.shape)
-            print("mel_masks: ", mel_masks.shape)
+            # print("mel_predictions after: ", mel_predictions.shape)
+            # print("mel targets: ", mel_targets.shape)
+            # print("mel_masks: ", mel_masks.shape)
 
             # Interpolate to get same size as starting mel
 
@@ -100,6 +100,9 @@ class FastSpeech2Loss(nn.Module):
 
             mel_loss = self.mae_loss(mel_predictions, mel_targets)
             postnet_mel_loss = self.mae_loss(postnet_mel_predictions, mel_targets)
+
+            print("Mel Loss: ", mel_loss)
+            print("Postnet Mel Loss: ", postnet_mel_loss)
 
         
         pitch_loss = self.mse_loss(pitch_predictions, pitch_targets)
@@ -113,8 +116,7 @@ class FastSpeech2Loss(nn.Module):
         # # phone Loss  (Requires extracting predicted phonemes from mel Spectrogram) whisper
         # phone_loss = self.phone_loss()
 
-        print("Mel Loss: ", mel_loss)
-        print("Postnet Mel Loss: ", postnet_mel_loss)
+        
         print("Pitch Loss: ", pitch_loss)
         print("Energy Loss: ", energy_loss)
         print("Duration Loss: ", duration_loss)

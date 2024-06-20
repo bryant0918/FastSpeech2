@@ -107,8 +107,8 @@ class VarianceAdaptor(nn.Module):
                 energy_target=None, duration_target=None, p_control=1.0, 
                 e_control=1.0, d_control=1.0):
         
-        print("\nIN VARIANCE PREDICTOR")
-        print("mel masks: ", mel_mask.shape)
+        # print("\nIN VARIANCE PREDICTOR")
+        # print("mel masks: ", mel_mask.shape)
 
         log_duration_prediction = self.duration_predictor(x, src_mask)
         
@@ -126,12 +126,12 @@ class VarianceAdaptor(nn.Module):
             x = x + energy_embedding
 
         if duration_target is not None:
-            print("x shape", x.shape)
-            print("duration target: ", duration_target.shape)
-            print("max len: ", max_len)
+            # print("x shape", x.shape)
+            # print("duration target: ", duration_target.shape)
+            # print("max len: ", max_len)
             x, mel_len = self.length_regulator(x, duration_target, max_len)
             duration_rounded = duration_target
-            print("mel len", mel_len)
+            # print("mel len", mel_len)
         else:
             duration_rounded = torch.clamp(
                 (torch.round(torch.exp(log_duration_prediction) - 1) * d_control),
@@ -139,7 +139,7 @@ class VarianceAdaptor(nn.Module):
             )
             x, mel_len = self.length_regulator(x, duration_rounded, max_len)
             mel_mask = get_mask_from_lengths(mel_len)
-            print("mel masks: ", mel_mask.shape)
+            # print("mel masks: ", mel_mask.shape)
 
         if self.pitch_feature_level == "frame_level":
             pitch_prediction, pitch_embedding = self.get_pitch_embedding(

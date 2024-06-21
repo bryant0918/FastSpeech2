@@ -72,37 +72,27 @@ class FastSpeech2Loss(nn.Module):
 
         log_duration_predictions = log_duration_predictions.masked_select(src_masks)
         log_duration_targets = log_duration_targets.masked_select(src_masks)
-
-        # print("mel_masks: ", mel_masks.shape)
-        # print("mel targets: ", mel_targets.shape)
-        # print("mel_predictions before: ", mel_predictions.shape)
                 
         # Calculate mel loss only in reverse direction
-        mel_loss, postnet_mel_loss = 0, 0
+        mel_loss, postnet_mel_loss, mel_duration_loss = 0, 0, 0
         if direction == "to_src":
             mel_targets = mel_targets[:, : mel_masks.shape[1], :]
             mel_targets.requires_grad = False
 
-            # print("mel_predictions before: ", mel_predictions.shape)
             mel_predictions = mel_predictions.masked_select(mel_masks.unsqueeze(-1))
-            
             postnet_mel_predictions = postnet_mel_predictions.masked_select(
                 mel_masks.unsqueeze(-1)
             )
-            # print("mel_predictions after: ", mel_predictions.shape)
-            # print("mel targets: ", mel_targets.shape)
-            # print("mel_masks: ", mel_masks.shape)
-
-            # Interpolate to get same size as starting mel
-
-
             mel_targets = mel_targets.masked_select(mel_masks.unsqueeze(-1))
 
             mel_loss = self.mae_loss(mel_predictions, mel_targets)
             postnet_mel_loss = self.mae_loss(postnet_mel_predictions, mel_targets)
 
+            # mel_duration_loss = self.mel_duration_loss(postnet_mel_predictions, mel_targets)
+
             print("Mel Loss: ", mel_loss)
             print("Postnet Mel Loss: ", postnet_mel_loss)
+            # print("mel_duration_loss: ", mel_duration_loss)
 
         
         pitch_loss = self.mse_loss(pitch_predictions, pitch_targets)
@@ -122,7 +112,7 @@ class FastSpeech2Loss(nn.Module):
         print("Duration Loss: ", duration_loss)
 
         total_loss = (
-            mel_loss + postnet_mel_loss + duration_loss + pitch_loss + energy_loss
+            mel_loss + postnet_mel_loss + duration_loss + pitch_loss + energy_loss + mel_duration_loss
             # + pros_loss + phone_loss
         )
 
@@ -159,4 +149,17 @@ class FastSpeech2Loss(nn.Module):
         Calculates the phone loss
         """
         return None
+
+    def mel_duration_loss(self, x, y):
+        """
+        Calculate the mel duration loss
+        x: predicted mel spectrogram
+        y: target mel spectrogram
+        """
+
+        x_durs = torch.tensor([len(mel) for mel in x])
+        y_durs = torch.tensor([len(mel) for mel in y])
+
+        return self.mae_loss(x_durs, y_durs)
+    
 

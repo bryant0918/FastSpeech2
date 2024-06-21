@@ -42,9 +42,6 @@ class FastSpeech2Pros(nn.Module):
     def forward(self, texts, src_lens, max_src_len, mels=None, mel_lens=None, max_mel_len=None,
                 speaker_embs=None, alignments=None, p_targets=None, e_targets=None, d_targets=None, 
                 d_src=None, p_control=1.0, e_control=1.0, d_control=1.0,):
-        # batch = (ids, raw_texts, raw_translations, speakers, texts, src_lens, max_text_lens, mels, mel_lens,
-        #          max_mel_lens, translations, translation_lens, max(translation_lens), speaker_embeddings, 
-        #          alignments, pitches, energies, durations)
 
         # Get masks
         batch_size = texts.size(0)
@@ -68,19 +65,6 @@ class FastSpeech2Pros(nn.Module):
         h_si = output
         prosody_predictor = ProsodyPredictor(256, 256, 4, 8).to(device)
 
-        # # Test this loop
-        # prev_prosody = torch.zeros(batch_size, 1, 256).to(device)
-        # prosodies = []
-        # for i in range(output.size()[1]):
-        #     h_sd_t = h_sd[:, i, :]
-        #     h_si_t = h_si[:, i, :]
-        #     print("h_sd_t shape: ", h_sd_t.shape)
-        #     out = prosody_predictor(h_sd_t, h_si_t, prev_prosody)
-        #     prosodies.append(out)
-        #     prev_prosody = out
-        # predicted_prosodies_tgt = torch.stack(prosodies, dim=1)
-        # print("predicted_prosodies_tgt shape: ", predicted_prosodies_tgt.shape)
-
         e_tgt = prosody_predictor(h_sd, h_si)  # TODO: prev_e here doesn't make sense.
         # print("e_tgt[0] (log_pi) shape: ", e_tgt[0].shape)  # torch.Size([Batch, tgt_seq_len, N_Components])
         # print("e_tgt[1] (mu) shape: ", e_tgt[1].shape)
@@ -97,11 +81,6 @@ class FastSpeech2Pros(nn.Module):
         e_k_src = prosody_extractor.split_phones(e_src, d_src)
         # print("e_k_src shape: ", len(e_k_src), len(e_k_src[0]), e_k_src[0][0].shape, torch.isnan(e_k_src[0][0]).any())
         # print("d_src[0][0]", d_src[0][0], torch.isnan(d_src).any())
-
-        # for b in range(len(e_k_src)):
-        #     for k in range(len(e_k_src[b])):
-        #         if torch.isnan(e_k_src[b][k]).any():
-        #             print("e_k_src nan: ", b, k)
 
         # TODO: Allow for new predicted_prosodies_tgt shape
         tgt_samp = prosody_predictor.sample2(e_tgt)
@@ -129,7 +108,6 @@ class FastSpeech2Pros(nn.Module):
         # print("predicted mel_masks shape: ", mel_masks.shape)
         # Remap p_predictions, e_predictions, log_d_predictions to tgt size
 
-
         output, mel_masks = self.decoder(output, mel_masks)
         # print("output mel_masks shape: ", mel_masks.shape)
 
@@ -139,11 +117,6 @@ class FastSpeech2Pros(nn.Module):
 
         # For calculating Lpp loss:
         # y_e_tgt = prosody_extractor.prosody_realigner(alignments, e_k_src)
-
-        # Output is mel_prediction and is the same size as target. 
-        # Predicted mel mask is also the same size as target on src -> tgt
-        # but for some reason is not the same size as source on tgt -> src
-        # this must have to do with durations. 
 
         return (output, postnet_output, p_predictions, e_predictions, log_d_predictions, d_rounded, tgt_masks,
                 mel_masks, src_lens, mel_lens, adjusted_e_tgt, )

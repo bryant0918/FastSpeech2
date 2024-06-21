@@ -134,7 +134,7 @@ def main(args, configs):
                 # max_mel_len = np.int64(max(output_tgt[9]).cpu().numpy())
                 
                 # output_tgt[4] is log_d_predictions
-                d_src = torch.clamp(torch.round(torch.exp(output_tgt[4] - 1)).long(), min=0)
+                d_src = torch.clamp(torch.round(torch.exp(output_tgt[4]) - 1).long(), min=0)
 
                 # realign p,e,d targets back to src space
                 realigned_p = realign_p_e_d(alignments, output_tgt[2])

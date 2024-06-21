@@ -10,7 +10,7 @@ from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm
 
 from utils.model import get_model, get_vocoder, get_param_num
-from utils.tools import to_device, log, synth_one_sample, flip_mapping, realign_p_e_d
+from utils.tools import to_device, log, synth_one_sample
 from model import FastSpeech2Loss
 from dataset import Dataset, TrainDataset
 
@@ -42,18 +42,6 @@ def main(args, configs):
         shuffle=True,
         collate_fn=dataset.collate_fn,
     )
-
-    # # Debugging dataset
-    # print("loader: ", loader)
-    # for batches in loader:
-    #     for batch in batches:
-    #         batch = to_device(batch, device)
-    #         print("batch", batch[8], batch[9])
-    #         input = batch[3:]
-    #         print("input", input[6], input[7])
-
-    #         raise NotImplementedError
-
 
     # Prepare model
     model, optimizer = get_model(args, configs, device, train=True)
@@ -106,59 +94,21 @@ def main(args, configs):
 
                 if step == 4:
                     raise NotImplementedError
-                
-                # realign pitch energy and duration here for target use batched for source below
-                realigned_p = realign_p_e_d(batch[14], batch[15])
-                realigned_e = realign_p_e_d(batch[14], batch[16])
-                realigned_d = realign_p_e_d(batch[14], batch[17])
 
                 # Forward
                 if batch is None:
                     raise ValueError("Batch is None")
-                    
-                input = batch[10:13] + batch[7:10] + batch[13:15] + (realigned_p, realigned_e, realigned_d, batch[-1])
                 
+                input = batch[4:10] + batch[13:]
 
-                # Forward pass: Src to Tgt
-                print("\nFORWARD PASS: SRC to TGT")
-                output_tgt = model(*(input))
+                # Forward pass: Src to Src
+                print("\nFORWARD PASS: SRC to SRC")
+                output = model(*(input))
                 
                 # Calculate loss for Src to Tgt
-                loss_input = (batch[7],) + (realigned_p, realigned_e, realigned_d)
-                losses_src_to_tgt = Loss(loss_input, output_tgt, "to_tgt")
-                total_loss_src_to_tgt = losses_src_to_tgt[0]
-                print("total_loss_src_to_tgt: ", total_loss_src_to_tgt)
-                
-                alignments = flip_mapping(batch[14], batch[4].shape[1])
-                
-                # max_mel_len = np.int64(max(output_tgt[9]).cpu().numpy())
-                
-                # output_tgt[4] is log_d_predictions
-                d_src = torch.clamp(torch.round(torch.exp(output_tgt[4]) - 1).long(), min=0)
-
-                # realign p,e,d targets back to src space
-                realigned_p = realign_p_e_d(alignments, output_tgt[2])
-                realigned_e = realign_p_e_d(alignments, output_tgt[3])
-                realigned_d = realign_p_e_d(alignments, output_tgt[4])
-                realigned_d_src = realign_p_e_d(alignments, d_src)
-
-                # TODO: Do I need to realign mels? I think not. That's what predicted mel_lens is for and everything else.
-
-                # # Forward pass: Tgt to Src (so tgt is now src and src is now tgt)
-                print("\nFORWARD PASS: TGT to SRC")
-                output_src = model(texts=batch[4], src_lens=batch[5], max_src_len=batch[6],
-                                   mels=output_tgt[1], mel_lens=output_tgt[9], max_mel_len=batch[9],
-                                   speaker_embs=batch[13], alignments=alignments, p_targets=realigned_p, 
-                                   e_targets=realigned_e, d_targets=realigned_d_src, d_src=d_src)
-
-                # # Calculate loss for Tgt to Src
-                loss_inputs = (batch[7],) + (realigned_p, realigned_e, realigned_d_src)
-                losses_tgt_to_src = Loss(loss_inputs, output_src, "to_src")
-                total_loss_tgt_to_src = losses_tgt_to_src[0]
-                print("total_loss_tgt_to_src: ", total_loss_tgt_to_src)
-
-                # Combine the losses
-                total_loss = (total_loss_src_to_tgt + total_loss_tgt_to_src) / 2
+                loss_input = (batch[7],) + (batch[15:18])
+                losses = Loss(loss_input, output, "to_src")
+                total_loss = losses[0]
                 print("Total Loss: ", total_loss)
                 print()
 

@@ -2,6 +2,18 @@ import torch
 import torch.nn as nn
 
 
+class ProsLearnerLoss(nn.Module):
+    def __init__(self, preprocess_config, model_config):
+        super(ProsLearnerLoss, self).__init__()
+        self.mse_loss = nn.MSELoss()
+        self.mae_loss = nn.L1Loss()
+
+    def forward(self, inputs, predictions):
+        
+
+        return None
+    
+
 class FastSpeech2Loss(nn.Module):
     """ FastSpeech2 Loss """
 
@@ -39,7 +51,8 @@ class FastSpeech2Loss(nn.Module):
             mel_masks,
             _,
             _,
-            e,
+            e_src,
+            e_src_hat,
         ) = predictions
         src_masks = ~src_masks
         mel_masks = ~mel_masks
@@ -73,8 +86,8 @@ class FastSpeech2Loss(nn.Module):
         log_duration_predictions = log_duration_predictions.masked_select(src_masks)
         log_duration_targets = log_duration_targets.masked_select(src_masks)
                 
-        # Calculate mel loss only in reverse direction
-        mel_loss, postnet_mel_loss, mel_duration_loss = 0, 0, 0
+        # Calculate mel loss and prosody loss only in reverse direction
+        mel_loss, postnet_mel_loss, pros_loss = 0, 0, 0
         if direction == "to_src":
             mel_targets = mel_targets[:, : mel_masks.shape[1], :]
             mel_targets.requires_grad = False
@@ -90,8 +103,12 @@ class FastSpeech2Loss(nn.Module):
 
             # mel_duration_loss = self.mel_duration_loss(postnet_mel_predictions, mel_targets)
 
+            pros_loss = self.pros_loss(e_src_hat, e_src)
+
             print("Mel Loss: ", mel_loss)
             print("Postnet Mel Loss: ", postnet_mel_loss)
+            print("Prosody Loss: ", pros_loss, pros_loss.shape) # Should be [Batch, 1] or [Batch]
+
             # print("mel_duration_loss: ", mel_duration_loss)
 
         
@@ -99,12 +116,8 @@ class FastSpeech2Loss(nn.Module):
         energy_loss = self.mse_loss(energy_predictions, energy_targets)
         duration_loss = self.mse_loss(log_duration_predictions, log_duration_targets)
 
-        # Prosody Loss
-        # pros_loss = self.pros_loss(e)  # Make sure to account for realignment in foreign language
-        # print("Prosody Loss: ", pros_loss, pros_loss.shape) # Should be [Batch, 1] or [Batch]
-
-        # # phone Loss  (Requires extracting predicted phonemes from mel Spectrogram) whisper
-        # phone_loss = self.phone_loss()
+        # # word_loss  (Requires extracting predicted phonemes from mel Spectrogram) whisper
+        # word_loss = self.word_loss()
 
         
         print("Pitch Loss: ", pitch_loss)
@@ -112,8 +125,8 @@ class FastSpeech2Loss(nn.Module):
         print("Duration Loss: ", duration_loss)
 
         total_loss = (
-            mel_loss + postnet_mel_loss + duration_loss + pitch_loss + energy_loss + mel_duration_loss
-            # + pros_loss + phone_loss
+            mel_loss + postnet_mel_loss + duration_loss + pitch_loss + energy_loss + pros_loss 
+            # + word_loss
         )
 
         return (
@@ -144,7 +157,7 @@ class FastSpeech2Loss(nn.Module):
         loglik = torch.logsumexp(log_pi + normal_loglik, dim=-1)
         return -loglik  # Sum over all phones for total loss (L_pp)
 
-    def phone_loss(self, x, y):
+    def word_loss(self, x, y):
         """
         Calculates the phone loss
         """

@@ -43,6 +43,11 @@ class FastSpeech2Pros(nn.Module):
                 speaker_embs=None, alignments=None, p_targets=None, e_targets=None, d_targets=None, 
                 d_src=None, p_control=1.0, e_control=1.0, d_control=1.0,):
 
+        pretraining = False
+        if d_src is None:
+            d_src = d_targets
+            pretraining = True
+
         # Get masks
         batch_size = texts.size(0)
 
@@ -63,18 +68,18 @@ class FastSpeech2Pros(nn.Module):
         # print("h_sd shape: ", h_sd.shape, torch.isnan(h_sd).any())
 
         h_si = output
-        prosody_predictor = ProsodyPredictor(256, 256, 4, 8).to(device)
+        prosody_predictor = ProsodyPredictor(config=self.model_config).to(device)
 
         e_tgt = prosody_predictor(h_sd, h_si)  # TODO: prev_e here doesn't make sense.
         # print("e_tgt[0] (log_pi) shape: ", e_tgt[0].shape)  # torch.Size([Batch, tgt_seq_len, N_Components])
         # print("e_tgt[1] (mu) shape: ", e_tgt[1].shape)
         
         # prosody extractor
-        prosody_extractor = ProsodyExtractor(1, 256, 8).to(device)
+        prosody_extractor = ProsodyExtractor(config=self.model_config).to(device)
         
         mels = mels.unsqueeze(1) # mels shape is [batch_size, 1, melspec W, melspec H]
         e_src = prosody_extractor(mels)   # e is [batch_size, melspec H, melspec W, 128]
-        # print("e_src shape: ", e_src.shape, torch.isnan(e_src).any())
+        print("e_src shape: ", e_src.shape, torch.isnan(e_src).any())
         
         # Split phone pros embeddings by phone duration
         # [batch_size (list), phoneme_sequence_length (list), melspec H (tensor), melspec W (tensor), 128 (tensor)]        
@@ -86,21 +91,22 @@ class FastSpeech2Pros(nn.Module):
         tgt_samp = prosody_predictor.sample2(e_tgt)
         # print("tgt_samp shape: ", tgt_samp.shape, torch.isnan(tgt_samp).any())  
         
-        # print("alignments shape: ", alignments.shape)  # TODO: unpad alignments for realigner otherwise everything mapped to 0.
-        adjusted_e_tgt = prosody_predictor.prosody_realigner(alignments, tgt_samp, e_k_src)
-        # print("alignments nan", torch.isnan(alignments).any())
-        # print("adjusted_e_tgt nan: ", torch.isnan(adjusted_e_tgt).any())
+        if not pretraining:
+            # print("alignments shape: ", alignments.shape)  # TODO: unpad alignments for realigner otherwise everything mapped to 0.
+            adjusted_e_tgt = prosody_predictor.prosody_realigner(alignments, tgt_samp, e_k_src)
+            # print("alignments nan", torch.isnan(alignments).any())
+            # print("adjusted_e_tgt nan: ", torch.isnan(adjusted_e_tgt).any())
 
-        # Concat
-        output = h_sd + adjusted_e_tgt
-        # print("Output shape after prosody: ", output.shape, torch.isnan(output).any())  # torch.Size([Batch, tgt_seq_len, 256])
+            # Concat
+            h_sd = h_sd + adjusted_e_tgt
+            # print("Output shape after prosody: ", output.shape, torch.isnan(output).any())  # torch.Size([Batch, tgt_seq_len, 256])
 
         # Now double check that durations and pitch etc are same as seq_length
         # print("Input mel_masks shape: ", mel_masks.shape)
         # print("Mel masks", mel_masks)
 
         (output, p_predictions, e_predictions, log_d_predictions, d_rounded, mel_lens, mel_masks,) = \
-            self.variance_adaptor(output, tgt_masks, mel_masks, max_mel_len, p_targets, e_targets, d_targets, p_control,
+            self.variance_adaptor(h_sd, tgt_masks, mel_masks, max_mel_len, p_targets, e_targets, d_targets, p_control,
                                   e_control, d_control, )
 
         # print("d_rounded shape: ", d_rounded.shape)
@@ -119,7 +125,7 @@ class FastSpeech2Pros(nn.Module):
         # y_e_tgt = prosody_extractor.prosody_realigner(alignments, e_k_src)
 
         return (output, postnet_output, p_predictions, e_predictions, log_d_predictions, d_rounded, tgt_masks,
-                mel_masks, src_lens, mel_lens, adjusted_e_tgt, )
+                mel_masks, src_lens, mel_lens, e_src, e_tgt)
 
 
 class FastSpeech2(nn.Module):

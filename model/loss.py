@@ -185,15 +185,17 @@ class FastSpeech2Loss(nn.Module):
         print("sigma shape: ", sigma.shape)     # sigma shape:  torch.Size([2, 112, 8, 256])
         print("y shape (extracted): ", y.shape) # y shape:  torch.Size([2, 80, 807, 256])
         
-        print("Diag sigma", torch.diagonal(sigma[0,:,0]))
+        print("Diag sigma", torch.diagonal(sigma[0,:,0]).shape))
         
+        # This needs to be per phone as well.
         for b in range(n_batches):
-            for k in range(n_components):
-                # Create a multivariate normal distribution for the k-th component
-                mvn = dist.MultivariateNormal(loc=mu[b,:,k], covariance_matrix=sigma[b,:,k])
-                
-                # Compute the log likelihood for each point in the batch for the k-th component
-                log_likelihoods[b, :, k] = mvn.log_prob(y)
+            for k in range(n_samples):
+                for i in range(n_components):
+                    # Create a multivariate normal distribution for the k-th component
+                    mvn = dist.MultivariateNormal(loc=mu[b,k,i], covariance_matrix=sigma[b,k,i])
+                    
+                    # Compute the log likelihood for each point in the batch for the k-th component
+                    log_likelihoods[b, k, i] = mvn.log_prob(y)
         
         # Compute the log of the weighted sum of the probabilities
         weighted_log_likelihoods = log_likelihoods + log_pi

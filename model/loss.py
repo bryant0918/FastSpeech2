@@ -103,7 +103,7 @@ class FastSpeech2Loss(nn.Module):
 
             # mel_duration_loss = self.mel_duration_loss(postnet_mel_predictions, mel_targets)
 
-            pros_loss = self.pros_loss(e_src_hat, e_src)
+            pros_loss = self.pros_loss2(e_src_hat, e_src)
 
             print("Mel Loss: ", mel_loss)
             print("Postnet Mel Loss: ", postnet_mel_loss)
@@ -149,13 +149,54 @@ class FastSpeech2Loss(nn.Module):
             -loglik: Negative log-likelihood of the phone sequence given the prosody features
         """
         log_pi, mu, sigma = x
-        z_score = (y.unsqueeze(1) - mu) / sigma
+        print("log_pi shape: ", log_pi.shape)   # log_pi shape:  torch.Size([2, 112, 8])
+        print("mu shape: ", mu.shape)           # mu shape:  torch.Size([2, 112, 8, 256])
+        print("sigma shape: ", sigma.shape)     # sigma shape:  torch.Size([2, 112, 8, 256])
+        print("y shape (extracted): ", y.shape) # y shape:  torch.Size([2, 80, 807, 256])
+
+        # TODO: Somehow map y from [Batch, melspec H, melspec W, 256] to [Batch, tgt_seq_len, 256]?
+
+
+        z_score = (y.unsqueeze(1) - mu) / sigma # Value Error Here
         normal_loglik = (
                 -0.5 * torch.einsum("bij,bij->bi", z_score, z_score)
                 - torch.sum(torch.log(sigma), dim=-1)
         )
         loglik = torch.logsumexp(log_pi + normal_loglik, dim=-1)
         return -loglik  # Sum over all phones for total loss (L_pp)
+
+    def pros_loss2(self, x,y):
+        import torch.distributions as dist
+
+        log_pi, mu, sigma = x
+        n_batches, n_samples, n_components, n_features = mu.shape
+        n_components = log_pi.shape[-1]
+        
+        # Initialize the log likelihoods for each batch
+        log_likelihoods = torch.zeros((n_batches, n_samples, n_components))
+
+        print("sigma has negative vals", (sigma <= 0).any())
+        print("Shape of sigma[b,:,k]: ", sigma[0,:,0].shape) 
+        #mvn wants this to be square but it's [58, 58, 256]
+        #Do I need a linear layer here or something to make it [58,58]
+        
+        
+        for b in range(n_batches):
+            for k in range(n_components):
+                # Create a multivariate normal distribution for the k-th component
+                mvn = dist.MultivariateNormal(loc=mu[b,:,k], covariance_matrix=sigma[b,:,k])
+                
+                # Compute the log likelihood for each point in the batch for the k-th component
+                log_likelihoods[:, :, k] = mvn.log_prob(y)
+        
+        # Compute the log of the weighted sum of the probabilities
+        weighted_log_likelihoods = log_likelihoods + log_pi
+        log_sum_exp = torch.logsumexp(weighted_log_likelihoods, dim=2)
+        
+        # Compute the negative log-likelihood for each batch
+        nlls = -torch.sum(log_sum_exp, dim=1)
+        
+        return nlls
 
     def word_loss(self, x, y):
         """

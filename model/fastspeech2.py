@@ -84,7 +84,7 @@ class FastSpeech2Pros(nn.Module):
         # Split phone pros embeddings by phone duration
         # [batch_size (list), phoneme_sequence_length (list), melspec H (tensor), melspec W (tensor), 128 (tensor)]        
         e_k_src = prosody_extractor.split_phones(e_src, d_src)
-        # print("e_k_src shape: ", len(e_k_src), len(e_k_src[0]), e_k_src[0][0].shape, torch.isnan(e_k_src[0][0]).any())
+        print("e_k_src shape: ", len(e_k_src), len(e_k_src[0]), e_k_src[0][0].shape)
         # print("d_src[0][0]", d_src[0][0], torch.isnan(d_src).any())
 
         # TODO: Allow for new predicted_prosodies_tgt shape
@@ -125,7 +125,7 @@ class FastSpeech2Pros(nn.Module):
         # y_e_tgt = prosody_extractor.prosody_realigner(alignments, e_k_src)
 
         return (output, postnet_output, p_predictions, e_predictions, log_d_predictions, d_rounded, tgt_masks,
-                mel_masks, src_lens, mel_lens, e_src, e_tgt)
+                mel_masks, src_lens, mel_lens, e_k_src, e_tgt)
 
 
 class FastSpeech2(nn.Module):

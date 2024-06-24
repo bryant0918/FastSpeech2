@@ -188,7 +188,7 @@ class FastSpeech2Loss(nn.Module):
         
         print("Diag sigma", torch.diag(sigma[0,:,0]).size())
         print("Shape of sigma[b,0,k]: ", sigma[0,0,0].shape)
-        print("Diag sigma", torch.diag(sigma[0,0,0]).unsqueeze().shape)
+        print("Diag sigma", torch.diag(sigma[0,0,0]).shape)
         
         # This needs to be per phone as well.
         for b in range(n_batches):

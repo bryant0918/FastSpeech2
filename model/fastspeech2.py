@@ -89,7 +89,7 @@ class FastSpeech2Pros(nn.Module):
 
         # TODO: Allow for new predicted_prosodies_tgt shape
         tgt_samp = prosody_predictor.sample2(e_tgt)
-        # print("tgt_samp shape: ", tgt_samp.shape, torch.isnan(tgt_samp).any())  
+        print("tgt_samp shape: ", tgt_samp.shape, torch.isnan(tgt_samp).any())  
         
         if not pretraining:
             # print("alignments shape: ", alignments.shape)  # TODO: unpad alignments for realigner otherwise everything mapped to 0.

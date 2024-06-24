@@ -92,6 +92,12 @@ class FastSpeech2Pros(nn.Module):
         agg_extracted_prosody = torch.zeros(batch_size, phone_seq_length, 256).to(device)
         for b in range(batch_size):
             for i in range(len(e_k_src[b])):
+                if torch.isnan(e_k_src[b][i]).any():
+                    print("NAN")
+                elif torch.isinf(e_k_src[b][i]).any():
+                    print("INF")
+                elif e_k_src[b][i].shape[0] == 0 or e_k_src[b][i].shape[1] == 0:
+                    print("EMPTY", b,i, e_k_src[b][i].shape)
                 agg_extracted_prosody[b,i,:] = torch.mean(e_k_src[b][i], dim=(0, 1))
 
         print("aggregated_prosody shape: ", agg_extracted_prosody.shape, torch.isnan(agg_extracted_prosody).any())

@@ -30,6 +30,12 @@ then
 conda install conda-forge::pyworld
 ```
 
+Then you must unzip the vocoders
+```
+unzip hifigan/generator_LJSpeech.pth.tar.zip -d hifigan/
+unzip hifigan/generator_universal.pth.tar.zip -d hifigan/
+```
+
 ## Inference
 
 You have to download the [pretrained models](https://drive.google.com/drive/folders/1DOhZGlTLMbbAAFZmZGDdc77kz1PloS7F?usp=sharing) and put them in ``output/ckpt/LJSpeech/``,  ``output/ckpt/AISHELL3``, or ``output/ckpt/LibriTTS/``.
@@ -159,6 +165,12 @@ python3 preprocess.py config/Bryant/preprocess.yaml
 ```
 nohup python3 preprocess.py config/LJSpeech/preprocess.yaml &
 ps -ef | grep 112675
+```
+
+### Get Speaker Embeddings
+For now use this one:
+```
+scp preprocessed_data/LJSpeech/speaker_emb/LJSpeech.pkl_emb.pkl ditto@Emotiv:/home/ditto/Ditto/FastSpeech2/preprocessed_data/LJSpeech/speaker_emb/LJSpeech.pkl_emb.pkl
 ```
 
 

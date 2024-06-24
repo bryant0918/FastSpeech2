@@ -10,6 +10,8 @@ _es_punctuations = "¡!\"#$%&'()*+,-./:;<=>¿?@[\]^_`{|}~"
 _symbol_to_id = {s: i for i, s in enumerate(symbols)}
 _id_to_symbol = {i: s for i, s in enumerate(symbols)}
 
+_vocab_size = len(symbols)
+
 # Regular expression matching text enclosed in curly braces:
 _curly_re = re.compile(r"(.*?)\{(.+?)\}(.*)")
 
@@ -80,6 +82,7 @@ def _symbols_to_sequence(symbols):
 
 def _arpabet_to_sequence(text):
     return _symbols_to_sequence(["@" + s for s in text.split()])
+
 
 def _ipa_to_sequence(text):
     return _symbols_to_sequence(["$" + s for s in text.split()])

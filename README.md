@@ -30,6 +30,12 @@ then
 conda install conda-forge::pyworld
 ```
 
+Then you must unzip the vocoders
+```
+unzip hifigan/generator_LJSpeech.pth.tar.zip -d hifigan/
+unzip hifigan/generator_universal.pth.tar.zip -d hifigan/
+```
+
 ## Inference
 
 You have to download the [pretrained models](https://drive.google.com/drive/folders/1DOhZGlTLMbbAAFZmZGDdc77kz1PloS7F?usp=sharing) and put them in ``output/ckpt/LJSpeech/``,  ``output/ckpt/AISHELL3``, or ``output/ckpt/LibriTTS/``.
@@ -111,7 +117,7 @@ python3 prepare_align.py config/LJSpeech/preprocess.yaml
 ```
 nohup python3 prepare_align.py config/LJSpeech/preprocess.yaml &
 
-ps -ef | grep 269277
+ps -ef | grep 89466
 ```
 
 ### Get the TextGrid Files
@@ -124,11 +130,11 @@ wget --no-check-certificate 'https://drive.google.com/uc?export=download&id=1ukb
 or copy the file to the server by
 ```
 scp /Users/bryantmcarthur/Downloads/LJSpeech.zip ditto@136.36.160.77:/home/ditto/Documents/ProsodyCloning/FastSpeech2/preprocessed_data/LJSpeech
+scp /Users/bryantmcarthur/Downloads/LJSpeech.zip ditto@Emotiv:/home/ditto/Ditto/FastSpeech2/preprocessed_data/LJSpeech
 ```
 You have to unzip the files in ``preprocessed_data/LJSpeech/TextGrid/``.
 
 ```unzip preprocessed_data/LJSpeech/LJSpeech.zip -d preprocessed_data/LJSpeech/```
-
 
 
 Alternately, you can align the corpus by yourself to get the TextGrid Files. 
@@ -158,12 +164,23 @@ python3 preprocess.py config/Bryant/preprocess.yaml
 ```
 ```
 nohup python3 preprocess.py config/LJSpeech/preprocess.yaml &
-ps -ef | grep 399229
+ps -ef | grep 112675
+```
+
+### Get Speaker Embeddings
+For now use this one if not already there:
+```
+scp preprocessed_data/LJSpeech/speaker_emb/LJSpeech.pkl_emb.pkl ditto@Emotiv:/home/ditto/Ditto/FastSpeech2/preprocessed_data/LJSpeech/speaker_emb/LJSpeech.pkl_emb.pkl
 ```
 
 
-## Training
+## PreTrain
+Pretrain is especially for the Prosody Extractor and Predictor, but will also update synthesizer weights (Encoder, Adapter, Decoder).
+```
+python3 pretrain.py -p config/LJSpeech/preprocess.yaml -m config/LJSpeech/model.yaml -t config/LJSpeech/train.yaml
+```
 
+## Train Synthesizer
 Train your model with
 ```
 python3 train.py -p config/LJSpeech/preprocess.yaml -m config/LJSpeech/model.yaml -t config/LJSpeech/train.yaml

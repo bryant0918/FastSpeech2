@@ -175,8 +175,13 @@ class Decoder(nn.Module):
 
 
 class ProsodyExtractor(nn.Module):
-    def __init__(self, dim_in=1, dim_out=128, hidden_dim=8):   # TODO: intialize with config
+    def __init__(self, dim_in=1, dim_out=128, hidden_dim=8, config=None):   # TODO: intialize with config
         super(ProsodyExtractor, self).__init__()
+
+        if config:
+            dim_in = config["prosody_extractor"]["dim_in"]
+            dim_out = config["prosody_extractor"]["dim_out"]
+            hidden_dim = config["prosody_extractor"]["hidden_dim"]
 
         self.cnn = nn.Sequential(
             nn.Conv2d(in_channels=dim_in, out_channels=hidden_dim, kernel_size=3, padding=1),
@@ -206,6 +211,8 @@ class ProsodyExtractor(nn.Module):
 
         # Apply Bi-GRU layer
         x, _ = self.gru(x)  # [batch_size, melspec H * melspec W, 128]
+
+        # x.view(x.size()[0], seq_length, num_directions, hidden_size).
 
         # TODO: Don't hardcode 80 here, use n_mel_channels from preprocess_config
         return x.view(x.size()[0], 80, -1, x.size()[-1])  # [batch_size, melspec H, melspec W, 128]
@@ -247,74 +254,42 @@ class ProsodyExtractor(nn.Module):
             batch_phone_emb_chunks.append(sample_phone_emb_chunks)
 
         return batch_phone_emb_chunks
-    
-    # def prosody_realigner(self, phone_alignments, e_k_src):
-    #     """
-    #     Realigns e_k_src to tgt phoneme sequence without shifting distribution
-    #     """
-        
-    #     # TODO!!!
-    #     batch_size = len(phone_alignments)
-    #     seq_length = tgt_samp.shape[1]
-    #     print("tgt samp shape", tgt_samp.shape)
-    #     new_e = torch.zeros(batch_size, seq_length, tgt_samp.shape[2], device=device)
-    #     counts = torch.zeros(batch_size, seq_length, device=device)  # Tensor to keep count of how many times each index is updated
-
-    #     print("e_k_src", type(e_k_src), len(e_k_src), len(e_k_src[0]))
-
-    #     # Works for when target sentence is longer
-
-    #     for b in range(batch_size):
-    #         for j in range(len(phone_alignments[b])):
-
-    #             # Account for size mismatch without having tgt_samp (0's in phone alignment)
-    #             if j >= tgt_samp[b].shape[0]:
-    #                     continue
-                
-    #             for i in phone_alignments[b][j]:
-    #                 # Compute the weighted combination
-    #                 result = e_k_src[b][i]
-    #                 new_mean = result.mean(dim=(0, 1))  # [256]
-
-    #                 # Accumulate the new_mean for each index
-    #                 # sum_results[b][:, i] += new_mean
-    #                 new_e[b, i] += new_mean
-    #                 counts[b, i] += 1
-
-    #         # Average the accumulated results
-    #         for i in range(seq_length):
-    #             if counts[b][i] > 0:
-    #                 new_e[b, i] /= counts[b][i]
-            
-    #     return new_e
-
 
 
 class ProsodyPredictor(nn.Module):
-    def __init__(self, dim_in, dim_out=256, n_components=8, hidden_dim=8):   # TODO: intialize with config
+    def __init__(self, config):   # TODO: intialize with config
         super(ProsodyPredictor, self).__init__()
+
+        sd_dim_in = config["prosody_predictor"]["sd_dim_in"]
+        si_dim_in = config["prosody_predictor"]["si_dim_in"]
+        dim_out = config["prosody_predictor"]["dim_out"]
+        conv_hidden_dim = config["prosody_predictor"]["conv_hidden_dim"]            
+        n_components = config["prosody_predictor"]["n_components"]
+        gru_hidden_dim = config["prosody_predictor"]["gru_hidden_dim"]
+        bigru_hidden_dim = config["prosody_predictor"]["bigru_hidden_dim"]
+        
         self.num_sigma_channels = dim_out * n_components
 
-        self.dim_in = dim_in
+        self.sd_dim_in = sd_dim_in
         self.dim_out = dim_out
         self.n_components = n_components
 
         # GRU layer (SD)
-        self.gru = nn.GRU(input_size=hidden_dim, hidden_size=512, num_layers=1, bidirectional=False, batch_first=True)
+        self.gru = nn.GRU(input_size=conv_hidden_dim, hidden_size=gru_hidden_dim, num_layers=1, bidirectional=False, batch_first=True)
         # Linear layer to output nonlinear transformation parameters
-        self.normal_linear = nn.Linear(512, self.dim_out * self.n_components * 4 + self.n_components)
+        self.normal_linear = nn.Linear(gru_hidden_dim, self.dim_out * self.n_components * 4 + self.n_components)
 
         # CNN Block (SD)
-        self.conv1 = nn.Conv1d(in_channels=dim_in, out_channels=hidden_dim, kernel_size=3, padding=1)
+        self.conv1 = nn.Conv1d(in_channels=sd_dim_in, out_channels=conv_hidden_dim, kernel_size=3, padding=1)
         self.relu = nn.ReLU()
-        self.layernorm = nn.LayerNorm(hidden_dim)
+        self.layernorm = nn.LayerNorm(conv_hidden_dim)
         self.dropout = nn.Dropout(0.1)
-        self.conv2 = nn.Conv1d(in_channels=hidden_dim, out_channels=hidden_dim, kernel_size=3, padding=1)
+        self.conv2 = nn.Conv1d(in_channels=conv_hidden_dim, out_channels=conv_hidden_dim, kernel_size=3, padding=1)
 
         # Bi-GRU layer (SI)
-        self.BiGru = nn.GRU(input_size=256, hidden_size=32, num_layers=1, bidirectional=True, batch_first=True)
+        self.BiGru = nn.GRU(input_size=si_dim_in, hidden_size=bigru_hidden_dim, num_layers=1, bidirectional=True, batch_first=True)
         # Linear layer for just means and log variances
-        self.normal_linear2 = nn.Linear(64, dim_out * n_components + self.num_sigma_channels)
+        self.normal_linear2 = nn.Linear(bigru_hidden_dim*2, dim_out * n_components + self.num_sigma_channels)
 
         self.linear2 = nn.Linear(dim_out * n_components, dim_out * n_components)
         self.linear3 = nn.Linear(dim_out * n_components, dim_out * n_components)
@@ -378,9 +353,18 @@ class ProsodyPredictor(nn.Module):
                       3 * self.dim_out * self.n_components + self.n_components]
         d = h_sd[..., 3 * self.dim_out * self.n_components + self.n_components:]
 
+        print("mu.size:", mu.size())
+        print("v.size:", v.size())
+        print("a.size:", a.size())
+        print("b.size:", b.size())
+        print("c.size:", c.size())
+        print("d.size:", d.size())
         # Perform non-Linear Transformation
         mu = self.linear2(torch.tanh(torch.multiply(a, mu) + b))
         v = self.linear3(torch.tanh(torch.multiply(c, v) + d))
+
+        print("mu.size:", mu.size())
+        print("v.size:", v.size())
 
         # Add Noise (Don't know if necessary, can set eps=0)
         sigma = torch.exp(v + eps)

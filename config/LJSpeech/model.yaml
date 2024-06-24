@@ -26,10 +26,13 @@ prosody_extractor:
   hidden_dim: 8
 
 prosody_predictor:
-  dim_in: 256
+  sd_dim_in: 256   # 512
+  si_dim_in: 256
   dim_out: 256
   n_components: 8
-  hidden_dim: 8
+  conv_hidden_dim: 8
+  gru_hidden_dim: 512
+  bigru_hidden_dim: 32
 
 # gst:
 #   use_gst: False

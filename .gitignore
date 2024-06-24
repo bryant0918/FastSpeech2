@@ -122,6 +122,8 @@ duration/
 energy/
 pitch/
 speaker_emb/
+*.zip
+*.tar.bz2
 
 # logs
 nohup.out

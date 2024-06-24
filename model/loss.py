@@ -2,6 +2,18 @@ import torch
 import torch.nn as nn
 
 
+class ProsLearnerLoss(nn.Module):
+    def __init__(self, preprocess_config, model_config):
+        super(ProsLearnerLoss, self).__init__()
+        self.mse_loss = nn.MSELoss()
+        self.mae_loss = nn.L1Loss()
+
+    def forward(self, inputs, predictions):
+        
+
+        return None
+    
+
 class FastSpeech2Loss(nn.Module):
     """ FastSpeech2 Loss """
 
@@ -39,7 +51,8 @@ class FastSpeech2Loss(nn.Module):
             mel_masks,
             _,
             _,
-            e,
+            extracted_e,
+            predicted_e,
         ) = predictions
         src_masks = ~src_masks
         mel_masks = ~mel_masks
@@ -50,6 +63,9 @@ class FastSpeech2Loss(nn.Module):
         log_duration_targets.requires_grad = False
         pitch_targets.requires_grad = False
         energy_targets.requires_grad = False
+        
+        # Stop Gradient
+        extracted_e = extracted_e.detach()
 
         # print("Src_masks ", src_masks.shape)
         # print("Pitch_predictions ", pitch_predictions.shape)
@@ -73,8 +89,8 @@ class FastSpeech2Loss(nn.Module):
         log_duration_predictions = log_duration_predictions.masked_select(src_masks)
         log_duration_targets = log_duration_targets.masked_select(src_masks)
                 
-        # Calculate mel loss only in reverse direction
-        mel_loss, postnet_mel_loss, mel_duration_loss = 0, 0, 0
+        # Calculate mel loss and prosody loss only in reverse direction
+        mel_loss, postnet_mel_loss, pros_loss = 0, 0, 0
         if direction == "to_src":
             mel_targets = mel_targets[:, : mel_masks.shape[1], :]
             mel_targets.requires_grad = False
@@ -89,9 +105,22 @@ class FastSpeech2Loss(nn.Module):
             postnet_mel_loss = self.mae_loss(postnet_mel_predictions, mel_targets)
 
             # mel_duration_loss = self.mel_duration_loss(postnet_mel_predictions, mel_targets)
+            
+            print("extracted_e shape: ", extracted_e.shape)
+            print("predicted_e shape: ", len(predicted_e), predicted_e[0].shape)
+
+            # print("extracted_e_masked", extracted_e*src_masks.unsqueeze(-1))
+
+            # extracted_e = extracted_e.masked_select(~src_masks.unsqueeze(-1))
+            # print("extracted_e masked_select: ", extracted_e.shape)
+
+            beta = .001
+            pros_loss = self.pros_loss2(predicted_e, extracted_e)*beta
 
             print("Mel Loss: ", mel_loss)
             print("Postnet Mel Loss: ", postnet_mel_loss)
+            print("Prosody Loss: ", pros_loss, pros_loss.shape) # Should be [Batch, 1] or [Batch]
+
             # print("mel_duration_loss: ", mel_duration_loss)
 
         
@@ -99,12 +128,8 @@ class FastSpeech2Loss(nn.Module):
         energy_loss = self.mse_loss(energy_predictions, energy_targets)
         duration_loss = self.mse_loss(log_duration_predictions, log_duration_targets)
 
-        # Prosody Loss
-        # pros_loss = self.pros_loss(e)  # Make sure to account for realignment in foreign language
-        # print("Prosody Loss: ", pros_loss, pros_loss.shape) # Should be [Batch, 1] or [Batch]
-
-        # # phone Loss  (Requires extracting predicted phonemes from mel Spectrogram) whisper
-        # phone_loss = self.phone_loss()
+        # # word_loss  (Requires extracting predicted phonemes from mel Spectrogram) whisper
+        # word_loss = self.word_loss()
 
         
         print("Pitch Loss: ", pitch_loss)
@@ -112,8 +137,8 @@ class FastSpeech2Loss(nn.Module):
         print("Duration Loss: ", duration_loss)
 
         total_loss = (
-            mel_loss + postnet_mel_loss + duration_loss + pitch_loss + energy_loss + mel_duration_loss
-            # + pros_loss + phone_loss
+            mel_loss + postnet_mel_loss + duration_loss + pitch_loss + energy_loss + pros_loss 
+            # + word_loss
         )
 
         return (
@@ -136,7 +161,15 @@ class FastSpeech2Loss(nn.Module):
             -loglik: Negative log-likelihood of the phone sequence given the prosody features
         """
         log_pi, mu, sigma = x
-        z_score = (y.unsqueeze(1) - mu) / sigma
+        print("log_pi shape: ", log_pi.shape)   # log_pi shape:  torch.Size([2, 112, 8])
+        print("mu shape: ", mu.shape)           # mu shape:  torch.Size([2, 112, 8, 256])
+        print("sigma shape: ", sigma.shape)     # sigma shape:  torch.Size([2, 112, 8, 256])
+        print("y shape (extracted): ", y.shape) # y shape:  torch.Size([2, 80, 807, 256])
+
+        # TODO: Somehow map y from [Batch, melspec H, melspec W, 256] to [Batch, tgt_seq_len, 256]?
+
+
+        z_score = (y.unsqueeze(1) - mu) / sigma # Value Error Here
         normal_loglik = (
                 -0.5 * torch.einsum("bij,bij->bi", z_score, z_score)
                 - torch.sum(torch.log(sigma), dim=-1)
@@ -144,7 +177,54 @@ class FastSpeech2Loss(nn.Module):
         loglik = torch.logsumexp(log_pi + normal_loglik, dim=-1)
         return -loglik  # Sum over all phones for total loss (L_pp)
 
-    def phone_loss(self, x, y):
+    def pros_loss2(self, x, y):
+        import torch.distributions as dist
+
+        log_pi, mu, sigma = x
+        n_batches, n_samples, n_components, n_features = mu.shape
+        n_components = log_pi.shape[-1]
+        
+        # Initialize the log likelihoods for each batch
+        log_likelihoods = torch.zeros((n_batches, n_samples, n_components)).to(log_pi.device)
+
+        print()
+        print("sigma has negative vals", (sigma <= 0).any())
+        print("Shape of sigma[b,:,k]: ", sigma[0,:,0].shape) 
+        #mvn wants this to be square but it's [58, 58, 256]
+        #Do I need a linear layer here or something to make it [58,58]
+
+        print("log_pi shape: ", log_pi.shape)   # log_pi shape:  torch.Size([2, 112, 8])
+        print("mu shape: ", mu.shape)           # mu shape:  torch.Size([2, 112, 8, 256])
+        print("sigma shape: ", sigma.shape)     # sigma shape:  torch.Size([2, 112, 8, 256])
+        print("y shape (extracted): ", y.shape, torch.isnan(y).any()) # y shape:  torch.Size([2, 80, 807, 256])
+        
+        print("Diag sigma", torch.diag(sigma[0,:,0]).size())
+        print("Shape of sigma[b,0,k]: ", sigma[0,0,0].shape)
+        print("Diag sigma", torch.diag(sigma[0,0,0]).shape)
+        
+        # This needs to be per phone as well.
+        for b in range(n_batches):
+            for k in range(n_samples):
+                for i in range(n_components):
+                    # Create a multivariate normal distribution for the k-th component
+                    mvn = dist.MultivariateNormal(loc=mu[b,k,i], covariance_matrix=torch.diag(sigma[b,k,i]))
+
+                    if torch.isnan(y[b,k]).any():
+                        continue
+                    
+                    # Compute the log likelihood for each point in the batch for the k-th component
+                    log_likelihoods[b, k, i] = mvn.log_prob(y[b,k])
+        
+        # Compute the log of the weighted sum of the probabilities
+        weighted_log_likelihoods = log_likelihoods + log_pi
+        log_sum_exp = torch.logsumexp(weighted_log_likelihoods, dim=2)
+        
+        # Compute the negative log-likelihood for each batch
+        nlls = -torch.sum(log_sum_exp, dim=1)
+        
+        return torch.mean(nlls)
+
+    def word_loss(self, x, y):
         """
         Calculates the phone loss
         """

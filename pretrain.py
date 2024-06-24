@@ -12,7 +12,7 @@ from tqdm import tqdm
 from utils.model import get_model, get_vocoder, get_param_num
 from utils.tools import to_device, log, synth_one_sample
 from model import FastSpeech2Loss
-from dataset import Dataset, TrainDataset
+from dataset import PreTrainDataset
 
 from evaluate import evaluate
 
@@ -32,7 +32,7 @@ def main(args, configs):
     preprocess_config, model_config, train_config = configs
 
     # Get dataset
-    dataset = TrainDataset("train.txt", preprocess_config, train_config, sort=True, drop_last=True)
+    dataset = PreTrainDataset("train.txt", preprocess_config, train_config, sort=True, drop_last=True)
     batch_size = train_config["optimizer"]["batch_size"]
     group_size = 1  # Set this larger than 1 (4) to enable sorting in Dataset
     # assert batch_size * group_size < len(dataset)
@@ -45,7 +45,6 @@ def main(args, configs):
 
     # Prepare model
     model, optimizer = get_model(args, configs, device, train=True)
-    print(next(model.parameters()).device)    
     model = nn.DataParallel(model)
     num_param = get_param_num(model)
     Loss = FastSpeech2Loss(preprocess_config, model_config).to(device)
@@ -88,25 +87,24 @@ def main(args, configs):
         for batches in loader:
             for batch in batches:
                 batch = to_device(batch, device)
-                # batch = (ids, raw_texts, raw_translations, speakers, texts, src_lens, max_text_lens, mels, mel_lens,
-                #          max_mel_lens, translations, translation_lens, max(translation_lens), speaker_embeddings, alignments, pitches, energies,
-                #          durations)
+                # batch = (ids, raw_texts, speakers, texts, src_lens, max_src_len, mels, mel_lens, max_mel_len, speaker_embeddings,
+                #           pitches, energies, durations)
 
-                if step == 4:
+                if step == 5:
                     raise NotImplementedError
 
                 # Forward
                 if batch is None:
                     raise ValueError("Batch is None")
                 
-                input = batch[4:10] + batch[13:]
+                input = batch[3:10] + (None,) + batch[10:]
 
                 # Forward pass: Src to Src
                 print("\nFORWARD PASS: SRC to SRC")
                 output = model(*(input))
                 
                 # Calculate loss for Src to Tgt
-                loss_input = (batch[7],) + (batch[15:18])
+                loss_input = (batch[6],) + (batch[10:])
                 losses = Loss(loss_input, output, "to_src")
                 total_loss = losses[0]
                 print("Total Loss: ", total_loss)
@@ -127,7 +125,7 @@ def main(args, configs):
                 if step % log_step == 0:
                     losses = [l.item() for l in losses]
                     message1 = "Step {}/{}, ".format(step, total_step)
-                    message2 = "Total Loss: {:.4f}, Mel Loss: {:.4f}, Mel PostNet Loss: {:.4f}, Pitch Loss: {:.4f}, Energy Loss: {:.4f}, Duration Loss: {:.4f}".format(
+                    message2 = "Total Loss: {:.4f}, Mel Loss: {:.4f}, Mel PostNet Loss: {:.4f}, Pitch Loss: {:.4f}, Energy Loss: {:.4f}, Duration Loss: {:.4f}, Prosody Loss: {:.4f}".format(
                         *losses
                     )
 
@@ -139,9 +137,11 @@ def main(args, configs):
                     log(train_logger, step, losses=losses)
 
                 if step % synth_step == 0:
+                    targets = (batch[0],) +(batch[6],) + batch[10:]
+                    predictions = (output[1],) + output[8:10]
                     fig, wav_reconstruction, wav_prediction, tag = synth_one_sample(
-                        batch,
-                        output,
+                        targets,
+                        predictions,
                         vocoder,
                         model_config,
                         preprocess_config,
@@ -169,7 +169,7 @@ def main(args, configs):
 
                 if step % val_step == 0:
                     model.eval()
-                    message = evaluate(model, step, configs, val_logger, vocoder)
+                    message = evaluate(model, step, configs, val_logger, vocoder, True)
                     with open(os.path.join(val_log_path, "log.txt"), "a") as f:
                         f.write(message + "\n")
                     outer_bar.write(message)
@@ -177,6 +177,7 @@ def main(args, configs):
                     model.train()
 
                 if step % save_step == 0:
+                    print("Saving checkpoint")
                     torch.save(
                         {
                             "model": model.module.state_dict(),

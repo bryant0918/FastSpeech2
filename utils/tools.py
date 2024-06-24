@@ -20,7 +20,7 @@ else:
 
 
 def to_device(data, device):
-    # For Pros training
+    # For Pros Full training
     if len(data) == 18:
         (ids, raw_texts, raw_translations, speakers, texts, text_lens, max_text_lens, mels, mel_lens,
         max_mel_lens, translations, translation_lens, max_translation_len, speaker_embeddings, alignments, 
@@ -46,33 +46,25 @@ def to_device(data, device):
                 max_mel_lens, translations, translation_lens, max_translation_len, speaker_embeddings, alignments, 
                 pitches, energies, durations)
 
-    if len(data) == 12:
-        (ids, raw_texts, speakers, texts, src_lens, max_src_len, mels, mel_lens, max_mel_len, pitches, energies,
-         durations) = data
+    # For Pros Pretraining
+    if len(data) == 13:
+        (ids, raw_texts, speakers, texts, src_lens, max_src_len, mels, mel_lens, max_mel_len, speaker_embeddings,
+        pitches, energies, durations) = data
 
         speakers = torch.from_numpy(speakers).long().to(device)
         texts = torch.from_numpy(texts).long().to(device)
         src_lens = torch.from_numpy(src_lens).to(device)
         mels = torch.from_numpy(mels).float().to(device)
         mel_lens = torch.from_numpy(mel_lens).to(device)
+
+        speaker_embeddings = torch.from_numpy(np.array(speaker_embeddings)).to(device)
+
         pitches = torch.from_numpy(pitches).float().to(device)
         energies = torch.from_numpy(energies).to(device)
         durations = torch.from_numpy(durations).long().to(device)
 
-        print("mels_lens", mel_lens, max_mel_len)
-        # speakers, texts, src_lens, max_src_len, speaker_embs, mels = None, mel_lens = None, max_mel_len = None,
-
-        return (ids, raw_texts, speakers, texts, src_lens, max_src_len, mels, mel_lens, max_mel_len, pitches, energies,
-                durations)
-
-    if len(data) == 6:
-        (ids, raw_texts, speakers, texts, src_lens, max_src_len) = data
-
-        speakers = torch.from_numpy(speakers).long().to(device)
-        texts = torch.from_numpy(texts).long().to(device)
-        src_lens = torch.from_numpy(src_lens).to(device)
-
-        return ids, raw_texts, speakers, texts, src_lens, max_src_len
+        return (ids, raw_texts, speakers, texts, src_lens, max_src_len, mels, mel_lens, max_mel_len, speaker_embeddings,
+                pitches, energies, durations)
 
     # For Pros Synth
     if len(data) == 8:
@@ -93,6 +85,16 @@ def to_device(data, device):
             mels = mels.to(device)
 
         return ids, raw_texts, speakers, texts, src_lens, max_src_len, speaker_embs, mels
+
+    if len(data) == 6:
+        (ids, raw_texts, speakers, texts, src_lens, max_src_len) = data
+
+        speakers = torch.from_numpy(speakers).long().to(device)
+        texts = torch.from_numpy(texts).long().to(device)
+        src_lens = torch.from_numpy(src_lens).to(device)
+
+        return ids, raw_texts, speakers, texts, src_lens, max_src_len
+
 
 
 def log(
@@ -138,27 +140,38 @@ def expand(values, durations):
 
 
 def synth_one_sample(targets, predictions, vocoder, model_config, preprocess_config):
-    # batch = (ids, raw_texts, raw_translations, speakers, texts, src_lens, max_text_lens, mels, mel_lens,
-    #                 max_mel_lens, translations, translation_lens, speaker_embeddings, alignments, pitches, energies,
-    #                 durations)
+    # TODO: Change train.py to pass in correct targets and predictions
+    
+    (   basename, 
+        mel_target, 
+        pitch_target, 
+        energy_target, 
+        duration_target,
+    ) = targets
 
-    # TODO: Change these indices to match new batch as above
-    basename = targets[0][0]
-    src_len = predictions[8][0].item()
-    mel_len = predictions[9][0].item()
-    mel_target = targets[6][0, :mel_len].detach().transpose(0, 1)
-    mel_prediction = predictions[1][0, :mel_len].detach().transpose(0, 1)
-    duration = targets[11][0, :src_len].detach().cpu().numpy()
+    (   mel_prediction,
+        src_len,
+        mel_len,
+    ) = predictions
+    
+    src_len = src_len[0].item()
+    mel_len = mel_len[0].item()
+
+    mel_target = mel_target[0, :mel_len].detach().transpose(0, 1)
+
+    mel_prediction = mel_prediction[0, :mel_len].detach().transpose(0, 1)
+    
+    duration = duration_target[0, :src_len].detach().cpu().numpy()
     if preprocess_config["preprocessing"]["pitch"]["feature"] == "phoneme_level":
-        pitch = targets[9][0, :src_len].detach().cpu().numpy()
+        pitch = pitch_target[0, :src_len].detach().cpu().numpy()
         pitch = expand(pitch, duration)
     else:
-        pitch = targets[9][0, :mel_len].detach().cpu().numpy()
+        pitch = pitch_target[0, :mel_len].detach().cpu().numpy()
     if preprocess_config["preprocessing"]["energy"]["feature"] == "phoneme_level":
-        energy = targets[10][0, :src_len].detach().cpu().numpy()
+        energy = energy_target[0, :src_len].detach().cpu().numpy()
         energy = expand(energy, duration)
     else:
-        energy = targets[10][0, :mel_len].detach().cpu().numpy()
+        energy = energy_target[0, :mel_len].detach().cpu().numpy()
 
     with open(
         os.path.join(preprocess_config["path"]["preprocessed_path"], "stats.json")

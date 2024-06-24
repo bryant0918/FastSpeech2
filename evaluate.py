@@ -9,7 +9,7 @@ from torch.utils.data import DataLoader
 from utils.model import get_model, get_vocoder
 from utils.tools import to_device, log, synth_one_sample
 from model import FastSpeech2Loss
-from dataset import Dataset
+from dataset import PreTrainDataset, TrainDataset
 
 
 if torch.cuda.is_available():
@@ -20,13 +20,18 @@ else:
     device = torch.device("cpu")
 
 
-def evaluate(model, step, configs, logger=None, vocoder=None):
+def evaluate(model, step, configs, logger=None, vocoder=None, pretrain=False):
     preprocess_config, model_config, train_config = configs
 
     # Get dataset
-    dataset = Dataset(
-        "val.txt", preprocess_config, train_config, sort=False, drop_last=False
-    )
+    if pretrain:
+        dataset = PreTrainDataset(
+            "val.txt", preprocess_config, train_config, sort=False, drop_last=False
+        )
+    else:
+        dataset = TrainDataset(
+            "val.txt", preprocess_config, train_config, sort=False, drop_last=False
+        )
     batch_size = train_config["optimizer"]["batch_size"]
     loader = DataLoader(
         dataset,
@@ -39,24 +44,35 @@ def evaluate(model, step, configs, logger=None, vocoder=None):
     Loss = FastSpeech2Loss(preprocess_config, model_config).to(device)
 
     # Evaluation
-    loss_sums = [0 for _ in range(6)]
+    loss_sums = [0 for _ in range(7)]
     for batchs in loader:
         for batch in batchs:
             batch = to_device(batch, device)
             with torch.no_grad():
                 # Forward
-                output = model(*(batch[2:]))
+                if pretrain:
+                    input = batch[3:10] + (None,) + batch[10:]
+                else:
+                    input = batch[10:13] + batch[7:10] + batch[13:15] + (realigned_p, realigned_e, realigned_d, batch[-1])
+                output = model(*(input))
 
                 # Cal Loss
-                losses = Loss(batch, output)
+                if pretrain:
+                    loss_input = (batch[6],) + (batch[10:])
+                    losses = Loss(loss_input, output, "to_src")
+                else:
+                    loss_input = (batch[7],) + (realigned_p, realigned_e, realigned_d)
+                    losses = Loss(loss_input, output, "to_tgt")
+
+                    # TODO: Implement to-src loss and realignment above
 
                 for i in range(len(losses)):
                     loss_sums[i] += losses[i].item() * len(batch[0])
 
     loss_means = [loss_sum / len(dataset) for loss_sum in loss_sums]
 
-    message = "Validation Step {}, Total Loss: {:.4f}, Mel Loss: {:.4f}, Mel PostNet Loss: {:.4f}, Pitch Loss: {:.4f}, Energy Loss: {:.4f}, Duration Loss: {:.4f}".format(
-        *([step] + [l for l in loss_means])
+    message = "Validation Step {}, Total Loss: {:.4f}, Mel Loss: {:.4f}, Mel PostNet Loss: {:.4f}, Pitch Loss: {:.4f}, Energy Loss: {:.4f}, Duration Loss: {:.4f}, Prosody Loss: {:.4f}".format(
+                *([step] + [l for l in loss_means])
     )
 
     if logger is not None:

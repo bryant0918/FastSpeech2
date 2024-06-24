@@ -175,7 +175,7 @@ class TrainDataset(Dataset):
         return output
 
 
-class Dataset(Dataset):
+class PreTrainDataset(Dataset):
     def __init__(
         self, filename, preprocess_config, train_config, sort=False, drop_last=False
     ):
@@ -184,7 +184,7 @@ class Dataset(Dataset):
         self.cleaners = preprocess_config["preprocessing"]["text"]["text_cleaners"]
         self.batch_size = train_config["optimizer"]["batch_size"]
 
-        self.basename, self.speaker, self.text, self.raw_text = self.process_meta(
+        self.basename, self.speaker, self.text, self.raw_text, _, _ = self.process_meta(
             filename
         )
         with open(os.path.join(self.preprocessed_path, "speakers.json")) as f:
@@ -200,7 +200,10 @@ class Dataset(Dataset):
         speaker = self.speaker[idx]
         speaker_id = self.speaker_map[speaker]
         raw_text = self.raw_text[idx]
-        phone = np.array(text_to_sequence(self.text[idx], self.cleaners))
+
+        # TODO: Don't hardcode language code here.
+        phone = np.array(text_to_sequence(self.text[idx], self.cleaners, 'en'))
+        
         mel_path = os.path.join(
             self.preprocessed_path,
             "mel",
@@ -226,6 +229,12 @@ class Dataset(Dataset):
         )
         duration = np.load(duration_path)
 
+        # Get Speaker Embedding
+        speaker_emb_path = os.path.join(self.preprocessed_path, "speaker_emb", "{}.pkl_emb.pkl".format(speaker))        
+        with open(speaker_emb_path, 'rb') as f:
+            emb_dict = pickle.load(f)
+        embedding = torch.from_numpy(emb_dict["default"])
+
         sample = {
             "id": basename,
             "speaker": speaker_id,
@@ -235,25 +244,26 @@ class Dataset(Dataset):
             "pitch": pitch,
             "energy": energy,
             "duration": duration,
+            "speaker_emb": embedding,
         }
 
         return sample
 
     def process_meta(self, filename):
-        with open(
-            os.path.join(self.preprocessed_path, filename), "r", encoding="utf-8"
-        ) as f:
-            name = []
-            speaker = []
-            text = []
-            raw_text = []
+        name, speaker, text, raw_text, translation, raw_translation = [], [], [], [], [], []
+        with open(os.path.join(self.preprocessed_path, filename), "r", encoding="utf-8") as f:
+
             for line in f.readlines():
-                n, s, t, r = line.strip("\n").split("|")
+                n, s, t, r, tr, rtr = line.strip("\n").split("|")
                 name.append(n)
                 speaker.append(s)
                 text.append(t)
                 raw_text.append(r)
-            return name, speaker, text, raw_text
+                translation.append(tr)
+                raw_translation.append(rtr)
+
+        return name, speaker, text, raw_text, translation, raw_translation
+
 
     def reprocess(self, data, idxs):
         ids = [data[idx]["id"] for idx in idxs]
@@ -264,6 +274,7 @@ class Dataset(Dataset):
         pitches = [data[idx]["pitch"] for idx in idxs]
         energies = [data[idx]["energy"] for idx in idxs]
         durations = [data[idx]["duration"] for idx in idxs]
+        speaker_embeddings = [data[idx]["speaker_emb"] for idx in idxs]
 
         text_lens = np.array([text.shape[0] for text in texts])
         mel_lens = np.array([mel.shape[0] for mel in mels])
@@ -285,6 +296,7 @@ class Dataset(Dataset):
             mels,
             mel_lens,
             max(mel_lens),
+            speaker_embeddings,
             pitches,
             energies,
             durations,

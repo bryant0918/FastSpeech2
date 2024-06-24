@@ -21,12 +21,14 @@ else:
 class FastSpeech2Pros(nn.Module):
     """ FastSpeech2 """
 
-    def __init__(self, preprocess_config, model_config):
+    def __init__(self, preprocess_config, model_config, pretrain=False):
         super(FastSpeech2Pros, self).__init__()
 
         self.model_config = model_config
         self.preprocess_config = preprocess_config
         self.encoder = Encoder(model_config)
+        self.prosody_predictor = ProsodyPredictor(model_config)
+        self.prosody_extractor = ProsodyExtractor(model_config)
         self.variance_adaptor = VarianceAdaptor(preprocess_config, model_config)
         self.decoder = Decoder(model_config)
         self.mel_linear = nn.Linear(
@@ -38,6 +40,14 @@ class FastSpeech2Pros(nn.Module):
         # Only need this if I'm getting speaker embeddings path from json
         with open(os.path.join(preprocess_config["path"]["preprocessed_path"], "speakers.json"), "r") as f:
             self.speakers_json = json.load(f)
+
+        # Freeze the weights of the prosody_predictor and prosody_extractor during full training
+        if not pretrain:
+            for param in self.prosody_predictor.parameters():
+                param.requires_grad = False
+
+            for param in self.prosody_extractor.parameters():
+                param.requires_grad = False
 
     def forward(self, texts, src_lens, max_src_len, mels=None, mel_lens=None, max_mel_len=None,
                 speaker_embs=None, alignments=None, p_targets=None, e_targets=None, d_targets=None, 
@@ -80,28 +90,28 @@ class FastSpeech2Pros(nn.Module):
         
         mels = mels.unsqueeze(1) # mels shape is [batch_size, 1, melspec W, melspec H]
         e_src = prosody_extractor(mels)   # e is [batch_size, melspec H, melspec W, 128]
-        print("e_src shape: ", e_src.shape, torch.isnan(e_src).any())
+        # print("e_src shape: ", e_src.shape, torch.isnan(e_src).any())
         
         # Split phone pros embeddings by phone duration
         # [batch_size (list), phoneme_sequence_length (list), melspec H (tensor), melspec W (tensor), 128 (tensor)]        
         e_k_src = prosody_extractor.split_phones(e_src, d_src)  
-        print("e_k_src shape: ", len(e_k_src), len(e_k_src[0]), e_k_src[0][0].shape)  # 2 58 torch.Size([80, 12, 256])
+        # print("e_k_src shape: ", len(e_k_src), len(e_k_src[0]), e_k_src[0][0].shape)  # 2 58 torch.Size([80, 12, 256])
         # print("d_src[0][0]", d_src[0][0], torch.isnan(d_src).any())
 
-        print("Phone sequence length: ", phone_seq_length)
         agg_extracted_prosody = torch.zeros(batch_size, phone_seq_length, 256).to(device)
         for b in range(batch_size):
             for i in range(len(e_k_src[b])):
-                # if e_k_src[b][i].shape[0] == 0 or e_k_src[b][i].shape[1] == 0:
-                #     print("EMPTY", b,i, e_k_src[b][i].shape)
-                agg_extracted_prosody[b,i,:] = torch.mean(e_k_src[b][i], dim=(0, 1))
+                if e_k_src[b][i].shape[0] == 0 or e_k_src[b][i].shape[1] == 0:
+                    agg_extracted_prosody[b,i,:] = torch.zeros(256)
+                else:
+                    agg_extracted_prosody[b,i,:] = torch.mean(e_k_src[b][i], dim=(0, 1))
 
-        print("aggregated_prosody shape: ", agg_extracted_prosody.shape, torch.isnan(agg_extracted_prosody).any())
+        # print("aggregated_prosody shape: ", agg_extracted_prosody.shape, torch.isnan(agg_extracted_prosody).any())
         agg_extracted_prosody = agg_extracted_prosody.detach()
 
         # TODO: Allow for new predicted_prosodies_tgt shape
         tgt_samp = prosody_predictor.sample2(e_tgt) # torch.Size([2, 88, 256])
-        print("tgt_samp shape: ", tgt_samp.shape, torch.isnan(tgt_samp).any())  
+        # print("tgt_samp shape: ", tgt_samp.shape, torch.isnan(tgt_samp).any())  
         
         if not pretraining:
             # print("alignments shape: ", alignments.shape)  # TODO: unpad alignments for realigner otherwise everything mapped to 0.
@@ -124,7 +134,6 @@ class FastSpeech2Pros(nn.Module):
         # print("d_rounded shape: ", d_rounded.shape)
         # print("mel_lens shape: ", mel_lens)
         # print("predicted mel_masks shape: ", mel_masks.shape)
-        # Remap p_predictions, e_predictions, log_d_predictions to tgt size
 
         output, mel_masks = self.decoder(output, mel_masks)
         # print("output mel_masks shape: ", mel_masks.shape)

@@ -175,7 +175,7 @@ class Decoder(nn.Module):
 
 
 class ProsodyExtractor(nn.Module):
-    def __init__(self, dim_in=1, dim_out=128, hidden_dim=8, config=None):   # TODO: intialize with config
+    def __init__(self, config):   # TODO: intialize with config
         super(ProsodyExtractor, self).__init__()
 
         if config:
@@ -315,32 +315,7 @@ class ProsodyPredictor(nn.Module):
         h_sd = h_sd.permute(0, 2, 1)  # Changes shape back to (Batch_size, sequence_length, channels) for layernorm
         h_sd = self.dropout(self.layernorm(h_sd))
 
-        # # for loop here ranging in sequence length
-        # prosodies = []
-        # prev_e = torch.zeros_like(h_sd)
-        # for i in range(h_sd.size(1)):
-        #     # Select the current time step for all sequences in the batch
-        #     h_sd_t = h_sd[:, i, :]
-        #     h_sd_t = torch.cat((h_sd_t, prev_e), dim=-1)
-
-        #     # Pass the current time step and previous prosody into the model
-        #     out, prev_e = self.gru(h_sd_t.unsqueeze(0), prev_e)
-
-        #     prosodies.append(out)
-
-        # prosodies = torch.stack(prosodies, dim=1)
-
-        # You're correct that PyTorch's GRU can process an entire sequence at once. However, the reason for the loop in your case is likely due to the need to manually pass the hidden state (prev_e) from one time step to the next.
-        # In a typical GRU, the hidden state is automatically passed from one time step to the next within the same sequence. But in your case, it seems like you want to manually control this process, perhaps because you're doing something special with the hidden state at each time step.
-        # Another reason for the loop could be that you want to extract and store the output (prosody) at each time step separately. If you processed the entire sequence at once, the GRU would return a single tensor containing the outputs at all time steps. But by using a loop, you can extract and store the output at each time step separately.
-        # So, to summarize, while PyTorch's GRU can process an entire sequence at once, the loop in your case is likely due to the need to manually pass the hidden state from one time step to the next and/or the need to extract and store the output at each time step separately.
-
         h_sd, _ = self.gru(h_sd)
-
-        # if prev_e:
-        #     h_sd, _ = self.gru(h_sd, prev_e)
-        # else:
-        #     h_sd, _ = self.gru(h_sd)
 
         h_sd = self.normal_linear(h_sd)
 
@@ -353,18 +328,9 @@ class ProsodyPredictor(nn.Module):
                       3 * self.dim_out * self.n_components + self.n_components]
         d = h_sd[..., 3 * self.dim_out * self.n_components + self.n_components:]
 
-        print("mu.size:", mu.size())
-        print("v.size:", v.size())
-        print("a.size:", a.size())
-        print("b.size:", b.size())
-        print("c.size:", c.size())
-        print("d.size:", d.size())
         # Perform non-Linear Transformation
         mu = self.linear2(torch.tanh(torch.multiply(a, mu) + b))
         v = self.linear3(torch.tanh(torch.multiply(c, v) + d))
-
-        print("mu.size:", mu.size())
-        print("v.size:", v.size())
 
         # Add Noise (Don't know if necessary, can set eps=0)
         sigma = torch.exp(v + eps)

@@ -351,9 +351,18 @@ class ProsodyPredictor(nn.Module):
                       3 * self.dim_out * self.n_components + self.n_components]
         d = h_sd[..., 3 * self.dim_out * self.n_components + self.n_components:]
 
+        print("mu.size:", mu.size())
+        print("v.size:", v.size())
+        print("a.size:", a.size())
+        print("b.size:", b.size())
+        print("c.size:", c.size())
+        print("d.size:", d.size())
         # Perform non-Linear Transformation
         mu = self.linear2(torch.tanh(torch.multiply(a, mu) + b))
         v = self.linear3(torch.tanh(torch.multiply(c, v) + d))
+
+        print("mu.size:", mu.size())
+        print("v.size:", v.size())
 
         # Add Noise (Don't know if necessary, can set eps=0)
         sigma = torch.exp(v + eps)

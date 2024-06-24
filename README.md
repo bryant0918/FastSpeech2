@@ -111,7 +111,7 @@ python3 prepare_align.py config/LJSpeech/preprocess.yaml
 ```
 nohup python3 prepare_align.py config/LJSpeech/preprocess.yaml &
 
-ps -ef | grep 71981
+ps -ef | grep 89466
 ```
 
 ### Get the TextGrid Files

@@ -192,7 +192,7 @@ class FastSpeech2Loss(nn.Module):
                 mvn = dist.MultivariateNormal(loc=mu[b,:,k], covariance_matrix=sigma[b,:,k])
                 
                 # Compute the log likelihood for each point in the batch for the k-th component
-                log_likelihoods[:, :, k] = mvn.log_prob(y)
+                log_likelihoods[b, :, k] = mvn.log_prob(y)
         
         # Compute the log of the weighted sum of the probabilities
         weighted_log_likelihoods = log_likelihoods + log_pi

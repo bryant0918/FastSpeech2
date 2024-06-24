@@ -34,6 +34,10 @@ def prepare_align(config):
             text = parts[2]
             text = _clean_text(text, cleaners)
 
+            # Skip if translation exists (pick up where you left off)
+            if os.path.exists(out_translation_path):
+                continue
+
             # TODO: Get cleaners for translation language also (and handle api connection errors)
             translation = GoogleTranslator(source='auto', target='es').translate(text)
             translation = spanish_cleaners(translation)

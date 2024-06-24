@@ -125,7 +125,7 @@ class FastSpeech2Pros(nn.Module):
         # y_e_tgt = prosody_extractor.prosody_realigner(alignments, e_k_src)
 
         return (output, postnet_output, p_predictions, e_predictions, log_d_predictions, d_rounded, tgt_masks,
-                mel_masks, src_lens, mel_lens, e_src, e_tgt)
+                mel_masks, src_lens, mel_lens, e_src, tgt_samp)
 
 
 class FastSpeech2(nn.Module):

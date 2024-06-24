@@ -88,7 +88,7 @@ class FastSpeech2Pros(nn.Module):
         # print("d_src[0][0]", d_src[0][0], torch.isnan(d_src).any())
 
         # TODO: Allow for new predicted_prosodies_tgt shape
-        tgt_samp = prosody_predictor.sample2(e_tgt)
+        tgt_samp = prosody_predictor.sample2(e_tgt) # torch.Size([2, 88, 256])
         print("tgt_samp shape: ", tgt_samp.shape, torch.isnan(tgt_samp).any())  
         
         if not pretraining:
@@ -125,7 +125,7 @@ class FastSpeech2Pros(nn.Module):
         # y_e_tgt = prosody_extractor.prosody_realigner(alignments, e_k_src)
 
         return (output, postnet_output, p_predictions, e_predictions, log_d_predictions, d_rounded, tgt_masks,
-                mel_masks, src_lens, mel_lens, e_src, tgt_samp)
+                mel_masks, src_lens, mel_lens, e_src, e_tgt)
 
 
 class FastSpeech2(nn.Module):

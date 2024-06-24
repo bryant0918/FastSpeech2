@@ -51,8 +51,8 @@ class FastSpeech2Loss(nn.Module):
             mel_masks,
             _,
             _,
-            e_src,
-            e_src_hat,
+            extracted_e,
+            predicted_e,
         ) = predictions
         src_masks = ~src_masks
         mel_masks = ~mel_masks
@@ -102,8 +102,11 @@ class FastSpeech2Loss(nn.Module):
             postnet_mel_loss = self.mae_loss(postnet_mel_predictions, mel_targets)
 
             # mel_duration_loss = self.mel_duration_loss(postnet_mel_predictions, mel_targets)
+            
+            print("extracted_e shape: ", extracted_e.shape)
+            print("predicted_e shape: ", predicted_e.shape)
 
-            pros_loss = self.pros_loss2(e_src_hat, e_src)
+            pros_loss = self.pros_loss2(predicted_e, extracted_e)
 
             print("Mel Loss: ", mel_loss)
             print("Postnet Mel Loss: ", postnet_mel_loss)
@@ -200,7 +203,7 @@ class FastSpeech2Loss(nn.Module):
                     print("mvn.log_prob(y) shape: ", mvn.log_prob(y).shape) # torch.Size([80, 807]
                     
                     # Compute the log likelihood for each point in the batch for the k-th component
-                    log_likelihoods[b, k, i] = mvn.log_prob(y)
+                    log_likelihoods[b, k, i] = mvn.log_prob(y[b,k])
         
         # Compute the log of the weighted sum of the probabilities
         weighted_log_likelihoods = log_likelihoods + log_pi

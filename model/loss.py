@@ -63,6 +63,9 @@ class FastSpeech2Loss(nn.Module):
         log_duration_targets.requires_grad = False
         pitch_targets.requires_grad = False
         energy_targets.requires_grad = False
+        
+        # Stop Gradient
+        extracted_e = extracted_e.detach()
 
         # print("Src_masks ", src_masks.shape)
         # print("Pitch_predictions ", pitch_predictions.shape)
@@ -106,7 +109,13 @@ class FastSpeech2Loss(nn.Module):
             print("extracted_e shape: ", extracted_e.shape)
             print("predicted_e shape: ", len(predicted_e), predicted_e[0].shape)
 
-            pros_loss = self.pros_loss2(predicted_e, extracted_e)
+            # print("extracted_e_masked", extracted_e*src_masks.unsqueeze(-1))
+
+            # extracted_e = extracted_e.masked_select(~src_masks.unsqueeze(-1))
+            # print("extracted_e masked_select: ", extracted_e.shape)
+
+            beta = .001
+            pros_loss = self.pros_loss2(predicted_e, extracted_e)*beta
 
             print("Mel Loss: ", mel_loss)
             print("Postnet Mel Loss: ", postnet_mel_loss)
@@ -176,7 +185,7 @@ class FastSpeech2Loss(nn.Module):
         n_components = log_pi.shape[-1]
         
         # Initialize the log likelihoods for each batch
-        log_likelihoods = torch.zeros((n_batches, n_samples, n_components))
+        log_likelihoods = torch.zeros((n_batches, n_samples, n_components)).to(log_pi.device)
 
         print()
         print("sigma has negative vals", (sigma <= 0).any())
@@ -200,7 +209,8 @@ class FastSpeech2Loss(nn.Module):
                     # Create a multivariate normal distribution for the k-th component
                     mvn = dist.MultivariateNormal(loc=mu[b,k,i], covariance_matrix=torch.diag(sigma[b,k,i]))
 
-                    print("mvn.log_prob(y) shape: ", mvn.log_prob(y).shape) # torch.Size([80, 807]
+                    if torch.isnan(y[b,k]).any():
+                        continue
                     
                     # Compute the log likelihood for each point in the batch for the k-th component
                     log_likelihoods[b, k, i] = mvn.log_prob(y[b,k])
@@ -212,7 +222,7 @@ class FastSpeech2Loss(nn.Module):
         # Compute the negative log-likelihood for each batch
         nlls = -torch.sum(log_sum_exp, dim=1)
         
-        return nlls
+        return torch.mean(nlls)
 
     def word_loss(self, x, y):
         """

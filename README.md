@@ -168,7 +168,7 @@ ps -ef | grep 112675
 ```
 
 ### Get Speaker Embeddings
-For now use this one:
+For now use this one if not already there:
 ```
 scp preprocessed_data/LJSpeech/speaker_emb/LJSpeech.pkl_emb.pkl ditto@Emotiv:/home/ditto/Ditto/FastSpeech2/preprocessed_data/LJSpeech/speaker_emb/LJSpeech.pkl_emb.pkl
 ```

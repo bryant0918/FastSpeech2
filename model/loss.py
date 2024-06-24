@@ -195,7 +195,7 @@ class FastSpeech2Loss(nn.Module):
             for k in range(n_samples):
                 for i in range(n_components):
                     # Create a multivariate normal distribution for the k-th component
-                    mvn = dist.MultivariateNormal(loc=mu[b,k,i], covariance_matrix=sigma[b,k,i])
+                    mvn = dist.MultivariateNormal(loc=mu[b,k,i], covariance_matrix=torch.diag(sigma[b,k,i]))
                     
                     # Compute the log likelihood for each point in the batch for the k-th component
                     log_likelihoods[b, k, i] = mvn.log_prob(y)

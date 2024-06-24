@@ -112,6 +112,7 @@ def log(
         logger.add_figure(tag, fig)
 
     if audio is not None:
+        print("Audio type: ", type(audio))
         logger.add_audio(
             tag,
             audio / max(abs(audio)),

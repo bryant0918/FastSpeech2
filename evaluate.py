@@ -76,9 +76,14 @@ def evaluate(model, step, configs, logger=None, vocoder=None, pretrain=False):
     )
 
     if logger is not None:
+        if pretrain:
+            targets = (batch[0],) +(batch[6],) + batch[10:]
+            predictions = (output[1],) + output[8:10]
+        else:
+            raise NotImplementedError
         fig, wav_reconstruction, wav_prediction, tag = synth_one_sample(
-            batch,
-            output,
+            targets,
+            predictions,
             vocoder,
             model_config,
             preprocess_config,

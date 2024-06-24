@@ -131,7 +131,6 @@ You have to unzip the files in ``preprocessed_data/LJSpeech/TextGrid/``.
 ```unzip preprocessed_data/LJSpeech/LJSpeech.zip -d preprocessed_data/LJSpeech/```
 
 
-
 Alternately, you can align the corpus by yourself to get the TextGrid Files. 
 Download the official MFA package and run
 ```

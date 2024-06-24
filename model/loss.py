@@ -104,7 +104,7 @@ class FastSpeech2Loss(nn.Module):
             # mel_duration_loss = self.mel_duration_loss(postnet_mel_predictions, mel_targets)
             
             print("extracted_e shape: ", extracted_e.shape)
-            print("predicted_e shape: ", predicted_e.shape)
+            print("predicted_e shape: ", len(predicted_e), predicted_e[0].shape)
 
             pros_loss = self.pros_loss2(predicted_e, extracted_e)
 

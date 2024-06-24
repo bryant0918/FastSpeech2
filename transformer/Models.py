@@ -212,6 +212,8 @@ class ProsodyExtractor(nn.Module):
         # Apply Bi-GRU layer
         x, _ = self.gru(x)  # [batch_size, melspec H * melspec W, 128]
 
+        x.view(x.size()[0], seq_length, num_directions, hidden_size).
+
         # TODO: Don't hardcode 80 here, use n_mel_channels from preprocess_config
         return x.view(x.size()[0], 80, -1, x.size()[-1])  # [batch_size, melspec H, melspec W, 128]
 

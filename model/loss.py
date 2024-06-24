@@ -187,7 +187,7 @@ class FastSpeech2Loss(nn.Module):
         print("log_pi shape: ", log_pi.shape)   # log_pi shape:  torch.Size([2, 112, 8])
         print("mu shape: ", mu.shape)           # mu shape:  torch.Size([2, 112, 8, 256])
         print("sigma shape: ", sigma.shape)     # sigma shape:  torch.Size([2, 112, 8, 256])
-        print("y shape (extracted): ", y.shape) # y shape:  torch.Size([2, 80, 807, 256])
+        print("y shape (extracted): ", y.shape, torch.is_nan(y).any()) # y shape:  torch.Size([2, 80, 807, 256])
         
         print("Diag sigma", torch.diag(sigma[0,:,0]).size())
         print("Shape of sigma[b,0,k]: ", sigma[0,0,0].shape)

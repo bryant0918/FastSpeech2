@@ -88,12 +88,13 @@ class FastSpeech2Pros(nn.Module):
         print("e_k_src shape: ", len(e_k_src), len(e_k_src[0]), e_k_src[0][0].shape)  # 2 58 torch.Size([80, 12, 256])
         # print("d_src[0][0]", d_src[0][0], torch.isnan(d_src).any())
 
+        print("Phone sequence length: ", phone_seq_length)
         agg_extracted_prosody = torch.zeros(batch_size, phone_seq_length, 256).to(device)
         for b in range(batch_size):
             for i in range(len(e_k_src[b])):
                 agg_extracted_prosody[b,i,:] = torch.mean(e_k_src[b][i], dim=(0, 1))
 
-        print("aggregated_prosody shape: ", agg_extracted_prosody.shape)
+        print("aggregated_prosody shape: ", agg_extracted_prosody.shape, torch.isnan(agg_extracted_prosody).any())
 
         # TODO: Allow for new predicted_prosodies_tgt shape
         tgt_samp = prosody_predictor.sample2(e_tgt) # torch.Size([2, 88, 256])

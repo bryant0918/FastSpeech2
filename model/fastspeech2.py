@@ -49,7 +49,8 @@ class FastSpeech2Pros(nn.Module):
             pretraining = True
 
         # Get masks
-        batch_size = texts.size(0)
+        batch_size, phone_seq_length = texts.size(0), texts.size(1)
+
 
         tgt_masks = get_mask_from_lengths(src_lens, max_src_len)
         # print("Tgt masks shape: ", tgt_masks.shape)
@@ -87,9 +88,12 @@ class FastSpeech2Pros(nn.Module):
         print("e_k_src shape: ", len(e_k_src), len(e_k_src[0]), e_k_src[0][0].shape)  # 2 58 torch.Size([80, 12, 256])
         # print("d_src[0][0]", d_src[0][0], torch.isnan(d_src).any())
 
-        e_k_src = torch.tensor(e_k_src).to(device)
-        aggregated_prosody = torch.mean(e_k_src, dim=(2, 3))
-        print("aggregated_prosody shape: ", aggregated_prosody.shape)
+        agg_extracted_prosody = torch.zeros(batch_size, phone_seq_length, 256).to(device)
+        for b in range(batch_size):
+            for i in range(len(e_k_src[b])):
+                agg_extracted_prosody[b,i,:] = torch.mean(e_k_src[b][i], dim=(0, 1))
+
+        print("aggregated_prosody shape: ", agg_extracted_prosody.shape)
 
         # TODO: Allow for new predicted_prosodies_tgt shape
         tgt_samp = prosody_predictor.sample2(e_tgt) # torch.Size([2, 88, 256])
@@ -129,7 +133,7 @@ class FastSpeech2Pros(nn.Module):
         # y_e_tgt = prosody_extractor.prosody_realigner(alignments, e_k_src)
 
         return (output, postnet_output, p_predictions, e_predictions, log_d_predictions, d_rounded, tgt_masks,
-                mel_masks, src_lens, mel_lens, e_k_src, e_tgt)
+                mel_masks, src_lens, mel_lens, agg_extracted_prosody, e_tgt)
 
 
 class FastSpeech2(nn.Module):

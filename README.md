@@ -111,7 +111,7 @@ python3 prepare_align.py config/LJSpeech/preprocess.yaml
 ```
 nohup python3 prepare_align.py config/LJSpeech/preprocess.yaml &
 
-ps -ef | grep 269277
+ps -ef | grep 71981
 ```
 
 ### Get the TextGrid Files
@@ -124,6 +124,7 @@ wget --no-check-certificate 'https://drive.google.com/uc?export=download&id=1ukb
 or copy the file to the server by
 ```
 scp /Users/bryantmcarthur/Downloads/LJSpeech.zip ditto@136.36.160.77:/home/ditto/Documents/ProsodyCloning/FastSpeech2/preprocessed_data/LJSpeech
+scp /Users/bryantmcarthur/Downloads/LJSpeech.zip ditto@Emotiv:/home/ditto/Ditto/FastSpeech2/preprocessed_data/LJSpeech
 ```
 You have to unzip the files in ``preprocessed_data/LJSpeech/TextGrid/``.
 

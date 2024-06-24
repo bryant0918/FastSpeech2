@@ -165,7 +165,7 @@ class FastSpeech2Loss(nn.Module):
         loglik = torch.logsumexp(log_pi + normal_loglik, dim=-1)
         return -loglik  # Sum over all phones for total loss (L_pp)
 
-    def pros_loss2(self, x,y):
+    def pros_loss2(self, x, y):
         import torch.distributions as dist
 
         log_pi, mu, sigma = x
@@ -179,6 +179,11 @@ class FastSpeech2Loss(nn.Module):
         print("Shape of sigma[b,:,k]: ", sigma[0,:,0].shape) 
         #mvn wants this to be square but it's [58, 58, 256]
         #Do I need a linear layer here or something to make it [58,58]
+
+        print("log_pi shape: ", log_pi.shape)   # log_pi shape:  torch.Size([2, 112, 8])
+        print("mu shape: ", mu.shape)           # mu shape:  torch.Size([2, 112, 8, 256])
+        print("sigma shape: ", sigma.shape)     # sigma shape:  torch.Size([2, 112, 8, 256])
+        print("y shape (extracted): ", y.shape) # y shape:  torch.Size([2, 80, 807, 256])
         
         
         for b in range(n_batches):

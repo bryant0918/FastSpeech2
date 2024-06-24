@@ -175,6 +175,7 @@ class FastSpeech2Loss(nn.Module):
         # Initialize the log likelihoods for each batch
         log_likelihoods = torch.zeros((n_batches, n_samples, n_components))
 
+        print()
         print("sigma has negative vals", (sigma <= 0).any())
         print("Shape of sigma[b,:,k]: ", sigma[0,:,0].shape) 
         #mvn wants this to be square but it's [58, 58, 256]
@@ -185,9 +186,9 @@ class FastSpeech2Loss(nn.Module):
         print("sigma shape: ", sigma.shape)     # sigma shape:  torch.Size([2, 112, 8, 256])
         print("y shape (extracted): ", y.shape) # y shape:  torch.Size([2, 80, 807, 256])
         
-        print("Diag sigma", torch.diagonal(sigma[0,:,0]).size())
+        print("Diag sigma", torch.diag(sigma[0,:,0]).size())
         print("Shape of sigma[b,0,k]: ", sigma[0,0,0].shape)
-        print("Diag sigma", torch.diagonal(sigma[0,0,0]).unsqueeze().shape)
+        print("Diag sigma", torch.diag(sigma[0,0,0]).unsqueeze().shape)
         
         # This needs to be per phone as well.
         for b in range(n_batches):

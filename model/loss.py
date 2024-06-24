@@ -185,6 +185,7 @@ class FastSpeech2Loss(nn.Module):
         print("sigma shape: ", sigma.shape)     # sigma shape:  torch.Size([2, 112, 8, 256])
         print("y shape (extracted): ", y.shape) # y shape:  torch.Size([2, 80, 807, 256])
         
+        print("Diag sigma", torch.diagonal(sigma[0,:,0]))
         
         for b in range(n_batches):
             for k in range(n_components):

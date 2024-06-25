@@ -9,7 +9,7 @@ from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm
 
-from utils.model import get_model, get_vocoder, get_param_num
+from utils.model import get_model, get_vocoder, get_param_num, vocoder_infer
 from utils.tools import to_device, log, synth_one_sample
 from model import FastSpeech2Loss
 from dataset import PreTrainDataset
@@ -74,6 +74,7 @@ def main(args, configs):
     save_step = train_config["step"]["save_step"]
     synth_step = train_config["step"]["synth_step"]
     val_step = train_config["step"]["val_step"]
+    word_step = train_config["step"]["word_step"]
 
     outer_bar = tqdm(total=total_step, desc="Training", position=0)
     outer_bar.n = args.restore_step
@@ -102,10 +103,27 @@ def main(args, configs):
                 # Forward pass: Src to Src
                 print("\nFORWARD PASS: SRC to SRC")
                 output = model(*(input))
+
+                if step % word_step == 0:
+
+                    mels = [output[1][i, :output[9][i]].transpose(0,1) for i in range(batch_size)]
+
+                    wav_predictions = vocoder_infer(
+                        mels,
+                        vocoder,
+                        model_config,
+                        preprocess_config,
+                    )
+                    print("Raw text: ", batch[1])
+                    loss_input = (batch[1],) + (batch[6],) + batch[10:]
+                    loss_predictions = output + (wav_predictions,)
+                    
+                else:
+                    loss_input = (None, batch[6]) + batch[10:]
+                    loss_predictions = output + (None,)
                 
                 # Calculate loss for Src to Tgt
-                loss_input = (batch[6],) + (batch[10:])
-                losses = Loss(loss_input, output, "to_src")
+                losses = Loss(loss_input, loss_predictions, "to_src")
                 total_loss = losses[0]
                 print("Total Loss: ", total_loss)
                 print()

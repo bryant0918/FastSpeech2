@@ -294,7 +294,7 @@ class ProsodyPredictor(nn.Module):
         self.linear2 = nn.Linear(dim_out * n_components, dim_out * n_components)
         self.linear3 = nn.Linear(dim_out * n_components, dim_out * n_components)
 
-    def forward(self, h_sd, h_si, eps=1e-6):
+    def forward(self, h_sd, h_si, eps=1e-8):
         # First predict the Speaker Independent means and log-variances
         h_si, _ = self.BiGru(h_si)  # Should we concat h_si and h_n?
         h_si = self.normal_linear2(h_si)
@@ -404,12 +404,12 @@ class ProsodyPredictor(nn.Module):
 
         return sample
 
-    def prosody_realigner(self, phone_alignments, tgt_samp, e_k_src):
+    def prosody_realigner(self, phone_alignments, tgt_samp, e_k_src, beta=.1):
         """
         Realigns and shifts tgt_samp distribution by e_k_src
         """
+        beta = torch.sigmoid(beta)
         # print("phone_alignments", phone_alignments.shape)
-        beta = 0.1
         batch_size = len(phone_alignments)
         seq_length = tgt_samp.shape[1]
         # print("tgt samp shape", tgt_samp.shape)
@@ -472,80 +472,6 @@ class ProsodyPredictor(nn.Module):
         new_e[mask] = sum_e[mask] / counts[mask].unsqueeze(-1)
             
         return new_e
-
-
-class BaseProsodyPredictor(nn.Module):
-    def __init__(self, dim_in, dim_out, n_components, hidden_dim):
-        super(BaseProsodyPredictor, self).__init__()
-        self.num_sigma_channels = dim_out * n_components
-        num_weights_channels = n_components
-
-        self.dim_in = dim_in
-        self.dim_out = dim_out
-        self.n_components = n_components
-
-        self.gru = nn.GRU(input_size=8, hidden_size=512, num_layers=1, bidirectional=False, batch_first=True)
-        # Linear layer to output speaker independent means and log-variances
-        self.normal_linear = nn.Linear(512, dim_out * n_components + self.num_sigma_channels + num_weights_channels)
-
-        self.conv1 = nn.Conv1d(in_channels=dim_in, out_channels=8, kernel_size=3, padding=1)
-        self.relu = nn.ReLU()
-        self.layernorm = nn.LayerNorm(8)
-        self.dropout = nn.Dropout(0.1)
-        self.conv2 = nn.Conv1d(in_channels=8, out_channels=8, kernel_size=3, padding=1)
-
-    def forward(self, x, prev_e=None, eps=1e-6):
-        print("x.size:", x.size())
-        # Permute the input tensor batch, sentence_length, embedding_dim = 20, 19, 10
-        x = x.permute(0, 2, 1)  # Changes shape to (Batch_size, 256, Sequence_length) for conv layer
-        x = self.relu(self.conv1(x))
-        x = x.permute(0, 2, 1)  # Changes shape back to (Batch_size, sequence_length, channels) for layernorm
-        x = self.dropout(self.layernorm(x))
-        x = x.permute(0, 2, 1)  # Changes shape back to (Batch_size, channels, sequence_length) for conv layer
-        x = self.relu(self.conv2(x))
-        x = x.permute(0, 2, 1)  # Changes shape back to (Batch_size, sequence_length, channels) for layernorm
-        x = self.dropout(self.layernorm(x))
-
-        if prev_e:
-            x, _ = self.gru(x, prev_e)
-        else:
-            x, _ = self.gru(x)
-
-        x = self.normal_linear(x)
-
-        mu = x[..., :self.dim_out * self.n_components]
-        sigma = x[..., self.dim_out * self.n_components:self.dim_out * self.n_components + self.num_sigma_channels]
-        pi = x[..., self.dim_out * self.n_components + self.num_sigma_channels:]
-
-        # This puts batch_size in the last dimension
-        # mu = mu.reshape(-1, self.n_components, self.dim_out)
-        # sigma = sigma.reshape(-1, self.n_components, self.dim_out)
-
-        # Add Noise (Don't know if necessary, can set eps=0)
-        sigma = torch.exp(sigma + eps)
-
-        log_pi = torch.log_softmax(pi, dim=-1)
-
-        return log_pi, mu, sigma
-
-    def phone_loss(self, e, y):
-        log_pi, mu, sigma = e
-        z_score = (y.unsqueeze(1) - mu) / sigma
-        normal_loglik = (
-                -0.5 * torch.einsum("bij,bij->bi", z_score, z_score)
-                - torch.sum(torch.log(sigma), dim=-1)
-        )
-        loglik = torch.logsumexp(log_pi + normal_loglik, dim=-1)
-        return -loglik  # Sum over all phones for total loss (L_pp)
-
-    def sample(self, x):
-        log_pi, mu, sigma = self.forward(x)
-        cum_pi = torch.cumsum(torch.exp(log_pi), dim=-1)
-        rvs = torch.rand(len(x), 1).to(x)
-        rand_pi = torch.searchsorted(cum_pi, rvs)
-        rand_normal = torch.randn_like(mu) * sigma + mu
-        samples = torch.take_along_dim(rand_normal, indices=rand_pi.unsqueeze(-1), dim=1).squeeze(dim=1)
-        return samples
 
 
 if __name__ == "__main__":

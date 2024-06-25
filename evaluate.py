@@ -6,7 +6,7 @@ import yaml
 import torch.nn as nn
 from torch.utils.data import DataLoader
 
-from utils.model import get_model, get_vocoder
+from utils.model import get_model, get_vocoder, vocoder_infer
 from utils.tools import to_device, log, synth_one_sample
 from model import FastSpeech2Loss
 from dataset import PreTrainDataset, TrainDataset
@@ -43,10 +43,13 @@ def evaluate(model, step, configs, logger=None, vocoder=None, pretrain=False):
     # Get loss function
     Loss = FastSpeech2Loss(preprocess_config, model_config).to(device)
 
+    word_step = train_config["step"]["word_step"]
+    step = 1
     # Evaluation
-    loss_sums = [0 for _ in range(7)]
-    for batchs in loader:
-        for batch in batchs:
+    loss_sums = [0 for _ in range(8)]
+    for batches in loader:
+        for batch in batches:
+            print("STEP: ", step)
             batch = to_device(batch, device)
             with torch.no_grad():
                 # Forward
@@ -56,10 +59,24 @@ def evaluate(model, step, configs, logger=None, vocoder=None, pretrain=False):
                     input = batch[10:13] + batch[7:10] + batch[13:15] + (realigned_p, realigned_e, realigned_d, batch[-1])
                 output = model(*(input))
 
+                if step % word_step == 0:
+                    # Get predicted audio
+                    mels = [output[1][i, :output[9][i]].transpose(0,1) for i in range(batch_size)]
+                    wav_predictions = vocoder_infer(
+                        mels,
+                        vocoder,
+                        model_config,
+                        preprocess_config,
+                    )
+                    loss_input = (batch[1],) + (batch[6],) + batch[10:]
+                    loss_predictions = output + (wav_predictions,)
+                else:
+                    loss_input = (None, batch[6]) + batch[10:]
+                    loss_predictions = output + (None,)
+                
                 # Cal Loss
                 if pretrain:
-                    loss_input = (batch[6],) + (batch[10:])
-                    losses = Loss(loss_input, output, "to_src")
+                    losses = Loss(loss_input, loss_predictions, "to_src")
                 else:
                     loss_input = (batch[7],) + (realigned_p, realigned_e, realigned_d)
                     losses = Loss(loss_input, output, "to_tgt")
@@ -68,6 +85,8 @@ def evaluate(model, step, configs, logger=None, vocoder=None, pretrain=False):
 
                 for i in range(len(losses)):
                     loss_sums[i] += losses[i].item() * len(batch[0])
+                
+            step += 1
 
     loss_means = [loss_sum / len(dataset) for loss_sum in loss_sums]
 

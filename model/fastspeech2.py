@@ -37,6 +37,8 @@ class FastSpeech2Pros(nn.Module):
         )
         self.postnet = PostNet()
 
+        self.beta = nn.Parameter(torch.tensor(-1.0))
+
         # Only need this if I'm getting speaker embeddings path from json
         with open(os.path.join(preprocess_config["path"]["preprocessed_path"], "speakers.json"), "r") as f:
             self.speakers_json = json.load(f)
@@ -113,7 +115,7 @@ class FastSpeech2Pros(nn.Module):
         
         if not pretraining:
             # print("alignments shape: ", alignments.shape)  # TODO: unpad alignments for realigner otherwise everything mapped to 0.
-            adjusted_e_tgt = prosody_predictor.prosody_realigner(alignments, tgt_samp, e_k_src)
+            adjusted_e_tgt = prosody_predictor.prosody_realigner(alignments, tgt_samp, e_k_src, self.beta)
             # print("alignments nan", torch.isnan(alignments).any())
             # print("adjusted_e_tgt nan: ", torch.isnan(adjusted_e_tgt).any())
 

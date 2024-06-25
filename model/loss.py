@@ -1,6 +1,8 @@
 import torch
 import torch.nn as nn
 import torch.distributions as dist
+from transformers import BertModel, BertTokenizer
+import whisper
 
 
 class ProsLearnerLoss(nn.Module):
@@ -30,12 +32,15 @@ class FastSpeech2Loss(nn.Module):
         self.mae_loss = nn.L1Loss()
         self.pros_loss = ProsLoss()
 
+        self.word_loss = WordLoss(model_config)
+
     def forward(self, inputs, predictions, direction="to_tgt"):
         """
         When going to_tgt everything should be in tgt space.
         When going to_src everything should be in src space.
         """
         (
+            text,
             mel_targets, 
             pitch_targets, 
             energy_targets, 
@@ -55,6 +60,7 @@ class FastSpeech2Loss(nn.Module):
             _,
             extracted_e,
             predicted_e,
+            audio,
         ) = predictions
         device = mel_masks.device
         src_masks = ~src_masks
@@ -124,17 +130,19 @@ class FastSpeech2Loss(nn.Module):
         energy_loss = self.mse_loss(energy_predictions, energy_targets)
         duration_loss = self.mse_loss(log_duration_predictions, log_duration_targets)
 
-        # # word_loss  (Requires extracting predicted phonemes from mel Spectrogram) whisper
-        # word_loss = self.word_loss()
+        # word_loss  (Requires extracting predicted phonemes from mel Spectrogram) whisper
+        if audio is not None:
+            word_loss = self.word_loss(audio, text)
+        else:
+            word_loss = torch.tensor([0]).to(device)
 
-        
         # print("Pitch Loss: ", pitch_loss)
         # print("Energy Loss: ", energy_loss)
         # print("Duration Loss: ", duration_loss)
 
         total_loss = (
-            mel_loss + postnet_mel_loss + duration_loss + pitch_loss + energy_loss + pros_loss 
-            # + word_loss
+            mel_loss + postnet_mel_loss + duration_loss + pitch_loss + energy_loss 
+            + pros_loss + word_loss
         )
 
         return (
@@ -145,6 +153,7 @@ class FastSpeech2Loss(nn.Module):
             energy_loss,
             duration_loss,
             pros_loss,
+            word_loss,
         )
 
 
@@ -217,11 +226,67 @@ class ProsLoss(nn.Module):
         print("nlls:", nlls)
         return torch.mean(nlls)
 
-    def word_loss(self, x, y):
+
+class WordLoss(nn.Module):
+    def __init__(self, config):
+        super(WordLoss, self).__init__()
+        bert = config['sentence_embedder']['model']
+        self.transcriber = whisper.load_model(config['transcriber']['model'])
+        self.tokenizer = BertTokenizer.from_pretrained(bert)
+        self.bert_model = BertModel.from_pretrained(bert)
+        self.cosine_loss = nn.CosineEmbeddingLoss()
+    
+    def forward(self, audio, text):
         """
-        Calculates the phone loss
+        Calculate the word loss.
+        Input:
+            audio: Audio waveform
+            text (str): Raw Text
+        Performs Speech to Text on audio and compares to text.
+        Uses 
+        
+        Output: Loss
+        
         """
-        return None
+        pred_texts = []
+
+        import time
+        start = time.time()
+        for aud in audio:
+            print(aud.dtype, aud.device, aud.shape, self.transcriber.device)
+            predicted_text = self.transcriber.transcribe(aud)
+            pred_texts.append(predicted_text['text'])
+        print("Time taken: ", time.time() - start)
+
+        start = time.time()
+        # Tokenize both predicted and reference text
+        predicted_tokens = self.tokenizer(pred_texts, return_tensors='pt', padding=True, truncation=True, max_length=512)
+        reference_tokens = self.tokenizer(text, return_tensors='pt', padding=True, truncation=True, max_length=512)
+        print("Time taken: ", time.time() - start)
+        print("predicted_tokens: ", predicted_tokens, predicted_tokens['input_ids'].device)
+        print("reference_tokens: ", reference_tokens)
+
+        # Move tokens to the specified device (CUDA if available)
+        predicted_tokens = {k: v.to(self.bert_model.device) for k, v in predicted_tokens.items()}
+        reference_tokens = {k: v.to(self.bert_model.device) for k, v in reference_tokens.items()}
+
+
+        start = time.time()
+        # Get BERT embeddings
+        with torch.no_grad():  # No need to calculate gradients here
+            predicted_embeddings = self.bert_model(**predicted_tokens).last_hidden_state
+            reference_embeddings = self.bert_model(**reference_tokens).last_hidden_state
+        print("Time taken: ", time.time() - start)
+
+        # Average the embeddings across the sequence length dimension
+        predicted_embeddings_avg = predicted_embeddings.mean(dim=1)
+        reference_embeddings_avg = reference_embeddings.mean(dim=1)
+        # Ensure the target tensor is on the same device and has the correct shape
+        target_tensor = torch.tensor([1]).to(predicted_embeddings.device).expand_as(predicted_embeddings_avg[:, 0])
+
+        loss = self.cosine_loss(predicted_embeddings_avg, reference_embeddings_avg, target_tensor)
+
+        return loss
 
     def mel_duration_loss(self, x, y):
         """

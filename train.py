@@ -168,6 +168,7 @@ def main(args, configs):
                 # Backward
                 total_loss = total_loss / grad_acc_step
                 total_loss.backward()
+                print("BETA GRAD", model.module.beta.grad)
 
 
                 if step % grad_acc_step == 0:
@@ -235,6 +236,11 @@ def main(args, configs):
                     model.train()
 
                 if step % save_step == 0:
+                    print("MODEL")
+                    print(model)
+                    for name, param in model.named_parameters():
+                        if 'beta' in name:
+                            print(name, param)
                     torch.save(
                         {
                             "model": model.module.state_dict(),

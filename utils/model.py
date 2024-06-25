@@ -84,21 +84,37 @@ def get_vocoder(config, device):
 
 def vocoder_infer(mels, vocoder, model_config, preprocess_config, lengths=None):
     name = model_config["vocoder"]["model"]
-    with torch.no_grad():
-        if name == "MelGAN":
-            wavs = vocoder.inverse(mels / np.log(10))
-        elif name == "HiFi-GAN":
-            wavs = vocoder(mels).squeeze(1)
 
-    wavs = (
-        wavs.cpu().numpy()
-        * preprocess_config["preprocessing"]["audio"]["max_wav_value"]
-    ).astype("int16")
-    wavs = [wav for wav in wavs]
+    if isinstance(mels, list):
+        wavs = []
+        for mel in mels:
 
-    for i in range(len(mels)):
-        if lengths is not None:
-            wavs[i] = wavs[i][: lengths[i]]
+            if name == "MelGAN":
+                wav = vocoder.inverse(mel / np.log(10))
+            elif name == "HiFi-GAN":
+                wav = vocoder(mel).squeeze(1).squeeze(0)
+            print("wav shape", wav.shape)
+            wav = wav * preprocess_config["preprocessing"]["audio"]["max_wav_value"]     
+            wavs.append(wav)
+
+        print("wavs shape", len(wavs))
+
+    else:
+        with torch.no_grad():
+            if name == "MelGAN":
+                wavs = vocoder.inverse(mels / np.log(10))
+            elif name == "HiFi-GAN":
+                wavs = vocoder(mels).squeeze(1)
+
+        wavs = (
+            wavs.cpu().numpy()
+            * preprocess_config["preprocessing"]["audio"]["max_wav_value"]
+        ).astype("int16")
+        wavs = [wav for wav in wavs]
+
+        for i in range(len(mels)):
+            if lengths is not None:
+                wavs[i] = wavs[i][: lengths[i]]
 
     return wavs
 

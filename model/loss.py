@@ -250,11 +250,15 @@ class WordLoss(nn.Module):
         """
         pred_texts = []
 
+
+        # TODO: Fix audio min and max.
         import time
         start = time.time()
         for aud in audio:
-            print(aud.dtype, aud.device, aud.shape, self.transcriber.device)
+            print(aud.dtype, aud.device, aud.shape, self.transcriber.device, aud.min(), aud.max())
+            start2 = time.time()
             predicted_text = self.transcriber.transcribe(aud)
+            print("Time taken: ", time.time() - start2)
             pred_texts.append(predicted_text['text'])
         print("Time taken: ", time.time() - start)
 

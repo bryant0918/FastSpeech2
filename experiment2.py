@@ -116,7 +116,7 @@ def test_whisper_STT():
     audio_path = "output/test2.wav"
     wav, _ = librosa.load(audio_path)
     wav = torch.from_numpy(wav).to('cpu')
-    print("wav shape", wav.shape, wav.dtype, wav.device)
+    print("wav shape", wav.shape, wav.dtype, wav.device, wav.min(), wav.max())
     
     start = time.time()
     text = model.transcribe(wav)

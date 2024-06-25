@@ -28,6 +28,7 @@ class FastSpeech2Loss(nn.Module):
         ]
         self.mse_loss = nn.MSELoss()
         self.mae_loss = nn.L1Loss()
+        self.pros_loss = ProsLoss()
 
     def forward(self, inputs, predictions, direction="to_tgt"):
         """
@@ -55,6 +56,7 @@ class FastSpeech2Loss(nn.Module):
             extracted_e,
             predicted_e,
         ) = predictions
+        device = mel_masks.device
         src_masks = ~src_masks
         mel_masks = ~mel_masks
         log_duration_targets = torch.log(duration_targets.float() + 1)
@@ -91,7 +93,7 @@ class FastSpeech2Loss(nn.Module):
         log_duration_targets = log_duration_targets.masked_select(src_masks)
                 
         # Calculate mel loss and prosody loss only in reverse direction
-        mel_loss, postnet_mel_loss, pros_loss = 0, 0, 0
+        mel_loss, postnet_mel_loss, pros_loss = torch.tensor([0]).to(device), torch.tensor([0]).to(device), torch.tensor([0]).to(device)
         if direction == "to_src":
             mel_targets = mel_targets[:, : mel_masks.shape[1], :]
             mel_targets.requires_grad = False
@@ -144,45 +146,33 @@ class FastSpeech2Loss(nn.Module):
             duration_loss,
             pros_loss,
         )
-    
-    def pros_loss(self, x, y, src_masks):
+
+
+class ProsLoss(nn.Module):
+    def __init__(self):
+        super(ProsLoss, self).__init__()
+
+    def forward(self, x, y, src_masks):
         """
         Calculate the negative log-likelihood of the phone sequence given the prosody features
         Input:
             x: (h_sd, h_si, prev_e)
             y: prosody embeddings e_k from prosody extractor
         Output:
-            -loglik: Negative log-likelihood of the phone sequence given the prosody features
+            Negative log-likelihood of the phone sequence given the prosody features
         """
         log_pi, mu, sigma = x
-
-        # Ensure sigma is not too small
         sigma = sigma + 1e-8
-
         batch_size = mu.shape[0]
-        # print("log_pi shape: ", log_pi.shape)   # log_pi shape:  torch.Size([2, seq, 8])
-        # print("mu shape: ", mu.shape)           # mu shape:  torch.Size([2, seq, 8, 256])
-        # print("sigma shape: ", sigma.shape)     # sigma shape:  torch.Size([2, seq, 8, 256])
-        # print("y shape (extracted): ", y.shape) # y shape:  torch.Size([2, seq, 256])
 
-        z_score = (y.unsqueeze(2) - mu) / sigma # torch.Size([2, seq, 8, 256])
-        # print("z_score shape: ", z_score.shape) # z_score shape:  torch.Size([2, seq, 8, 256])
-        normal_loglik = (
-                -0.5 * torch.einsum("bkih,bkih->bki", z_score, z_score)
-                - torch.sum(torch.log(sigma), dim=-1)
-        ) # torch.Size([2, seq, 256])
-
-        # print("normal_loglik shape: ", normal_loglik.shape) # normal_loglik shape:  torch.Size([2, seq, 256])
+        z_score = (y.unsqueeze(2) - mu) / sigma                 # torch.Size([2, seq, 8, 256])
+        normal_loglik = (-0.5 * torch.einsum("bkih,bkih->bki", z_score, z_score)
+                         - torch.sum(torch.log(sigma), dim=-1))  # torch.Size([2, seq, 256])
         loglik = torch.logsumexp(log_pi + normal_loglik, dim=-1) # torch.Size([2, seq]
-        # print("loglik shape: ", loglik.shape) # loglik shape:  torch.Size([2, seq]
-        # print(-loglik)
-        # print()
-        # print(-loglik.masked_select(src_masks))
         negloglik = -loglik.masked_select(src_masks)
-        
-        nlls = torch.sum(negloglik)  # Sum over all phones for total loss (L_pp)
-        # print("nlls:", nlls)
-        return nlls/batch_size  # divide by batch size for average batch loss
+        nlls = torch.sum(negloglik)
+
+        return nlls / batch_size
 
     def pros_loss2(self, x, y):
         """

@@ -177,7 +177,7 @@ scp preprocessed_data/LJSpeech/speaker_emb/LJSpeech.pkl_emb.pkl ditto@Emotiv:/ho
 ## PreTrain
 Pretrain is especially for the Prosody Extractor and Predictor, but will also update synthesizer weights (Encoder, Adapter, Decoder).
 ```
-python3 pretrain.py -p config/LJSpeech/preprocess.yaml -m config/LJSpeech/model.yaml -t config/LJSpeech/train.yaml
+python3 pretrain.py -p config/LJSpeech/preprocess.yaml -m config/LJSpeech/model.yaml -t config/LJSpeech/pretrain.yaml
 ```
 
 ## Train Synthesizer

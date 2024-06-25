@@ -151,9 +151,12 @@ def main(args, configs):
                                    speaker_embs=batch[13], alignments=alignments, p_targets=realigned_p, 
                                    e_targets=realigned_e, d_targets=realigned_d_src, d_src=d_src)
 
+                
+
                 # # Calculate loss for Tgt to Src
                 loss_inputs = (batch[7],) + (realigned_p, realigned_e, realigned_d_src)
-                losses_tgt_to_src = Loss(loss_inputs, output_src, "to_src")
+                prediction_inputs = output_src[:10] + (output_tgt[10],) + (output_src[11],)
+                losses_tgt_to_src = Loss(loss_inputs, prediction_inputs, "to_src")
                 total_loss_tgt_to_src = losses_tgt_to_src[0]
                 print("total_loss_tgt_to_src: ", total_loss_tgt_to_src)
 
@@ -166,6 +169,7 @@ def main(args, configs):
                 total_loss = total_loss / grad_acc_step
                 total_loss.backward()
 
+
                 if step % grad_acc_step == 0:
                     # Clipping gradients to avoid gradient explosion
                     nn.utils.clip_grad_norm_(model.parameters(), grad_clip_thresh)
@@ -175,9 +179,9 @@ def main(args, configs):
                     optimizer.zero_grad()
 
                 if step % log_step == 0:
-                    losses = [l.item() for l in losses]
+                    losses = [(l1.item() + l2.item())/2 for l1, l2 in zip(losses_src_to_tgt, losses_tgt_to_src)]
                     message1 = "Step {}/{}, ".format(step, total_step)
-                    message2 = "Total Loss: {:.4f}, Mel Loss: {:.4f}, Mel PostNet Loss: {:.4f}, Pitch Loss: {:.4f}, Energy Loss: {:.4f}, Duration Loss: {:.4f}".format(
+                    message2 = "Total Loss: {:.4f}, Mel Loss: {:.4f}, Mel PostNet Loss: {:.4f}, Pitch Loss: {:.4f}, Energy Loss: {:.4f}, Duration Loss: {:.4f}, Prosody Loss: {:.4f}".format(
                         *losses
                     )
 
@@ -189,9 +193,13 @@ def main(args, configs):
                     log(train_logger, step, losses=losses)
 
                 if step % synth_step == 0:
+                    # Want to see all 3 mels
+                    targets = (batch[0],) +(batch[7],) + batch[15:]
+                    predictions = (output_tgt[1],) + output_tgt[8:10]
+
                     fig, wav_reconstruction, wav_prediction, tag = synth_one_sample(
-                        batch,
-                        output,
+                        targets,
+                        predictions,
                         vocoder,
                         model_config,
                         preprocess_config,

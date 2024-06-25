@@ -58,10 +58,7 @@ class FastSpeech2Pros(nn.Module):
             d_src = d_targets
             pretraining = True
 
-        # Get masks
-        batch_size, phone_seq_length = texts.size(0), texts.size(1)
-
-
+        batch_size, src_seq_length = d_src.size(0), d_src.size(1)
         tgt_masks = get_mask_from_lengths(src_lens, max_src_len)
         # print("Tgt masks shape: ", tgt_masks.shape)
         
@@ -98,7 +95,8 @@ class FastSpeech2Pros(nn.Module):
         # print("e_k_src shape: ", len(e_k_src), len(e_k_src[0]), e_k_src[0][0].shape)  # 2 58 torch.Size([80, 12, 256])
         # print("d_src[0][0]", d_src[0][0], torch.isnan(d_src).any())
 
-        agg_extracted_prosody = torch.zeros(batch_size, phone_seq_length, 256).to(device)
+        # For calculating Lpp loss:
+        agg_extracted_prosody = torch.zeros(batch_size, src_seq_length, 256).to(device)
         for b in range(batch_size):
             for i in range(len(e_k_src[b])):
                 if e_k_src[b][i].shape[0] == 0 or e_k_src[b][i].shape[1] == 0:

@@ -10,12 +10,14 @@ from model import FastSpeech2, ScheduledOptim, FastSpeech2Pros, ProsLearner
 
 def get_model(args, configs, device, train=False):
     (preprocess_config, model_config, train_config) = configs
+    
+    pretrain = train_config['pretrain']
 
     if "synthesizer" in model_config:
         if model_config["synthesizer"]["model"] == "FastSpeech2":
             model = FastSpeech2(preprocess_config, model_config).to(device)
         elif model_config["synthesizer"]["model"] == "FastSpeech2Pros":
-            model = FastSpeech2Pros(preprocess_config, model_config).to(device)
+            model = FastSpeech2Pros(preprocess_config, model_config, pretrain).to(device)
     elif "pros_learner" in model_config:
         model = ProsLearner(preprocess_config, model_config).to(device)
     else:

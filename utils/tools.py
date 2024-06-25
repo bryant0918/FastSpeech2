@@ -112,7 +112,6 @@ def log(
         logger.add_figure(tag, fig)
 
     if audio is not None:
-        print("Audio type: ", type(audio))
         logger.add_audio(
             tag,
             audio / max(abs(audio)),
@@ -140,9 +139,7 @@ def expand(values, durations):
     return np.array(out)
 
 
-def synth_one_sample(targets, predictions, vocoder, model_config, preprocess_config):
-    # TODO: Change train.py to pass in correct targets and predictions
-    
+def synth_one_sample(targets, predictions, vocoder, model_config, preprocess_config):    
     (   basename, 
         mel_target, 
         pitch_target, 

@@ -1,7 +1,7 @@
 path:
-  ckpt_path: "./output/ckpt/LJSpeech/train"
-  log_path: "./output/log/LJSpeech/train"
-  result_path: "./output/result/LJSpeech/train"
+  ckpt_path: "./output/ckpt/LJSpeech/pretrain"
+  log_path: "./output/log/LJSpeech/pretrain"
+  result_path: "./output/result/LJSpeech/pretrain"
 optimizer:
   batch_size: 2
   betas: [0.9, 0.98]
@@ -17,5 +17,5 @@ step:
   log_step: 2     # 100
   synth_step: 3  # 1000
   val_step: 4    # 1000
-  save_step: 3  # 100000
-pretrain: False
+  save_step: 4  # 100000
+pretrain: True

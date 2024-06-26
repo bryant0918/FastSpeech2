@@ -81,6 +81,16 @@ class VarianceAdaptor(nn.Module):
             n_bins, model_config["transformer"]["encoder_hidden"]
         )
 
+        self.pitch_downsize = nn.Linear(
+            model_config["transformer"]["encoder_hidden"]*2,
+            model_config["transformer"]["encoder_hidden"],
+        )
+        self.energy_downsize = nn.Linear(
+            model_config["transformer"]["encoder_hidden"]*2,
+            model_config["transformer"]["encoder_hidden"],
+        )
+        
+
     def get_pitch_embedding(self, x, target, mask, control):
         prediction = self.pitch_predictor(x, mask)
         if target is not None:
@@ -113,13 +123,15 @@ class VarianceAdaptor(nn.Module):
             pitch_prediction, pitch_embedding = self.get_pitch_embedding(
                 x, pitch_target, src_mask, p_control
             )
-            x = x + pitch_embedding
+            x = self.pitch_downsize(torch.cat((x, pitch_embedding), dim=-1))
+            # x = x + pitch_embedding
         
         if self.energy_feature_level == "phoneme_level":
             energy_prediction, energy_embedding = self.get_energy_embedding(
                 x, energy_target, src_mask, e_control
             )
-            x = x + energy_embedding
+            x = self.energy_downsize(torch.cat((x, energy_embedding), dim=-1))
+            # x = x + energy_embedding
 
         if duration_target is not None:
             x, mel_len = self.length_regulator(x, duration_target, max_len)

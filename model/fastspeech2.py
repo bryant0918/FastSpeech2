@@ -29,6 +29,10 @@ class FastSpeech2Pros(nn.Module):
         self.encoder = Encoder(model_config)
         self.prosody_predictor = ProsodyPredictor(model_config)
         self.prosody_extractor = ProsodyExtractor(model_config)
+        self.h_sd_downsize = nn.Linear(model_config["prosody_predictor"]["sd_dim_in"],
+                                        model_config["prosody_extractor"]["dim_out"])
+        self.h_sd_downsize2 = nn.Linear(model_config["prosody_predictor"]["sd_dim_in"],
+                                        model_config["prosody_extractor"]["dim_out"])
         self.variance_adaptor = VarianceAdaptor(preprocess_config, model_config)
         self.decoder = Decoder(model_config)
         self.mel_linear = nn.Linear(
@@ -73,8 +77,11 @@ class FastSpeech2Pros(nn.Module):
         output = self.encoder(texts, tgt_masks)  # torch.Size([Batch, seq_len, 256])
 
         speaker_embs = speaker_embs.unsqueeze(1).expand(-1, output.size()[1], -1)
-        
-        h_sd = output + speaker_embs  # torch.Size([Batch, tgt_seq_len, 256])
+        print("Speaker embeddings shape: ", speaker_embs.shape, torch.isnan(speaker_embs).any())
+        print("Output shape: ", output.shape, torch.isnan(output).any())
+
+        # h_sd = output + speaker_embs  # torch.Size([Batch, tgt_seq_len, 256])
+        h_sd = torch.cat((output, speaker_embs), dim=-1)
         # print("h_sd shape: ", h_sd.shape, torch.isnan(h_sd).any())
 
         h_si = output
@@ -88,7 +95,8 @@ class FastSpeech2Pros(nn.Module):
         enhanced_mels = self.prosody_extractor.add_lang_emb(mels, langs)
         
         e_src = self.prosody_extractor(enhanced_mels)   # e is [batch_size, melspec H, melspec W, 128]
-        # print("e_src shape: ", e_src.shape, torch.isnan(e_src).any())
+        print("e_src shape: ", e_src.shape, torch.isnan(e_src).any())
+        print("h_sd shape: ", h_sd.shape, torch.isnan(h_sd).any())
         
         # Split phone pros embeddings by phone duration
         # [batch_size (list), phoneme_sequence_length (list), melspec H (tensor), melspec W (tensor), 128 (tensor)]        
@@ -105,8 +113,13 @@ class FastSpeech2Pros(nn.Module):
                 else:
                     agg_extracted_prosody[b,i,:] = torch.mean(e_k_src[b][i], dim=(0, 1))
 
-        # print("aggregated_prosody shape: ", agg_extracted_prosody.shape, torch.isnan(agg_extracted_prosody).any())
+        print("aggregated_prosody shape: ", agg_extracted_prosody.shape, torch.isnan(agg_extracted_prosody).any())
         agg_extracted_prosody = agg_extracted_prosody.detach()
+
+        h_sd = self.h_sd_downsize(h_sd) # 512 to 256
+        if pretraining:
+            h_sd = torch.cat((h_sd, agg_extracted_prosody), dim=-1) # torch.Size([Batch, tgt_seq_len, 512]
+
 
         # TODO: Allow for new predicted_prosodies_tgt shape
         tgt_samp = self.prosody_predictor.sample2(e_tgt) # torch.Size([2, 88, 256])
@@ -119,17 +132,20 @@ class FastSpeech2Pros(nn.Module):
             print("adjusted_e_tgt shape: ", adjusted_e_tgt.shape)
 
             # Concat
-            h_sd = h_sd + adjusted_e_tgt
+            h_sd = torch.cat((h_sd, adjusted_e_tgt), dim=-1)  # torch.Size([Batch, tgt_seq_len, 512]
+            # h_sd = h_sd + adjusted_e_tgt
             # print("Output shape after prosody: ", output.shape, torch.isnan(output).any())  # torch.Size([Batch, tgt_seq_len, 256])
 
         # Now double check that durations and pitch etc are same as seq_length
         # print("Input mel_masks shape: ", mel_masks.shape)
         # print("Mel masks", mel_masks)
 
+        h_sd = self.h_sd_downsize2(h_sd) # 512 to 256
         (output, p_predictions, e_predictions, log_d_predictions, d_rounded, mel_lens, mel_masks,) = \
             self.variance_adaptor(h_sd, tgt_masks, mel_masks, max_mel_len, p_targets, e_targets, d_targets, p_control,
                                   e_control, d_control, )
 
+        print("output shape: ", output.shape)
         # print("d_rounded shape: ", d_rounded.shape)
         # print("mel_lens shape: ", mel_lens)
         # print("predicted mel_masks shape: ", mel_masks.shape)

@@ -26,7 +26,7 @@ prosody_extractor:
   hidden_dim: 8
 
 prosody_predictor:
-  sd_dim_in: 256   # 512
+  sd_dim_in: 512
   si_dim_in: 256
   dim_out: 256
   n_components: 8

@@ -104,20 +104,17 @@ def main(args, configs):
                 print("\nFORWARD PASS: SRC to SRC")
                 output = model(*(input))
 
+                # For calculating Word Loss
                 if step % word_step == 0:
-
                     mels = [output[1][i, :output[9][i]].transpose(0,1) for i in range(batch_size)]
-
                     wav_predictions = vocoder_infer(
                         mels,
                         vocoder,
                         model_config,
                         preprocess_config,
                     )
-                    print("Raw text: ", batch[1])
                     loss_input = (batch[1],) + (batch[6],) + batch[10:]
                     loss_predictions = output + (wav_predictions,)
-                    
                 else:
                     loss_input = (None, batch[6]) + batch[10:]
                     loss_predictions = output + (None,)
@@ -143,7 +140,7 @@ def main(args, configs):
                 if step % log_step == 0:
                     losses = [l.item() for l in losses]
                     message1 = "Step {}/{}, ".format(step, total_step)
-                    message2 = "Total Loss: {:.4f}, Mel Loss: {:.4f}, Mel PostNet Loss: {:.4f}, Pitch Loss: {:.4f}, Energy Loss: {:.4f}, Duration Loss: {:.4f}, Prosody Loss: {:.4f}".format(
+                    message2 = "Total Loss: {:.4f}, Mel Loss: {:.4f}, Mel PostNet Loss: {:.4f}, Pitch Loss: {:.4f}, Energy Loss: {:.4f}, Duration Loss: {:.4f}, Prosody Loss: {:.4f}, Word Loss: {:.4f}".format(
                         *losses
                     )
 

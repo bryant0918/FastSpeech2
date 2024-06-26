@@ -88,16 +88,12 @@ def vocoder_infer(mels, vocoder, model_config, preprocess_config, lengths=None):
     if isinstance(mels, list):
         wavs = []
         for mel in mels:
-
             if name == "MelGAN":
                 wav = vocoder.inverse(mel / np.log(10))
             elif name == "HiFi-GAN":
                 wav = vocoder(mel).squeeze(1).squeeze(0)
-            print("wav shape", wav.shape)
-            wav = wav * preprocess_config["preprocessing"]["audio"]["max_wav_value"]     
+            # wav = wav * preprocess_config["preprocessing"]["audio"]["max_wav_value"]     
             wavs.append(wav)
-
-        print("wavs shape", len(wavs))
 
     else:
         with torch.no_grad():

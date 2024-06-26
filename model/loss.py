@@ -250,37 +250,22 @@ class WordLoss(nn.Module):
         """
         pred_texts = []
 
-
-        # TODO: Fix audio min and max.
-        import time
-        start = time.time()
         for aud in audio:
-            print(aud.dtype, aud.device, aud.shape, self.transcriber.device, aud.min(), aud.max())
-            start2 = time.time()
             predicted_text = self.transcriber.transcribe(aud)
-            print("Time taken: ", time.time() - start2)
             pred_texts.append(predicted_text['text'])
-        print("Time taken: ", time.time() - start)
 
-        start = time.time()
         # Tokenize both predicted and reference text
         predicted_tokens = self.tokenizer(pred_texts, return_tensors='pt', padding=True, truncation=True, max_length=512)
         reference_tokens = self.tokenizer(text, return_tensors='pt', padding=True, truncation=True, max_length=512)
-        print("Time taken: ", time.time() - start)
-        print("predicted_tokens: ", predicted_tokens, predicted_tokens['input_ids'].device)
-        print("reference_tokens: ", reference_tokens)
 
         # Move tokens to the specified device (CUDA if available)
         predicted_tokens = {k: v.to(self.bert_model.device) for k, v in predicted_tokens.items()}
         reference_tokens = {k: v.to(self.bert_model.device) for k, v in reference_tokens.items()}
 
-
-        start = time.time()
         # Get BERT embeddings
         with torch.no_grad():  # No need to calculate gradients here
             predicted_embeddings = self.bert_model(**predicted_tokens).last_hidden_state
             reference_embeddings = self.bert_model(**reference_tokens).last_hidden_state
-        print("Time taken: ", time.time() - start)
 
         # Average the embeddings across the sequence length dimension
         predicted_embeddings_avg = predicted_embeddings.mean(dim=1)

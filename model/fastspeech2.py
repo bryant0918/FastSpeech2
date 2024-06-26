@@ -93,8 +93,8 @@ class FastSpeech2Pros(nn.Module):
         # Split phone pros embeddings by phone duration
         # [batch_size (list), phoneme_sequence_length (list), melspec H (tensor), melspec W (tensor), 128 (tensor)]        
         e_k_src = self.prosody_extractor.split_phones(e_src, d_src)  
-        # print("e_k_src shape: ", len(e_k_src), len(e_k_src[0]), e_k_src[0][0].shape)  # 2 58 torch.Size([80, 12, 256])
-        # print("d_src[0][0]", d_src[0][0], torch.isnan(d_src).any())
+        print("e_k_src shape: ", len(e_k_src), len(e_k_src[0]), e_k_src[0][0].shape)  # 2 58 torch.Size([80, 12, 256])
+        print("d_src[0][0]", d_src[0][0], torch.isnan(d_src).any())
 
         # For calculating Lpp loss:
         agg_extracted_prosody = torch.zeros(batch_size, src_seq_length, 256).to(device)
@@ -116,7 +116,7 @@ class FastSpeech2Pros(nn.Module):
             # print("alignments shape: ", alignments.shape)  # TODO: unpad alignments for realigner otherwise everything mapped to 0.
             adjusted_e_tgt = self.prosody_predictor.prosody_realigner(alignments, tgt_samp, e_k_src, self.beta)
             # print("alignments nan", torch.isnan(alignments).any())
-            # print("adjusted_e_tgt nan: ", torch.isnan(adjusted_e_tgt).any())
+            print("adjusted_e_tgt shape: ", adjusted_e_tgt.shape)
 
             # Concat
             h_sd = h_sd + adjusted_e_tgt

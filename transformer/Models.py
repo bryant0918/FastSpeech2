@@ -419,6 +419,8 @@ class ProsodyPredictor(nn.Module):
     def prosody_realigner(self, phone_alignments, tgt_samp, e_k_src, beta=.1):
         """
         Realigns and shifts tgt_samp distribution by e_k_src
+        Inputs:
+            phone_alignments: Maps tgt (text) to src (audio)
         """
         beta = torch.sigmoid(beta)
         # print("phone_alignments", phone_alignments.shape)
@@ -452,7 +454,8 @@ class ProsodyPredictor(nn.Module):
 
                     # Reshape B to be broadcastable to A's shape
                     try:
-                        B_broadcasted = tgt_samp[b][j].unsqueeze(0).unsqueeze(0)
+                        # Must be j+1 instead of j to account for lang_token at beginning of sequence.
+                        B_broadcasted = tgt_samp[b][j+1].unsqueeze(0).unsqueeze(0)
                     except:
                         print("tgt_samp[b].shape", tgt_samp[b].shape, b,j, len(phone_alignments[b]))
                         print(phone_alignments[b][j])

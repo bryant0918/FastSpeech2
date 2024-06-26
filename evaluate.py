@@ -53,7 +53,7 @@ def evaluate(model, step, configs, logger=None, vocoder=None, pretrain=False):
             with torch.no_grad():
                 # Forward
                 if pretrain:
-                    input = batch[3:10] + (None,) + batch[10:]
+                    input = batch[3:11] + (None,) + batch[11:]
                 else:
                     input = batch[10:13] + batch[7:10] + batch[13:15] + (realigned_p, realigned_e, realigned_d, batch[-1])
                 output = model(*(input))
@@ -67,10 +67,10 @@ def evaluate(model, step, configs, logger=None, vocoder=None, pretrain=False):
                         model_config,
                         preprocess_config,
                     )
-                    loss_input = (batch[1],) + (batch[6],) + batch[10:]
+                    loss_input = (batch[1],) + (batch[7],) + batch[11:]
                     loss_predictions = output + (wav_predictions,)
                 else:
-                    loss_input = (None, batch[6]) + batch[10:]
+                    loss_input = (None, batch[7]) + batch[11:]
                     loss_predictions = output + (None,)
                 
                 # Cal Loss
@@ -95,7 +95,7 @@ def evaluate(model, step, configs, logger=None, vocoder=None, pretrain=False):
 
     if logger is not None:
         if pretrain:
-            targets = (batch[0],) +(batch[6],) + batch[10:]
+            targets = (batch[0],) +(batch[7],) + batch[11:]
             predictions = (output[1],) + output[8:10]
         else:
             raise NotImplementedError

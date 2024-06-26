@@ -130,9 +130,20 @@ def test_whisper_STT():
     text = model.transcribe(wav)
     print("Time taken: ", time.time() - start)
 
+def new_train_val_file():
+    filepaths = ["preprocessed_data/LJSpeech/train.txt",
+                    "preprocessed_data/LJSpeech/val.txt"]
+    for filepath in filepaths:
+        with open(filepath, "r") as f:
+            lines = f.readlines()
+
+        # Open the file again (or a new file) to write the modified contents
+        with open(filepath, 'w') as file:
+            for line in lines:
+                # Prepend "en|es|" to each line
+                file.write(f'en|es|{line}')
 
 if __name__ == "__main__":
-    # test_inv_melspec()
-    test_whisper_STT()
+    new_train_val_file()
 
     pass

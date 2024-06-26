@@ -47,11 +47,13 @@ def to_device(data, device):
                 pitches, energies, durations)
 
     # For Pros Pretraining
-    if len(data) == 13:
-        (ids, raw_texts, speakers, texts, src_lens, max_src_len, mels, mel_lens, max_mel_len, speaker_embeddings,
+    if len(data) == 14:
+        (ids, raw_texts, speakers, text_langs, texts, src_lens, max_src_len, mels, mel_lens, max_mel_len, speaker_embeddings,
         pitches, energies, durations) = data
 
         speakers = torch.from_numpy(speakers).long().to(device)
+        text_langs = torch.from_numpy(text_langs).long().to(device)
+
         texts = torch.from_numpy(texts).long().to(device)
         src_lens = torch.from_numpy(src_lens).to(device)
         mels = torch.from_numpy(mels).float().to(device)
@@ -63,7 +65,7 @@ def to_device(data, device):
         energies = torch.from_numpy(energies).to(device)
         durations = torch.from_numpy(durations).long().to(device)
 
-        return (ids, raw_texts, speakers, texts, src_lens, max_src_len, mels, mel_lens, max_mel_len, speaker_embeddings,
+        return (ids, raw_texts, speakers, text_langs, texts, src_lens, max_src_len, mels, mel_lens, max_mel_len, speaker_embeddings,
                 pitches, energies, durations)
 
     # For Pros Synth
@@ -120,7 +122,6 @@ def log(
 
 
 def get_mask_from_lengths(lengths, max_len=None):
-    # print("Lengths,", lengths)
     batch_size = lengths.shape[0]
     if max_len is None:
         max_len = torch.max(lengths).item()

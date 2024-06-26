@@ -88,17 +88,13 @@ def main(args, configs):
         for batches in loader:
             for batch in batches:
                 batch = to_device(batch, device)
-                # batch = (ids, raw_texts, speakers, texts, src_lens, max_src_len, mels, mel_lens, max_mel_len, speaker_embeddings,
-                #           pitches, energies, durations)
+                # batch = (ids, raw_texts, speakers, langs, texts, src_lens, max_src_len, mels, mel_lens, max_mel_len, 
+                #           speaker_embeddings, pitches, energies, durations)
 
                 if step == 5:
                     raise NotImplementedError
-
-                # Forward
-                if batch is None:
-                    raise ValueError("Batch is None")
                 
-                input = batch[3:10] + (None,) + batch[10:]
+                input = batch[3:11] + (None,) + batch[11:]
 
                 # Forward pass: Src to Src
                 print("\nFORWARD PASS: SRC to SRC")
@@ -113,10 +109,10 @@ def main(args, configs):
                         model_config,
                         preprocess_config,
                     )
-                    loss_input = (batch[1],) + (batch[6],) + batch[10:]
+                    loss_input = (batch[1],) + (batch[7],) + batch[11:]
                     loss_predictions = output + (wav_predictions,)
                 else:
-                    loss_input = (None, batch[6]) + batch[10:]
+                    loss_input = (None, batch[7]) + batch[11:]
                     loss_predictions = output + (None,)
                 
                 # Calculate loss for Src to Tgt
@@ -152,7 +148,7 @@ def main(args, configs):
                     log(train_logger, step, losses=losses)
 
                 if step % synth_step == 0:
-                    targets = (batch[0],) +(batch[6],) + batch[10:]
+                    targets = (batch[0],) +(batch[7],) + batch[11:]
                     predictions = (output[1],) + output[8:10]
                     fig, wav_reconstruction, wav_prediction, tag = synth_one_sample(
                         targets,

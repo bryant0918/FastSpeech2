@@ -1,7 +1,7 @@
 """ from https://github.com/keithito/tacotron """
 import re
 from text import cleaners
-from text.symbols import symbols
+from text.symbols import symbols, _langs
 
 # Punctuations to remove from spanish text
 _es_punctuations = "¡!\"#$%&'()*+,-./:;<=>¿?@[\]^_`{|}~"
@@ -9,6 +9,9 @@ _es_punctuations = "¡!\"#$%&'()*+,-./:;<=>¿?@[\]^_`{|}~"
 # Mappings from symbol to numeric ID and vice versa:
 _symbol_to_id = {s: i for i, s in enumerate(symbols)}
 _id_to_symbol = {i: s for i, s in enumerate(symbols)}
+
+# Only for Extractor side (Text side uses _lang id in symbols)
+lang_to_id = {l: i for i, l in enumerate(_langs)}
 
 _vocab_size = len(symbols)
 
@@ -42,9 +45,9 @@ def text_to_sequence(text, cleaner_names, language):
         # print("In text_to_sequence: ", text, len(text), "group1", m.group(1), "group2", m.group(2), "group3", m.group(3))
         sequence += _symbols_to_sequence(_clean_text(m.group(1), cleaner_names))
         if language == 'en':
-            sequence += _arpabet_to_sequence(m.group(2))
+            sequence += _arpabet_to_sequence(m.group(2), language)
         elif language == 'es':
-            sequence += _ipa_to_sequence(m.group(2))
+            sequence += _ipa_to_sequence(m.group(2), language)
         text = m.group(3)
 
     return sequence
@@ -80,12 +83,12 @@ def _symbols_to_sequence(symbols):
     return [_symbol_to_id[s] for s in symbols if _should_keep_symbol(s)]
 
 
-def _arpabet_to_sequence(text):
-    return _symbols_to_sequence(["@" + s for s in text.split()])
+def _arpabet_to_sequence(text, lang="en"):
+    return _symbols_to_sequence([lang]+["@" + s for s in text.split()])
 
 
-def _ipa_to_sequence(text):
-    return _symbols_to_sequence(["$" + s for s in text.split()])
+def _ipa_to_sequence(text, lang="es"):
+    return _symbols_to_sequence([lang]+["$" + s for s in text.split()])
 
 
 def _should_keep_symbol(s):

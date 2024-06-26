@@ -124,6 +124,7 @@ pitch/
 speaker_emb/
 *.zip
 *.tar.bz2
+*copy.txt
 
 # logs
 nohup.out

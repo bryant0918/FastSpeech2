@@ -18,6 +18,9 @@ _arpabet = ["@" + s for s in cmudict.valid_symbols]
 _pinyin = ["@" + s for s in pinyin.valid_symbols]
 _ipa = ["$" + s for s in ipadict.db.keys()]
 
+# Languages Supported (May change langs not already trained on for finetuning)
+_langs = ["en", "es", "zh", "fr", "de", "pl", "ru", "pt", "ja", "it"]
+
 # Export all symbols:
 symbols = (
     [_pad]
@@ -27,5 +30,6 @@ symbols = (
     + _arpabet
     + _pinyin
     + _ipa
+    + _langs
     + _silences
 )

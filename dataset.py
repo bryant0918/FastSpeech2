@@ -7,7 +7,7 @@ import numpy as np
 import torch
 from torch.utils.data import Dataset
 
-from text import text_to_sequence
+from text import text_to_sequence, lang_to_id
 from utils.tools import pad_1D, pad_2D, pad_inhomogeneous_2D, flip_mapping
 
 
@@ -18,7 +18,7 @@ class TrainDataset(Dataset):
         self.cleaners = preprocess_config["preprocessing"]["text"]["text_cleaners"]
         self.batch_size = train_config["optimizer"]["batch_size"]
 
-        self.basename, self.speaker, self.text, self.raw_text, self.translation, self.raw_translation = \
+        self.src_lang, self.tgt_lang, self.basename, self.speaker, self.text, self.raw_text, self.translation, self.raw_translation = \
             self.process_meta(filename)
 
         with open(os.path.join(self.preprocessed_path, "speakers.json")) as f:
@@ -101,11 +101,13 @@ class TrainDataset(Dataset):
         return sample
 
     def process_meta(self, filename):
-        name, speaker, text, raw_text, translation, raw_translation = [], [], [], [], [], []
+        src_lang, tgt_lang, name, speaker, text, raw_text, translation, raw_translation = [], [], [], [], [], [], [], []
         with open(os.path.join(self.preprocessed_path, filename), "r", encoding="utf-8") as f:
 
             for line in f.readlines():
-                n, s, t, r, tr, rtr = line.strip("\n").split("|")
+                sl, tl, n, s, t, r, tr, rtr = line.strip("\n").split("|")
+                src_lang.append(sl)
+                tgt_lang.append(tl)
                 name.append(n)
                 speaker.append(s)
                 text.append(t)
@@ -113,7 +115,7 @@ class TrainDataset(Dataset):
                 translation.append(tr)
                 raw_translation.append(rtr)
 
-        return name, speaker, text, raw_text, translation, raw_translation
+        return src_lang, tgt_lang, name, speaker, text, raw_text, translation, raw_translation
 
     def reprocess(self, data, idxs):
         ids = [data[idx]["id"] for idx in idxs]
@@ -184,7 +186,7 @@ class PreTrainDataset(Dataset):
         self.cleaners = preprocess_config["preprocessing"]["text"]["text_cleaners"]
         self.batch_size = train_config["optimizer"]["batch_size"]
 
-        self.basename, self.speaker, self.text, self.raw_text, _, _ = self.process_meta(
+        self.src_lang, _, self.basename, self.speaker, self.text, self.raw_text, _, _ = self.process_meta(
             filename
         )
         with open(os.path.join(self.preprocessed_path, "speakers.json")) as f:
@@ -200,9 +202,9 @@ class PreTrainDataset(Dataset):
         speaker = self.speaker[idx]
         speaker_id = self.speaker_map[speaker]
         raw_text = self.raw_text[idx]
-
-        # TODO: Don't hardcode language code here.
-        phone = np.array(text_to_sequence(self.text[idx], self.cleaners, 'en'))
+        src_lang = lang_to_id[self.src_lang[idx]]
+        
+        phone = np.array(text_to_sequence(self.text[idx], self.cleaners, self.src_lang[idx]))
         
         mel_path = os.path.join(
             self.preprocessed_path,
@@ -215,20 +217,22 @@ class PreTrainDataset(Dataset):
             "pitch",
             "{}-pitch-{}.npy".format(speaker, basename),
         )
-        pitch = np.load(pitch_path)
+        # Prepend zero for language token
+        pitch = np.insert(np.load(pitch_path), 0, 0)
         energy_path = os.path.join(
             self.preprocessed_path,
             "energy",
             "{}-energy-{}.npy".format(speaker, basename),
         )
-        energy = np.load(energy_path)
+        # Prepend zero for language token
+        energy = np.insert(np.load(energy_path), 0, 0)
         duration_path = os.path.join(
             self.preprocessed_path,
             "duration",
             "{}-duration-{}.npy".format(speaker, basename),
         )
-        duration = np.load(duration_path)
-
+        # Prepend zero for language token
+        duration = np.insert(np.load(duration_path), 0, 0)
         # Get Speaker Embedding
         speaker_emb_path = os.path.join(self.preprocessed_path, "speaker_emb", "{}.pkl_emb.pkl".format(speaker))        
         with open(speaker_emb_path, 'rb') as f:
@@ -238,6 +242,7 @@ class PreTrainDataset(Dataset):
         sample = {
             "id": basename,
             "speaker": speaker_id,
+            "text_lang": src_lang,
             "text": phone,
             "raw_text": raw_text,
             "mel": mel,
@@ -250,11 +255,13 @@ class PreTrainDataset(Dataset):
         return sample
 
     def process_meta(self, filename):
-        name, speaker, text, raw_text, translation, raw_translation = [], [], [], [], [], []
+        src_lang, tgt_lang, name, speaker, text, raw_text, translation, raw_translation = [], [], [], [], [], [], [], []
         with open(os.path.join(self.preprocessed_path, filename), "r", encoding="utf-8") as f:
 
             for line in f.readlines():
-                n, s, t, r, tr, rtr = line.strip("\n").split("|")
+                sl, tl, n, s, t, r, tr, rtr = line.strip("\n").split("|")
+                src_lang.append(sl)
+                tgt_lang.append(tl)
                 name.append(n)
                 speaker.append(s)
                 text.append(t)
@@ -262,12 +269,13 @@ class PreTrainDataset(Dataset):
                 translation.append(tr)
                 raw_translation.append(rtr)
 
-        return name, speaker, text, raw_text, translation, raw_translation
+        return src_lang, tgt_lang, name, speaker, text, raw_text, translation, raw_translation
 
 
     def reprocess(self, data, idxs):
         ids = [data[idx]["id"] for idx in idxs]
         speakers = [data[idx]["speaker"] for idx in idxs]
+        text_langs = [data[idx]["text_lang"] for idx in idxs]
         texts = [data[idx]["text"] for idx in idxs]
         raw_texts = [data[idx]["raw_text"] for idx in idxs]
         mels = [data[idx]["mel"] for idx in idxs]
@@ -280,6 +288,7 @@ class PreTrainDataset(Dataset):
         mel_lens = np.array([mel.shape[0] for mel in mels])
 
         speakers = np.array(speakers)
+        text_langs = np.array(text_langs)
         texts = pad_1D(texts)
         mels = pad_2D(mels)
         pitches = pad_1D(pitches)
@@ -290,6 +299,7 @@ class PreTrainDataset(Dataset):
             ids,
             raw_texts,
             speakers,
+            text_langs,
             texts,
             text_lens,
             max(text_lens),

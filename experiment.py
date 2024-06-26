@@ -3,7 +3,7 @@ import torch
 import yaml
 import numpy as np
 from synthesize import preprocess_english
-from transformer.Models import BaseProsodyPredictor, ProsodyPredictor, ProsodyExtractor
+from transformer.Models import ProsodyPredictor, ProsodyExtractor
 import pickle
 from audio.tools import get_mel_from_wav
 import audio as Audio
@@ -403,7 +403,7 @@ if phone_realignment:
     print()
 
 """Test TextGrid"""
-test_textgrid = True
+test_textgrid = False
 if test_textgrid:
     import tgt
     from itertools import chain
@@ -553,7 +553,7 @@ if test_word_alignment:
     print(len(phone_alignments))
 
 """Test Sentence Aligner"""
-test_aligner = True
+test_aligner = False
 if test_aligner:
     from simalign import SentenceAligner
     # making an instance of our model.
@@ -627,10 +627,10 @@ if test_embedding:
     print("Speaker Embeddings shape: ", speaker_embs.size(), "Time: ", time.time() - start)
 
 """Test Prosody Extractor"""
-test_extractor = False
+test_extractor = True
 if test_extractor:
     # Create the model
-    model = ProsodyExtractor(1, 128, 8).to(device)
+    model = ProsodyExtractor(model_config).to(device)
     # Print the model summary
     print(model)
     config = preprocess_config
@@ -666,7 +666,45 @@ if test_extractor:
     melspec = melspec.unsqueeze(0).unsqueeze(0)   # To get dimension [1,1,W:X, H:80]
     print("Mel shape: ", melspec.size())
 
-    e = model(melspec)
+    from torch import nn
+    class LanguageEmbedding(nn.Module):
+        def __init__(self, embedding_dim=80):
+            super(LanguageEmbedding, self).__init__()
+            # Assuming index 0 for 'en' and 1 for 'es'
+            self.embedding = nn.Embedding(num_embeddings=2, embedding_dim=80)
+
+        def forward(self, seq_length, language_code):
+            # Get the embeddings for the specified language codes
+            # language_codes shape: [batch_size]
+            language_embeddings = self.embedding(language_codes)
+
+            # language_embeddings shape: [batch_size, 80]
+            # We need to add an extra dimension to match the mel spectrogram's shape for concatenation
+            language_embeddings = language_embeddings.unsqueeze(1).unsqueeze(2)
+
+            # Repeat the embedding to match seq_length
+            # New shape: [batch_size, 1, seq_length, 80]
+            language_embeddings = language_embeddings.repeat(1, 1, seq_length, 1)
+
+            return language_embeddings
+    
+    # Initialize the language embedding module
+    language_embedding_module = LanguageEmbedding().to(device)
+
+    batch_size, seq_length = melspec.size(0), melspec.size(2)
+    print("seq_length", seq_length)
+    language_codes = torch.tensor([0, 1]).long().to(device)
+    # Generate the language embedding
+    language_embedding = language_embedding_module(seq_length, language_codes)
+    print("language_embedding shape", language_embedding.size())
+
+    # Assuming `melspec` is your mel spectrogram with shape [batch_size, 1, seq_length, 80]
+    # Concatenate the language embedding with the mel spectrogram
+    melspec = torch.cat([melspec,melspec], dim=0)
+    enhanced_melspec = torch.cat([melspec, language_embedding], dim=1)
+    print("Enhanced Mel Spectrogram Shape:", enhanced_melspec.shape)
+
+    e = model(enhanced_melspec)
     print("e shape: ", e.size())  # [1, W:80, H:X, 128]
     print("shape of e after view", e.view(e.size()[0], 80, -1, e.size()[-1]).size())
     e = e.view(e.size()[0], 80, -1, e.size()[-1])
@@ -770,7 +808,7 @@ if test_predictor:
     # print("Sample shape: ", sample.size())
 
 """Test phone alignment"""
-test_phone_alignment = True
+test_phone_alignment = False
 if test_phone_alignment:
     from itertools import chain
 

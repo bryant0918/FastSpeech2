@@ -5,7 +5,7 @@ import numpy as np
 
 import transformer.Constants as Constants
 from .Layers import FFTBlock
-from text.symbols import symbols
+from text.symbols import symbols, _langs
 
 if torch.cuda.is_available():
     device = torch.device("cuda")
@@ -178,10 +178,11 @@ class ProsodyExtractor(nn.Module):
     def __init__(self, config):   # TODO: intialize with config
         super(ProsodyExtractor, self).__init__()
 
-        if config:
-            dim_in = config["prosody_extractor"]["dim_in"]
-            dim_out = config["prosody_extractor"]["dim_out"]
-            hidden_dim = config["prosody_extractor"]["hidden_dim"]
+        dim_in = config["prosody_extractor"]["dim_in"]
+        dim_out = config["prosody_extractor"]["dim_out"]
+        hidden_dim = config["prosody_extractor"]["hidden_dim"]
+
+        self.lang_embedding = nn.Embedding(len(_langs), 80)
 
         self.cnn = nn.Sequential(
             nn.Conv2d(in_channels=dim_in, out_channels=hidden_dim, kernel_size=3, padding=1),
@@ -204,6 +205,9 @@ class ProsodyExtractor(nn.Module):
         -------
         prosody_embedding e
         """
+        # Apply language embedding
+
+
         # Apply network
         x = self.cnn(x)
 
@@ -254,6 +258,14 @@ class ProsodyExtractor(nn.Module):
             batch_phone_emb_chunks.append(sample_phone_emb_chunks)
 
         return batch_phone_emb_chunks
+
+    def add_lang_emb(self, melspec, language_codes):
+        # Get the embedding for the specified language
+        language_embeddings = self.lang_embedding(language_codes)
+        language_embeddings = language_embeddings.unsqueeze(1).unsqueeze(2)
+        language_embeddings = language_embeddings.repeat(1, 1, melspec.shape[2], 1)
+        
+        return torch.cat([melspec, language_embeddings], dim=1)
 
 
 class ProsodyPredictor(nn.Module):

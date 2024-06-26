@@ -136,9 +136,13 @@ class FastSpeech2Loss(nn.Module):
         else:
             word_loss = torch.tensor([0]).to(device)
 
+        # Full Duration Loss
+        # full_duration_loss = self.mae_loss(mel_lens_predictions, mel_lens_targets.float())
+
         # print("Pitch Loss: ", pitch_loss)
         # print("Energy Loss: ", energy_loss)
         # print("Duration Loss: ", duration_loss)
+        # print("Full Duration Loss: ", full_duration_loss)
 
         total_loss = (
             mel_loss + postnet_mel_loss + duration_loss + pitch_loss + energy_loss 
@@ -277,16 +281,16 @@ class WordLoss(nn.Module):
 
         return loss
 
-    def mel_duration_loss(self, x, y):
-        """
-        Calculate the mel duration loss
-        x: predicted mel spectrogram
-        y: target mel spectrogram
-        """
+    # def mel_duration_loss(self, x, y):
+    #     """
+    #     Calculate the mel duration loss
+    #     x: predicted mel spectrogram
+    #     y: target mel spectrogram
+    #     """
 
-        x_durs = torch.tensor([len(mel) for mel in x])
-        y_durs = torch.tensor([len(mel) for mel in y])
+    #     x_durs = torch.tensor([len(mel) for mel in x])
+    #     y_durs = torch.tensor([len(mel) for mel in y])
 
-        return self.mae_loss(x_durs, y_durs)
+    #     return self.mae_loss(x_durs, y_durs)
     
 

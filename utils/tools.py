@@ -144,6 +144,7 @@ def expand(values, durations):
 
 def synth_one_sample(src_gt, tgt_targets, src_targets, predicted_tgt, predicted_src, vocoder, model_config, preprocess_config):    
     (   basename, 
+        src_gt_len,
         src_gt_mel,
         src_gt_mel_lens,
         src_gt_pitch,
@@ -153,6 +154,7 @@ def synth_one_sample(src_gt, tgt_targets, src_targets, predicted_tgt, predicted_
     
     (   
         tgt_mel_target, 
+        tgt_len,
         tgt_pitch_target, 
         tgt_energy_target, 
         tgt_duration_target,
@@ -175,24 +177,38 @@ def synth_one_sample(src_gt, tgt_targets, src_targets, predicted_tgt, predicted_
         src_mel_len,
     ) = predicted_src
     
-    src_len = src_len[0].item()
-    src_gt_mel_lens = src_gt_mel_lens[0].item()
+    src_gt_len = src_gt_len[0].item()
+    src_gt_mel_len = src_gt_mel_lens[0].item()
+    tgt_len = tgt_len[0].item()
+    tgt_mel_len = tgt_mel_len[0].item()
+    src_mel_len = src_mel_len[0].item()
 
-    src_gt_mel = src_gt_mel[0, :src_gt_mel_lens].detach().transpose(0, 1)
+    src_gt_mel = src_gt_mel[0, :src_gt_mel_len].detach().transpose(0, 1)
 
-    mel_prediction = mel_prediction[0, :mel_len].detach().transpose(0, 1)
+    tgt_mel_prediction = tgt_mel_prediction[0, :tgt_mel_len].detach().transpose(0, 1)
+    src_mel_prediction = src_mel_prediction[0, :src_mel_len].detach().transpose(0, 1)
     
-    src_gt_duration = src_gt_duration[0, :src_len].detach().cpu().numpy()
+    src_gt_duration = src_gt_duration[0, :src_gt_len].detach().cpu().numpy()
+    tgt_duration_target = tgt_duration_target[0, :tgt_len].detach().cpu().numpy()
+
     if preprocess_config["preprocessing"]["pitch"]["feature"] == "phoneme_level":
-        src_gt_pitch = src_gt_pitch[0, :src_len].detach().cpu().numpy()
+        src_gt_pitch = src_gt_pitch[0, :src_gt_len].detach().cpu().numpy()
         src_gt_pitch = expand(src_gt_pitch, src_gt_duration)
+
+        tgt_pitch_target = tgt_pitch_target[0, :tgt_len].detach().cpu().numpy()
+        tgt_pitch_target = expand(tgt_pitch_target, tgt_duration_target)
+
     else:
-        src_gt_pitch = src_gt_pitch[0, :mel_len].detach().cpu().numpy()
+        src_gt_pitch = src_gt_pitch[0, :src_gt_mel_len].detach().cpu().numpy()
     if preprocess_config["preprocessing"]["energy"]["feature"] == "phoneme_level":
-        src_gt_energy = src_gt_energy[0, :src_len].detach().cpu().numpy()
+        src_gt_energy = src_gt_energy[0, :src_gt_len].detach().cpu().numpy()
         src_gt_energy = expand(src_gt_energy, src_gt_duration)
+
+        tgt_energy_target = tgt_energy_target[0, :tgt_len].detach().cpu().numpy()
+        tgt_energy_target = expand(tgt_energy_target, tgt_duration_target)
+
     else:
-        src_gt_energy = src_gt_energy[0, :mel_len].detach().cpu().numpy()
+        src_gt_energy = src_gt_energy[0, :src_gt_mel_len].detach().cpu().numpy()
 
     with open(
         os.path.join(preprocess_config["path"]["preprocessed_path"], "stats.json")
@@ -202,7 +218,7 @@ def synth_one_sample(src_gt, tgt_targets, src_targets, predicted_tgt, predicted_
 
     fig = plot_mel(
         [
-            (tgt_mel_prediction.cpu().numpy(), pitch, energy),
+            (tgt_mel_prediction.cpu().numpy(), tgt_pitch_target, tgt_energy_target),
             (src_mel_prediction.cpu().numpy(), src_gt_pitch, src_gt_energy),
             (src_gt_mel.cpu().numpy(), src_gt_pitch, src_gt_energy),
             
@@ -213,23 +229,30 @@ def synth_one_sample(src_gt, tgt_targets, src_targets, predicted_tgt, predicted_
 
     if vocoder is not None:
         from .model import vocoder_infer
-
-        wav_reconstruction = vocoder_infer(
-            mel_target.unsqueeze(0),
+        tgt_wav_prediction = vocoder_infer(
+            tgt_mel_prediction.unsqueeze(0),
             vocoder,
             model_config,
             preprocess_config,
         )[0]
-        wav_prediction = vocoder_infer(
-            mel_prediction.unsqueeze(0),
+
+        src_wav_prediction = vocoder_infer(
+            src_mel_prediction.unsqueeze(0),
+            vocoder,
+            model_config,
+            preprocess_config,
+        )[0]
+
+        wav_reconstruction = vocoder_infer(
+            src_gt_mel.unsqueeze(0),
             vocoder,
             model_config,
             preprocess_config,
         )[0]
     else:
-        wav_reconstruction = wav_prediction = None
+        tgt_wav_prediction = src_wav_prediction = wav_reconstruction = None
 
-    return fig, wav_reconstruction, wav_prediction, basename
+    return fig, tgt_wav_prediction, src_wav_prediction, wav_reconstruction, basename
 
 
 def synth_one_sample_pretrain(targets, predictions, vocoder, model_config, preprocess_config):    

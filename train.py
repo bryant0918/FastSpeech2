@@ -121,12 +121,10 @@ def main(args, configs):
                         model_config,
                         preprocess_config,
                     )
-                    loss_input = (batch[2],) + (batch[8],) + (realigned_p, realigned_e, log_duration_targets)
-                    loss_input = (None,) + batch[8:10] + (realigned_p, realigned_e, log_duration_targets)
+                    loss_input = (batch[1],) + batch[8:10] + (realigned_p, realigned_e, log_duration_targets)
                     loss_predictions = output_tgt + (wav_predictions,)
                 else:
                     loss_input = (None,) + batch[8:10] + (realigned_p, realigned_e, log_duration_targets)
-                    # loss_input = (None, batch[8]) + (realigned_p, realigned_e, log_duration_targets)
                     loss_predictions = output_tgt + (None,)
                 
                 # Calculate loss for Src to Tgt
@@ -145,18 +143,19 @@ def main(args, configs):
                 # print("batdch[-1]", batch[-1])
 
                 # realign p,e,d targets back to src space
-                realigned_p = realign_p_e_d(alignments, output_tgt[2])
-                realigned_e = realign_p_e_d(alignments, output_tgt[3])
+                re_realigned_p = realign_p_e_d(alignments, output_tgt[2])
+                re_realigned_e = realign_p_e_d(alignments, output_tgt[3])
                 realigned_log_d = realign_p_e_d(alignments, output_tgt[4])
-                realigned_d = torch.clamp(torch.exp(realigned_log_d) - 1, min=0)
-                realigned_d = custom_round(realigned_d)
+                re_realigned_d = torch.clamp(torch.exp(realigned_log_d) - 1, min=0)
+                
+                re_realigned_d = custom_round(re_realigned_d)
 
                 # # Forward pass: Tgt to Src (so tgt is now src and src is now tgt)
                 print("\nFORWARD PASS: TGT to SRC")
                 output_src = model(langs=batch[11], texts=batch[5], text_lens=batch[6], max_text_len=batch[7],
                                    mels=output_tgt[1], mel_lens=output_tgt[9], max_mel_len=batch[10],
-                                   speaker_embs=batch[15], alignments=alignments, p_targets=realigned_p, 
-                                   e_targets=realigned_e, d_targets=realigned_d, d_src=d_src)
+                                   speaker_embs=batch[15], alignments=alignments, p_targets=re_realigned_p, 
+                                   e_targets=re_realigned_e, d_targets=re_realigned_d, d_src=d_src)
 
                 print("Out_src Mel Len: ", output_src[9])
 
@@ -169,10 +168,10 @@ def main(args, configs):
                         model_config,
                         preprocess_config,
                     )
-                    loss_input = (batch[1],) + (batch[8],) + (realigned_p, realigned_e, realigned_log_d)
+                    loss_input = (batch[2],) + batch[8:10] + (re_realigned_p, re_realigned_e, realigned_log_d)
                     loss_predictions = output_src[:10] + (output_tgt[10],) + (output_src[11],) + (wav_predictions,)
                 else:
-                    loss_input = (None, batch[8]) + (realigned_p, realigned_e, realigned_log_d)
+                    loss_input = (None,) + batch[8:10] + (re_realigned_p, re_realigned_e, realigned_log_d)
                     loss_predictions = output_src[:10] + (output_tgt[10],) + (output_src[11],) + (None,)
                 
                 # # Calculate loss for Tgt to Src
@@ -200,7 +199,7 @@ def main(args, configs):
                 if step % log_step == 0:
                     losses = [(l1.item() + l2.item())/2 for l1, l2 in zip(losses_src_to_tgt, losses_tgt_to_src)]
                     message1 = "Step {}/{}, ".format(step, total_step)
-                    message2 = "Total Loss: {:.4f}, Mel Loss: {:.4f}, Mel PostNet Loss: {:.4f}, Pitch Loss: {:.4f}, Energy Loss: {:.4f}, Duration Loss: {:.4f}, Prosody Loss: {:.4f}, Word Loss: {:.4f}".format(
+                    message2 = "Total Loss: {:.4f}, Mel Loss: {:.4f}, Mel PostNet Loss: {:.4f}, Pitch Loss: {:.4f}, Energy Loss: {:.4f}, Duration Loss: {:.4f}, Prosody Loss: {:.4f}, Word Loss: {:.4f}, Full Duration Loss: {:.4f}".format(
                         *losses
                     )
 
@@ -213,13 +212,13 @@ def main(args, configs):
 
                 if step % synth_step == 0:
                     # Want to see all 3 mels
-                    src_gt = (batch[0],), (batch[8:10]) + batch[17:]
-                    tgt_targets = (batch[8],) + batch[17:]
+                    src_gt = (batch[0], batch[6]) + (batch[8:10]) + batch[17:]
+                    tgt_targets = (batch[8], batch[13]) + (realigned_p, realigned_e, realigned_d)
                     src_targets = (batch[8],) + batch[17:]
                     predicted_tgt = (output_tgt[1],) + output_tgt[8:10]
                     predicted_src = (output_src[1],) + output_src[8:10]
 
-                    fig, wav_reconstruction, wav_prediction, tag = synth_one_sample(
+                    fig, tgt_wav_prediction, src_wav_prediction, wav_reconstruction, tag = synth_one_sample(
                         src_gt, 
                         tgt_targets, src_targets,
                         predicted_tgt, predicted_src,
@@ -237,15 +236,21 @@ def main(args, configs):
                     ]
                     log(
                         train_logger,
-                        audio=wav_reconstruction,
+                        audio=tgt_wav_prediction,
                         sampling_rate=sampling_rate,
-                        tag="Training/step_{}_{}_reconstructed".format(step, tag),
+                        tag="Training/step_{}_{}_tgt_synthesized".format(step, tag),
                     )
                     log(
                         train_logger,
-                        audio=wav_prediction,
+                        audio=src_wav_prediction,
                         sampling_rate=sampling_rate,
-                        tag="Training/step_{}_{}_synthesized".format(step, tag),
+                        tag="Training/step_{}_{}_src_synthesized".format(step, tag),
+                    )
+                    log(
+                        train_logger,
+                        audio=wav_reconstruction,
+                        sampling_rate=sampling_rate,
+                        tag="Training/step_{}_{}_reconstructed".format(step, tag),
                     )
 
                 if step % val_step == 0:

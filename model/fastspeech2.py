@@ -106,7 +106,6 @@ class FastSpeech2Pros(nn.Module):
                 else:
                     agg_extracted_prosody[b,i,:] = torch.mean(e_k_src[b][i], dim=(0, 1))
 
-        print("aggregated_prosody shape: ", agg_extracted_prosody.shape, torch.isnan(agg_extracted_prosody).any())
         agg_extracted_prosody = agg_extracted_prosody.detach()
 
         h_sd = self.h_sd_downsize(h_sd) # 512 to 256
@@ -120,7 +119,6 @@ class FastSpeech2Pros(nn.Module):
             # print("alignments shape: ", alignments.shape)  # TODO: unpad alignments for realigner otherwise everything mapped to 0.
             adjusted_e_tgt = self.prosody_predictor.prosody_realigner(alignments, tgt_samp, e_k_src, self.beta)
             # print("alignments nan", torch.isnan(alignments).any())
-            print("adjusted_e_tgt shape: ", adjusted_e_tgt.shape)
 
             # Concat
             h_sd = torch.cat((h_sd, adjusted_e_tgt), dim=-1)  # torch.Size([Batch, tgt_seq_len, 512]
@@ -136,7 +134,6 @@ class FastSpeech2Pros(nn.Module):
             self.variance_adaptor(h_sd, tgt_masks, mel_masks, max_mel_len, p_targets, e_targets, d_targets, p_control,
                                   e_control, d_control, )
 
-        print("output shape: ", output.shape)
         # print("d_rounded shape: ", d_rounded.shape)
         # print("mel_lens shape: ", mel_lens)
         # print("predicted mel_masks shape: ", mel_masks.shape)

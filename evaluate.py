@@ -68,7 +68,7 @@ def evaluate(model, step, configs, logger=None, vocoder=None):
                         model_config,
                         preprocess_config,
                     )
-                    loss_input = (batch[1],) + batch[8:10] + (realigned_p, realigned_e, log_duration_targets)
+                    loss_input = (batch[2],) + batch[8:10] + (realigned_p, realigned_e, log_duration_targets)
                     loss_predictions = output_tgt + (wav_predictions,)
                 else:
                     loss_input = (None,) + batch[8:10] + (realigned_p, realigned_e, log_duration_targets)
@@ -102,7 +102,7 @@ def evaluate(model, step, configs, logger=None, vocoder=None):
                         model_config,
                         preprocess_config,
                     )
-                    loss_input = (batch[2],) + batch[8:10] + (re_realigned_p, re_realigned_e, realigned_log_d)
+                    loss_input = (batch[1],) + batch[8:10] + (re_realigned_p, re_realigned_e, realigned_log_d)
                     loss_predictions = output_src[:10] + (output_tgt[10],) + (output_src[11],) + (wav_predictions,)
                 else:
                     loss_input = (None,) + batch[8:10]+ (re_realigned_p, re_realigned_e, realigned_log_d)

@@ -102,14 +102,9 @@ def main(args, configs):
                 realigned_d = realign_p_e_d(batch[16], batch[19])
                 realigned_d = custom_round(realigned_d)
 
-                print("Mel_lens: ", batch[9])
-
                 # Forward pass: Src to Tgt
-                print("\nFORWARD PASS: SRC to TGT")
                 input = (batch[4],) + batch[12:15] + batch[8:11] + batch[15:17] + (realigned_p, realigned_e, realigned_d, batch[-1])
                 output_tgt = model(*(input))
-
-                print("Out_tgt Mel Len: ", output_tgt[9])
 
                 log_duration_targets = torch.log(realigned_d.float() + 1)
                 # For calculating Word Loss
@@ -121,7 +116,7 @@ def main(args, configs):
                         model_config,
                         preprocess_config,
                     )
-                    loss_input = (batch[1],) + batch[8:10] + (realigned_p, realigned_e, log_duration_targets)
+                    loss_input = (batch[2],) + batch[8:10] + (realigned_p, realigned_e, log_duration_targets)
                     loss_predictions = output_tgt + (wav_predictions,)
                 else:
                     loss_input = (None,) + batch[8:10] + (realigned_p, realigned_e, log_duration_targets)
@@ -130,7 +125,6 @@ def main(args, configs):
                 # Calculate loss for Src to Tgt
                 losses_src_to_tgt = Loss(loss_input, loss_predictions, "to_tgt")
                 total_loss_src_to_tgt = losses_src_to_tgt[0]
-                print("total_loss_src_to_tgt: ", total_loss_src_to_tgt)
                 
                 alignments = flip_mapping(batch[16], batch[5].shape[1])
                                 
@@ -151,13 +145,10 @@ def main(args, configs):
                 re_realigned_d = custom_round(re_realigned_d)
 
                 # # Forward pass: Tgt to Src (so tgt is now src and src is now tgt)
-                print("\nFORWARD PASS: TGT to SRC")
                 output_src = model(langs=batch[11], texts=batch[5], text_lens=batch[6], max_text_len=batch[7],
                                    mels=output_tgt[1], mel_lens=output_tgt[9], max_mel_len=batch[10],
                                    speaker_embs=batch[15], alignments=alignments, p_targets=re_realigned_p, 
                                    e_targets=re_realigned_e, d_targets=re_realigned_d, d_src=d_src)
-
-                print("Out_src Mel Len: ", output_src[9])
 
                 # For calculating Word Loss
                 if step % word_step == 0:
@@ -168,7 +159,7 @@ def main(args, configs):
                         model_config,
                         preprocess_config,
                     )
-                    loss_input = (batch[2],) + batch[8:10] + (re_realigned_p, re_realigned_e, realigned_log_d)
+                    loss_input = (batch[1],) + batch[8:10] + (re_realigned_p, re_realigned_e, realigned_log_d)
                     loss_predictions = output_src[:10] + (output_tgt[10],) + (output_src[11],) + (wav_predictions,)
                 else:
                     loss_input = (None,) + batch[8:10] + (re_realigned_p, re_realigned_e, realigned_log_d)
@@ -177,12 +168,9 @@ def main(args, configs):
                 # # Calculate loss for Tgt to Src
                 losses_tgt_to_src = Loss(loss_input, loss_predictions, "to_src")
                 total_loss_tgt_to_src = losses_tgt_to_src[0]
-                print("total_loss_tgt_to_src: ", total_loss_tgt_to_src)
 
                 # Combine the losses
                 total_loss = (total_loss_src_to_tgt + total_loss_tgt_to_src) / 2
-                print("Total Loss: ", total_loss)
-                print()
 
                 # Backward
                 total_loss = total_loss / grad_acc_step
@@ -263,8 +251,6 @@ def main(args, configs):
                     model.train()
 
                 if step % save_step == 0:
-                    print("MODEL")
-                    print(model)
                     for name, param in model.named_parameters():
                         if 'beta' in name:
                             print(name, param)

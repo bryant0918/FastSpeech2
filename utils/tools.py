@@ -21,10 +21,10 @@ else:
 
 def to_device(data, device):
     # For Pros Full training
-    if len(data) == 20:
+    if len(data) == 23:
         (ids, raw_texts, raw_translations, speakers, src_langs, texts, text_lens, max_text_lens, mels, mel_lens,
         max_mel_lens, tgt_langs, translations, translation_lens, max_translation_len, speaker_embeddings, alignments, 
-        pitches, energies, durations) = data
+        pitches, energies, durations, realigned_p, realigned_e, realigned_d) = data
 
         speakers = torch.from_numpy(speakers).long().to(device)
         text_langs = torch.from_numpy(src_langs).long().to(device)
@@ -39,14 +39,17 @@ def to_device(data, device):
         speaker_embeddings = np.array(speaker_embeddings)
         speaker_embeddings = torch.from_numpy(speaker_embeddings).to(device)
 
-        alignments = torch.from_numpy(alignments).int().to(device)
-        pitches = torch.from_numpy(pitches).float().to(device)
-        energies = torch.from_numpy(energies).to(device)
-        durations = torch.from_numpy(durations).long().to(device)
+        alignments = alignments.to(device)
+        pitches = pitches.to(device)
+        energies = energies.to(device)
+        durations = durations.to(device)
+        realigend_p = realigned_p.to(device)
+        realigned_e = realigned_e.to(device)
+        realigned_d = realigned_d.to(device)
 
         return (ids, raw_texts, raw_translations, speakers, text_langs, texts, src_lens, max_text_lens, mels, mel_lens,
                 max_mel_lens, translation_langs, translations, translation_lens, max_translation_len, speaker_embeddings, 
-                alignments, pitches, energies, durations)
+                alignments, pitches, energies, durations, realigned_p, realigned_e, realigned_d)
 
     # For Pros Pretraining
     if len(data) == 14:

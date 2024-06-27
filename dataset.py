@@ -8,7 +8,7 @@ import torch
 from torch.utils.data import Dataset
 
 from text import text_to_sequence, lang_to_id
-from utils.tools import pad_1D, pad_2D, pad_inhomogeneous_2D, flip_mapping
+from utils.tools import pad_1D, pad_2D, pad_inhomogeneous_2D, flip_mapping, realign_p_e_d, custom_round
 
 
 class TrainDataset(Dataset):
@@ -155,11 +155,19 @@ class TrainDataset(Dataset):
         if np.shape(alignments)[1] + 1 != np.shape(translations)[1] or reverse_alignments.shape[1] + 1 != np.shape(texts)[1]:
             print(np.shape(alignments)[1], np.shape(translations)[1],reverse_alignments.shape[1], np.shape(texts)[1])
             raise ValueError("Alignments and Texts must have the same length")
+        
+        alignments = torch.from_numpy(alignments).int()
+        pitches = torch.from_numpy(pitches).float()
+        energies = torch.from_numpy(energies).float()
+        durations = torch.from_numpy(durations).long()
+        realigned_p = realign_p_e_d(alignments, pitches)
+        realigned_e = realign_p_e_d(alignments, energies)
+        realigned_d = realign_p_e_d(alignments, durations)
+        realigned_d = custom_round(realigned_d)
             
-
         return (ids, raw_texts, raw_translations, speakers, src_langs, texts, text_lens, max(text_lens), mels, mel_lens,
                 max(mel_lens), tgt_langs, translations, translation_lens, max(translation_lens), speaker_embeddings, alignments, 
-                pitches, energies, durations)
+                pitches, energies, durations, realigned_p, realigned_e, realigned_d)
 
     def collate_fn(self, data):
         data_size = len(data)

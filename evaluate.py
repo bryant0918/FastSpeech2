@@ -8,8 +8,10 @@ from torch.utils.data import DataLoader
 
 from utils.model import get_model, get_vocoder, vocoder_infer
 from utils.tools import to_device, log, synth_one_sample, synth_one_sample_pretrain, flip_mapping, realign_p_e_d, custom_round
+from utils.training import loop
 from model import FastSpeech2Loss
 from dataset import PreTrainDataset, TrainDataset
+
 
 
 if torch.cuda.is_available():
@@ -47,69 +49,70 @@ def evaluate(model, step, configs, logger=None, vocoder=None):
         for batch in batches:
             batch = to_device(batch, device)
             with torch.no_grad():
-                # realign pitch energy and duration here for target use batched for source below
-                realigned_p = realign_p_e_d(batch[16], batch[17])
-                realigned_e = realign_p_e_d(batch[16], batch[18])
-                realigned_d = realign_p_e_d(batch[16], batch[19])
-                realigned_d = custom_round(realigned_d)
 
-                # Forward pass: Src to Tgt
-                input = (batch[4],) + batch[12:15] + batch[8:11] + batch[15:17] + (realigned_p, realigned_e, realigned_d, batch[-1])
-                output_tgt = model(*(input))
+                losses_src_to_tgt, losses_tgt_to_src, output_tgt, output_src = loop(preprocess_config, model_config, batch, model, Loss, vocoder, step, word_step)
+                # # realign pitch energy and duration here for target use batched for source below
+                # realigned_p = realign_p_e_d(batch[16], batch[17])
+                # realigned_e = realign_p_e_d(batch[16], batch[18])
+                # realigned_d = realign_p_e_d(batch[16], batch[19])
+                # realigned_d = custom_round(realigned_d)
 
-                log_duration_targets = torch.log(realigned_d.float() + 1)
+                # # Forward pass: Src to Tgt
+                # input = (batch[4],) + batch[12:15] + batch[8:11] + batch[15:17] + (realigned_p, realigned_e, realigned_d, batch[-1])
+                # output_tgt = model(*(input))
 
-                # For calculating Word Loss
-                if step % word_step == 0:
-                    mels = [output_tgt[1][i, :output_tgt[9][i]].transpose(0,1) for i in range(batch_size)]
-                    wav_predictions = vocoder_infer(
-                        mels,
-                        vocoder,
-                        model_config,
-                        preprocess_config,
-                    )
-                    loss_input = (batch[2],) + batch[8:10] + (realigned_p, realigned_e, log_duration_targets)
-                    loss_predictions = output_tgt + (wav_predictions,)
-                else:
-                    loss_input = (None,) + batch[8:10] + (realigned_p, realigned_e, log_duration_targets)
-                    loss_predictions = output_tgt + (None,)
+                # log_duration_targets = torch.log(realigned_d.float() + 1)
+                # # For calculating Word Loss
+                # if step % word_step == 0:
+                #     mels = [output_tgt[1][i, :output_tgt[9][i]].transpose(0,1) for i in range(batch_size)]
+                #     wav_predictions = vocoder_infer(
+                #         mels,
+                #         vocoder,
+                #         model_config,
+                #         preprocess_config,
+                #     )
+                #     loss_input = (batch[2],) + batch[8:10] + (realigned_p, realigned_e, log_duration_targets)
+                #     loss_predictions = output_tgt + (wav_predictions,)
+                # else:
+                #     loss_input = (None,) + batch[8:10] + (realigned_p, realigned_e, log_duration_targets)
+                #     loss_predictions = output_tgt + (None,)
                 
-                # Calculate loss for Src to Tgt
-                losses_src_to_tgt = Loss(loss_input, loss_predictions, "to_tgt")
+                # # Calculate loss for Src to Tgt
+                # losses_src_to_tgt = Loss(loss_input, loss_predictions, "to_tgt")
                 
-                alignments = flip_mapping(batch[16], batch[5].shape[1])
+                # alignments = flip_mapping(batch[16], batch[5].shape[1])
 
-                d_src = realigned_d
-                # realign p,e,d targets back to src space
-                re_realigned_p = realign_p_e_d(alignments, output_tgt[2])
-                re_realigned_e = realign_p_e_d(alignments, output_tgt[3])
-                realigned_log_d = realign_p_e_d(alignments, output_tgt[4])
-                re_realigned_d = torch.clamp(torch.exp(realigned_log_d) - 1, min=0)
-                re_realigned_d = custom_round(re_realigned_d)
+                # d_src = realigned_d
+                # # realign p,e,d targets back to src space
+                # re_realigned_p = realign_p_e_d(alignments, output_tgt[2])
+                # re_realigned_e = realign_p_e_d(alignments, output_tgt[3])
+                # realigned_log_d = realign_p_e_d(alignments, output_tgt[4])
+                # re_realigned_d = torch.clamp(torch.exp(realigned_log_d) - 1, min=0)
+                # re_realigned_d = custom_round(re_realigned_d)
 
-                # Forward pass: Tgt to Src (so tgt is now src and src is now tgt)
-                output_src = model(langs=batch[11], texts=batch[5], text_lens=batch[6], max_text_len=batch[7],
-                                   mels=output_tgt[1], mel_lens=output_tgt[9], max_mel_len=batch[10],
-                                   speaker_embs=batch[15], alignments=alignments, p_targets=re_realigned_p, 
-                                   e_targets=re_realigned_e, d_targets=re_realigned_d, d_src=d_src)
+                # # Forward pass: Tgt to Src (so tgt is now src and src is now tgt)
+                # output_src = model(langs=batch[11], texts=batch[5], text_lens=batch[6], max_text_len=batch[7],
+                #                    mels=output_tgt[1], mel_lens=output_tgt[9], max_mel_len=batch[10],
+                #                    speaker_embs=batch[15], alignments=alignments, p_targets=re_realigned_p, 
+                #                    e_targets=re_realigned_e, d_targets=re_realigned_d, d_src=d_src)
 
-                # For calculating Word Loss
-                if step % word_step == 0:
-                    mels = [output_src[1][i, :output_src[9][i]].transpose(0,1) for i in range(batch_size)]
-                    wav_predictions = vocoder_infer(
-                        mels,
-                        vocoder,
-                        model_config,
-                        preprocess_config,
-                    )
-                    loss_input = (batch[1],) + batch[8:10] + (re_realigned_p, re_realigned_e, realigned_log_d)
-                    loss_predictions = output_src[:10] + (output_tgt[10],) + (output_src[11],) + (wav_predictions,)
-                else:
-                    loss_input = (None,) + batch[8:10]+ (re_realigned_p, re_realigned_e, realigned_log_d)
-                    loss_predictions = output_src[:10] + (output_tgt[10],) + (output_src[11],) + (None,)
+                # # For calculating Word Loss
+                # if step % word_step == 0:
+                #     mels = [output_src[1][i, :output_src[9][i]].transpose(0,1) for i in range(batch_size)]
+                #     wav_predictions = vocoder_infer(
+                #         mels,
+                #         vocoder,
+                #         model_config,
+                #         preprocess_config,
+                #     )
+                #     loss_input = (batch[1],) + batch[8:10] + (re_realigned_p, re_realigned_e, realigned_log_d)
+                #     loss_predictions = output_src[:10] + (output_tgt[10],) + (output_src[11],) + (wav_predictions,)
+                # else:
+                #     loss_input = (None,) + batch[8:10]+ (re_realigned_p, re_realigned_e, realigned_log_d)
+                #     loss_predictions = output_src[:10] + (output_tgt[10],) + (output_src[11],) + (None,)
 
-                # Calculate loss for Tgt to Src
-                losses_tgt_to_src = Loss(loss_input, loss_predictions, "to_src")
+                # # Calculate loss for Tgt to Src
+                # losses_tgt_to_src = Loss(loss_input, loss_predictions, "to_src")
                 
                 losses = [(l1.item() + l2.item())/2 for l1, l2 in zip(losses_src_to_tgt, losses_tgt_to_src)]
 
@@ -127,7 +130,7 @@ def evaluate(model, step, configs, logger=None, vocoder=None):
     if logger is not None:
         # Want to see all 3 mels
         src_gt = (batch[0], batch[6]) + (batch[8:10]) + batch[17:]
-        tgt_targets = (batch[8], batch[13]) + (realigned_p, realigned_e, realigned_d)
+        tgt_targets = (batch[8], batch[13]) + batch[20:]
         src_targets = (batch[8],) + batch[17:]
         predicted_tgt = (output_tgt[1],) + output_tgt[8:10]
         predicted_src = (output_src[1],) + output_src[8:10]

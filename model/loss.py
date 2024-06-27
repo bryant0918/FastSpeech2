@@ -42,9 +42,10 @@ class FastSpeech2Loss(nn.Module):
         (
             text,
             mel_targets, 
+            mel_lens_targets,
             pitch_targets, 
             energy_targets, 
-            duration_targets,
+            log_duration_targets,
         ) = inputs
 
         (
@@ -57,7 +58,7 @@ class FastSpeech2Loss(nn.Module):
             src_masks,
             mel_masks,
             _,
-            _,
+            mel_lens_predictions,
             extracted_e,
             predicted_e,
             audio,
@@ -65,21 +66,16 @@ class FastSpeech2Loss(nn.Module):
         device = mel_masks.device
         src_masks = ~src_masks
         mel_masks = ~mel_masks
-        log_duration_targets = torch.log(duration_targets.float() + 1)
         
         mel_masks = mel_masks[:, :mel_masks.shape[1]]
 
         log_duration_targets.requires_grad = False
         pitch_targets.requires_grad = False
         energy_targets.requires_grad = False
+        mel_lens_targets.requires_grad = False
         
         # Stop Gradient
         extracted_e = extracted_e.detach()
-
-        # print("Src_masks ", src_masks.shape)
-        # print("Pitch_predictions ", pitch_predictions.shape)
-        # print("is nan pitch_predictions: ", torch.isnan(pitch_predictions).any())
-        # print("Pitch_targets ", pitch_targets.shape)
 
         if self.pitch_feature_level == "phoneme_level":
             pitch_predictions = pitch_predictions.masked_select(src_masks)
@@ -97,7 +93,7 @@ class FastSpeech2Loss(nn.Module):
 
         log_duration_predictions = log_duration_predictions.masked_select(src_masks)
         log_duration_targets = log_duration_targets.masked_select(src_masks)
-                
+        
         # Calculate mel loss and prosody loss only in reverse direction
         mel_loss, postnet_mel_loss, pros_loss = torch.tensor([0]).to(device), torch.tensor([0]).to(device), torch.tensor([0]).to(device)
         if direction == "to_src":
@@ -113,8 +109,6 @@ class FastSpeech2Loss(nn.Module):
             mel_loss = self.mae_loss(mel_predictions, mel_targets)
             postnet_mel_loss = self.mae_loss(postnet_mel_predictions, mel_targets)
 
-            # mel_duration_loss = self.mel_duration_loss(postnet_mel_predictions, mel_targets)
-
             # TODO: Figure out best beta value
             beta = .2
             pros_loss = self.pros_loss(predicted_e, extracted_e, src_masks)*beta
@@ -129,7 +123,7 @@ class FastSpeech2Loss(nn.Module):
         pitch_loss = self.mse_loss(pitch_predictions, pitch_targets)
         energy_loss = self.mse_loss(energy_predictions, energy_targets)
         duration_loss = self.mse_loss(log_duration_predictions, log_duration_targets)
-
+        
         # word_loss  (Requires extracting predicted phonemes from mel Spectrogram) whisper
         if audio is not None:
             word_loss = self.word_loss(audio, text)
@@ -137,16 +131,16 @@ class FastSpeech2Loss(nn.Module):
             word_loss = torch.tensor([0]).to(device)
 
         # Full Duration Loss
-        # full_duration_loss = self.mae_loss(mel_lens_predictions, mel_lens_targets.float())
+        full_duration_loss = self.mae_loss(mel_lens_predictions, mel_lens_targets.float())
 
         # print("Pitch Loss: ", pitch_loss)
         # print("Energy Loss: ", energy_loss)
         # print("Duration Loss: ", duration_loss)
-        # print("Full Duration Loss: ", full_duration_loss)
+        # print("Full Duration Loss: ", full_duration_loss) # Will be 0 during pretraining.
 
         total_loss = (
             mel_loss + postnet_mel_loss + duration_loss + pitch_loss + energy_loss 
-            + pros_loss + word_loss
+            + pros_loss + word_loss + full_duration_loss
         )
 
         return (
@@ -158,6 +152,7 @@ class FastSpeech2Loss(nn.Module):
             duration_loss,
             pros_loss,
             word_loss,
+            full_duration_loss,
         )
 
 
@@ -281,16 +276,4 @@ class WordLoss(nn.Module):
 
         return loss
 
-    # def mel_duration_loss(self, x, y):
-    #     """
-    #     Calculate the mel duration loss
-    #     x: predicted mel spectrogram
-    #     y: target mel spectrogram
-    #     """
-
-    #     x_durs = torch.tensor([len(mel) for mel in x])
-    #     y_durs = torch.tensor([len(mel) for mel in y])
-
-    #     return self.mae_loss(x_durs, y_durs)
-    
 

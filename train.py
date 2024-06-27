@@ -9,8 +9,8 @@ from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm
 
-from utils.model import get_model, get_vocoder, get_param_num
-from utils.tools import to_device, log, synth_one_sample, flip_mapping, realign_p_e_d
+from utils.model import get_model, get_vocoder, get_param_num, vocoder_infer
+from utils.tools import to_device, log, synth_one_sample, flip_mapping, realign_p_e_d, custom_round
 from model import FastSpeech2Loss
 from dataset import Dataset, TrainDataset
 
@@ -42,18 +42,6 @@ def main(args, configs):
         shuffle=True,
         collate_fn=dataset.collate_fn,
     )
-
-    # # Debugging dataset
-    # print("loader: ", loader)
-    # for batches in loader:
-    #     for batch in batches:
-    #         batch = to_device(batch, device)
-    #         print("batch", batch[8], batch[9])
-    #         input = batch[3:]
-    #         print("input", input[6], input[7])
-
-    #         raise NotImplementedError
-
 
     # Prepare model
     model, optimizer = get_model(args, configs, device, train=True)
@@ -87,6 +75,7 @@ def main(args, configs):
     save_step = train_config["step"]["save_step"]
     synth_step = train_config["step"]["synth_step"]
     val_step = train_config["step"]["val_step"]
+    word_step = train_config["step"]["word_step"]
 
     outer_bar = tqdm(total=total_step, desc="Training", position=0)
     outer_bar.n = args.restore_step
@@ -100,63 +89,94 @@ def main(args, configs):
         for batches in loader:
             for batch in batches:
                 batch = to_device(batch, device)
-                # batch = (ids, raw_texts, raw_translations, speakers, texts, src_lens, max_text_lens, mels, mel_lens,
-                #          max_mel_lens, translations, translation_lens, max(translation_lens), speaker_embeddings, alignments, pitches, energies,
-                #          durations)
+                # batch = (ids, raw_texts, raw_translations, speakers, text_langs, texts, src_lens, max_text_lens, mels, mel_lens,
+                #           max_mel_lens, translation_langs, translations, translation_lens, max_translation_len, speaker_embeddings, 
+                #           alignments, pitches, energies, durations)
 
-                if step == 4:
+                if step == 5:
                     raise NotImplementedError
-                
-                # realign pitch energy and duration here for target use batched for source below
-                realigned_p = realign_p_e_d(batch[14], batch[15])
-                realigned_e = realign_p_e_d(batch[14], batch[16])
-                realigned_d = realign_p_e_d(batch[14], batch[17])
 
-                # Forward
-                if batch is None:
-                    raise ValueError("Batch is None")
-                    
-                input = batch[10:13] + batch[7:10] + batch[13:15] + (realigned_p, realigned_e, realigned_d, batch[-1])
-                
+                # realign pitch energy and duration here for target use batched for source below
+                realigned_p = realign_p_e_d(batch[16], batch[17])
+                realigned_e = realign_p_e_d(batch[16], batch[18])
+                realigned_d = realign_p_e_d(batch[16], batch[19])
+                realigned_d = custom_round(realigned_d)
+
+                print("Mel_lens: ", batch[9])
 
                 # Forward pass: Src to Tgt
                 print("\nFORWARD PASS: SRC to TGT")
+                input = (batch[4],) + batch[12:15] + batch[8:11] + batch[15:17] + (realigned_p, realigned_e, realigned_d, batch[-1])
                 output_tgt = model(*(input))
+
+                print("Out_tgt Mel Len: ", output_tgt[9])
+
+                log_duration_targets = torch.log(realigned_d.float() + 1)
+                # For calculating Word Loss
+                if step % word_step == 0:
+                    mels = [output_tgt[1][i, :output_tgt[9][i]].transpose(0,1) for i in range(batch_size)]
+                    wav_predictions = vocoder_infer(
+                        mels,
+                        vocoder,
+                        model_config,
+                        preprocess_config,
+                    )
+                    loss_input = (batch[2],) + (batch[8],) + (realigned_p, realigned_e, log_duration_targets)
+                    loss_input = (None,) + batch[8:10] + (realigned_p, realigned_e, log_duration_targets)
+                    loss_predictions = output_tgt + (wav_predictions,)
+                else:
+                    loss_input = (None,) + batch[8:10] + (realigned_p, realigned_e, log_duration_targets)
+                    # loss_input = (None, batch[8]) + (realigned_p, realigned_e, log_duration_targets)
+                    loss_predictions = output_tgt + (None,)
                 
                 # Calculate loss for Src to Tgt
-                loss_input = (batch[7],) + (realigned_p, realigned_e, realigned_d)
-                losses_src_to_tgt = Loss(loss_input, output_tgt, "to_tgt")
+                losses_src_to_tgt = Loss(loss_input, loss_predictions, "to_tgt")
                 total_loss_src_to_tgt = losses_src_to_tgt[0]
                 print("total_loss_src_to_tgt: ", total_loss_src_to_tgt)
                 
-                alignments = flip_mapping(batch[14], batch[4].shape[1])
-                
-                # max_mel_len = np.int64(max(output_tgt[9]).cpu().numpy())
-                
+                alignments = flip_mapping(batch[16], batch[5].shape[1])
+                                
                 # output_tgt[4] is log_d_predictions
-                d_src = torch.clamp(torch.round(torch.exp(output_tgt[4]) - 1).long(), min=0)
+                # print("d_rounded: ", output_tgt[5])
+                # print("log_d_predictions: ", output_tgt[4])
+                # d_src = torch.clamp(torch.round(torch.exp(output_tgt[4]) - 1).long(), min=0)
+                d_src = realigned_d
+                
+                # print("batdch[-1]", batch[-1])
 
                 # realign p,e,d targets back to src space
                 realigned_p = realign_p_e_d(alignments, output_tgt[2])
                 realigned_e = realign_p_e_d(alignments, output_tgt[3])
-                realigned_d = realign_p_e_d(alignments, output_tgt[4])
-                realigned_d_src = realign_p_e_d(alignments, d_src)
-
-                # TODO: Do I need to realign mels? I think not. That's what predicted mel_lens is for and everything else.
+                realigned_log_d = realign_p_e_d(alignments, output_tgt[4])
+                realigned_d = torch.clamp(torch.exp(realigned_log_d) - 1, min=0)
+                realigned_d = custom_round(realigned_d)
 
                 # # Forward pass: Tgt to Src (so tgt is now src and src is now tgt)
                 print("\nFORWARD PASS: TGT to SRC")
-                output_src = model(texts=batch[4], src_lens=batch[5], max_src_len=batch[6],
-                                   mels=output_tgt[1], mel_lens=output_tgt[9], max_mel_len=batch[9],
-                                   speaker_embs=batch[13], alignments=alignments, p_targets=realigned_p, 
-                                   e_targets=realigned_e, d_targets=realigned_d_src, d_src=d_src)
+                output_src = model(langs=batch[11], texts=batch[5], text_lens=batch[6], max_text_len=batch[7],
+                                   mels=output_tgt[1], mel_lens=output_tgt[9], max_mel_len=batch[10],
+                                   speaker_embs=batch[15], alignments=alignments, p_targets=realigned_p, 
+                                   e_targets=realigned_e, d_targets=realigned_d, d_src=d_src)
 
+                print("Out_src Mel Len: ", output_src[9])
+
+                # For calculating Word Loss
+                if step % word_step == 0:
+                    mels = [output_src[1][i, :output_src[9][i]].transpose(0,1) for i in range(batch_size)]
+                    wav_predictions = vocoder_infer(
+                        mels,
+                        vocoder,
+                        model_config,
+                        preprocess_config,
+                    )
+                    loss_input = (batch[1],) + (batch[8],) + (realigned_p, realigned_e, realigned_log_d)
+                    loss_predictions = output_src[:10] + (output_tgt[10],) + (output_src[11],) + (wav_predictions,)
+                else:
+                    loss_input = (None, batch[8]) + (realigned_p, realigned_e, realigned_log_d)
+                    loss_predictions = output_src[:10] + (output_tgt[10],) + (output_src[11],) + (None,)
                 
-
                 # # Calculate loss for Tgt to Src
-                loss_inputs = (batch[7],) + (realigned_p, realigned_e, realigned_d_src)
-                prediction_inputs = output_src[:10] + (output_tgt[10],) + (output_src[11],)
-                losses_tgt_to_src = Loss(loss_inputs, prediction_inputs, "to_src")
+                losses_tgt_to_src = Loss(loss_input, loss_predictions, "to_src")
                 total_loss_tgt_to_src = losses_tgt_to_src[0]
                 print("total_loss_tgt_to_src: ", total_loss_tgt_to_src)
 
@@ -168,8 +188,6 @@ def main(args, configs):
                 # Backward
                 total_loss = total_loss / grad_acc_step
                 total_loss.backward()
-                print("BETA GRAD", model.module.beta.grad)
-
 
                 if step % grad_acc_step == 0:
                     # Clipping gradients to avoid gradient explosion
@@ -182,7 +200,7 @@ def main(args, configs):
                 if step % log_step == 0:
                     losses = [(l1.item() + l2.item())/2 for l1, l2 in zip(losses_src_to_tgt, losses_tgt_to_src)]
                     message1 = "Step {}/{}, ".format(step, total_step)
-                    message2 = "Total Loss: {:.4f}, Mel Loss: {:.4f}, Mel PostNet Loss: {:.4f}, Pitch Loss: {:.4f}, Energy Loss: {:.4f}, Duration Loss: {:.4f}, Prosody Loss: {:.4f}".format(
+                    message2 = "Total Loss: {:.4f}, Mel Loss: {:.4f}, Mel PostNet Loss: {:.4f}, Pitch Loss: {:.4f}, Energy Loss: {:.4f}, Duration Loss: {:.4f}, Prosody Loss: {:.4f}, Word Loss: {:.4f}".format(
                         *losses
                     )
 
@@ -195,12 +213,16 @@ def main(args, configs):
 
                 if step % synth_step == 0:
                     # Want to see all 3 mels
-                    targets = (batch[0],) +(batch[7],) + batch[15:]
-                    predictions = (output_tgt[1],) + output_tgt[8:10]
+                    src_gt = (batch[0],), (batch[8:10]) + batch[17:]
+                    tgt_targets = (batch[8],) + batch[17:]
+                    src_targets = (batch[8],) + batch[17:]
+                    predicted_tgt = (output_tgt[1],) + output_tgt[8:10]
+                    predicted_src = (output_src[1],) + output_src[8:10]
 
                     fig, wav_reconstruction, wav_prediction, tag = synth_one_sample(
-                        targets,
-                        predictions,
+                        src_gt, 
+                        tgt_targets, src_targets,
+                        predicted_tgt, predicted_src,
                         vocoder,
                         model_config,
                         preprocess_config,
@@ -288,3 +310,4 @@ if __name__ == "__main__":
     configs = (preprocess_config, model_config, train_config)
 
     main(args, configs)
+

@@ -31,18 +31,15 @@ class TrainDataset(Dataset):
 
     def __getitem__(self, idx):
         basename = self.basename[idx]
-        print("BASENAME", basename)
         speaker = self.speaker[idx]
         speaker_id = self.speaker_map[speaker]
         raw_text = self.raw_text[idx]
         raw_translation = self.raw_translation[idx]
+        src_lang = lang_to_id[self.src_lang[idx]]
+        tgt_lang = lang_to_id[self.tgt_lang[idx]]
 
-        # TODO: Don't hardcode Language code here (cmudict vs. ipa) eventually all ipa so language agnostic
-        src_phone = np.array(text_to_sequence(self.text[idx], self.cleaners, 'en'))
-        tgt_phone = np.array(text_to_sequence(self.translation[idx], self.cleaners, 'es')) # TODO: Cleaners here?
-
-        # print("len(src_phone)", len(src_phone))
-        # print("len(tgt_phone)", len(tgt_phone))
+        src_phone = np.array(text_to_sequence(self.text[idx], self.cleaners, self.src_lang[idx]))
+        tgt_phone = np.array(text_to_sequence(self.translation[idx], self.cleaners, self.tgt_lang[idx])) # TODO: Cleaners here?
         
         mel_path = os.path.join(
             self.preprocessed_path,
@@ -55,21 +52,24 @@ class TrainDataset(Dataset):
             "pitch",
             "{}-pitch-{}.npy".format(speaker, basename),
         )
-        pitch = np.load(pitch_path)
+        # Prepend zero for language token
+        pitch = np.insert(np.load(pitch_path), 0, 0)
         energy_path = os.path.join(
             self.preprocessed_path,
             "energy",
             "{}-energy-{}.npy".format(speaker, basename),
         )
-        energy = np.load(energy_path)
+        # Prepend zero for language token
+        energy = np.insert(np.load(energy_path), 0, 0)
         duration_path = os.path.join(
             self.preprocessed_path,
             "duration",
             "{}-duration-{}.npy".format(speaker, basename),
         )
-        duration = np.load(duration_path)
+        # Prepend zero for language token
+        duration = np.insert(np.load(duration_path), 0, 0)
 
-        # Get Random Speaker Embedding
+        # TODO: Get Random Speaker Embedding
         speaker_emb_path = os.path.join(self.preprocessed_path, "speaker_emb", "{}.pkl_emb.pkl".format(speaker))        
         with open(speaker_emb_path, 'rb') as f:
             emb_dict = pickle.load(f)
@@ -86,12 +86,14 @@ class TrainDataset(Dataset):
         sample = {
             "id": basename,
             "speaker": speaker_id,
+            "src_lang": src_lang,
             "text": src_phone,
             "raw_text": raw_text,
             "mel": mel,
             "pitch": pitch,
             "energy": energy,
             "duration": duration,
+            "tgt_lang": tgt_lang,
             "translation": tgt_phone,
             "raw_translation": raw_translation,
             "speaker_emb": embedding,
@@ -120,12 +122,14 @@ class TrainDataset(Dataset):
     def reprocess(self, data, idxs):
         ids = [data[idx]["id"] for idx in idxs]
         speakers = [data[idx]["speaker"] for idx in idxs]
+        src_langs = [data[idx]["src_lang"] for idx in idxs]
         texts = [data[idx]["text"] for idx in idxs]
         raw_texts = [data[idx]["raw_text"] for idx in idxs]
         mels = [data[idx]["mel"] for idx in idxs]
         pitches = [data[idx]["pitch"] for idx in idxs]
         energies = [data[idx]["energy"] for idx in idxs]
         durations = [data[idx]["duration"] for idx in idxs]
+        tgt_langs = [data[idx]["tgt_lang"] for idx in idxs]
         translations = [data[idx]["translation"] for idx in idxs]
         raw_translations = [data[idx]["raw_translation"] for idx in idxs]
         speaker_embeddings = [data[idx]["speaker_emb"] for idx in idxs]
@@ -136,24 +140,26 @@ class TrainDataset(Dataset):
         translation_lens = np.array([translation.shape[0] for translation in translations])
 
         speakers = np.array(speakers)
+        src_langs = np.array(src_langs)
         texts = pad_1D(texts)
         mels = pad_2D(mels)
         pitches = pad_1D(pitches)
         energies = pad_1D(energies)
         durations = pad_1D(durations)
-
+        tgt_langs = np.array(tgt_langs)
         translations = pad_1D(translations)
         alignments = pad_inhomogeneous_2D(alignments)
 
         # Debugging but maybe add reverse_alignments to dataset
         reverse_alignments = flip_mapping(torch.from_numpy(alignments).int(), np.shape(texts)[1])
-        if np.shape(alignments)[1] != np.shape(translations)[1] or reverse_alignments.shape[1] != np.shape(texts)[1]:
+        if np.shape(alignments)[1] + 1 != np.shape(translations)[1] or reverse_alignments.shape[1] + 1 != np.shape(texts)[1]:
+            print(np.shape(alignments)[1], np.shape(translations)[1],reverse_alignments.shape[1], np.shape(texts)[1])
             raise ValueError("Alignments and Texts must have the same length")
             
 
-        return (ids, raw_texts, raw_translations, speakers, texts, text_lens, max(text_lens), mels, mel_lens,
-                max(mel_lens), translations, translation_lens, max(translation_lens), speaker_embeddings, alignments, pitches, energies,
-                durations)
+        return (ids, raw_texts, raw_translations, speakers, src_langs, texts, text_lens, max(text_lens), mels, mel_lens,
+                max(mel_lens), tgt_langs, translations, translation_lens, max(translation_lens), speaker_embeddings, alignments, 
+                pitches, energies, durations)
 
     def collate_fn(self, data):
         data_size = len(data)
@@ -233,7 +239,8 @@ class PreTrainDataset(Dataset):
         )
         # Prepend zero for language token
         duration = np.insert(np.load(duration_path), 0, 0)
-        # Get Speaker Embedding
+        
+        # TODO: Get Speaker Embedding
         speaker_emb_path = os.path.join(self.preprocessed_path, "speaker_emb", "{}.pkl_emb.pkl".format(speaker))        
         with open(speaker_emb_path, 'rb') as f:
             emb_dict = pickle.load(f)

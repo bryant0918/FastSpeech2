@@ -1,3 +1,5 @@
+import torch
+
 
 def test_translation():
     import os
@@ -101,7 +103,6 @@ def test_inv_melspec():
 def test_whisper_STT():
     import whisper
     import librosa
-    import torch
     import time
 
     audio_path = "raw_data/LJSpeech/LJSpeech/LJ001-0004.wav"
@@ -143,7 +144,17 @@ def new_train_val_file():
                 # Prepend "en|es|" to each line
                 file.write(f'en|es|{line}')
 
-if __name__ == "__main__":
-    new_train_val_file()
+def custom_round(x):
+    # Round x in (0, .5] up to 1, keep 0 as is
+    mask = (x <= 0.5) & (x > 0)
+    # Add pos/neg eps randomely so half the .5's round up and half down
+    eps = (torch.rand_like(x) - .5)/100
+    x[mask] = torch.ceil(x[mask])
+    return torch.round(x + eps)
+    
 
+if __name__ == "__main__":
+    x = torch.tensor([0, .25, 0.5, 1.5, 2.5, 3.5, 4.5, 0.5, 0])
+    x = custom_round(x)
+    print(x)
     pass

@@ -21,16 +21,18 @@ else:
 
 def to_device(data, device):
     # For Pros Full training
-    if len(data) == 18:
-        (ids, raw_texts, raw_translations, speakers, texts, text_lens, max_text_lens, mels, mel_lens,
-        max_mel_lens, translations, translation_lens, max_translation_len, speaker_embeddings, alignments, 
+    if len(data) == 20:
+        (ids, raw_texts, raw_translations, speakers, src_langs, texts, text_lens, max_text_lens, mels, mel_lens,
+        max_mel_lens, tgt_langs, translations, translation_lens, max_translation_len, speaker_embeddings, alignments, 
         pitches, energies, durations) = data
 
         speakers = torch.from_numpy(speakers).long().to(device)
+        text_langs = torch.from_numpy(src_langs).long().to(device)
         texts = torch.from_numpy(texts).long().to(device)
         src_lens = torch.from_numpy(text_lens).to(device)
         mels = torch.from_numpy(mels).float().to(device)
         mel_lens = torch.from_numpy(mel_lens).to(device)
+        translation_langs = torch.from_numpy(tgt_langs).long().to(device)
         translations = torch.from_numpy(translations).long().to(device)
         translation_lens = torch.from_numpy(translation_lens).to(device)
 
@@ -42,9 +44,9 @@ def to_device(data, device):
         energies = torch.from_numpy(energies).to(device)
         durations = torch.from_numpy(durations).long().to(device)
 
-        return (ids, raw_texts, raw_translations, speakers, texts, src_lens, max_text_lens, mels, mel_lens,
-                max_mel_lens, translations, translation_lens, max_translation_len, speaker_embeddings, alignments, 
-                pitches, energies, durations)
+        return (ids, raw_texts, raw_translations, speakers, text_langs, texts, src_lens, max_text_lens, mels, mel_lens,
+                max_mel_lens, translation_langs, translations, translation_lens, max_translation_len, speaker_embeddings, 
+                alignments, pitches, energies, durations)
 
     # For Pros Pretraining
     if len(data) == 14:
@@ -140,7 +142,97 @@ def expand(values, durations):
     return np.array(out)
 
 
-def synth_one_sample(targets, predictions, vocoder, model_config, preprocess_config):    
+def synth_one_sample(src_gt, tgt_targets, src_targets, predicted_tgt, predicted_src, vocoder, model_config, preprocess_config):    
+    (   basename, 
+        src_gt_mel,
+        src_gt_mel_lens,
+        src_gt_pitch,
+        src_gt_energy,
+        src_gt_duration,
+    ) = src_gt
+    
+    (   
+        tgt_mel_target, 
+        tgt_pitch_target, 
+        tgt_energy_target, 
+        tgt_duration_target,
+    ) = tgt_targets
+
+    (   
+        src_mel_target, 
+        src_pitch_target, 
+        src_energy_target, 
+        src_duration_target,
+    ) = src_targets
+
+    (   tgt_mel_prediction,
+        tgt_src_len,
+        tgt_mel_len,
+    ) = predicted_tgt
+
+    (   src_mel_prediction,
+        src_src_len,
+        src_mel_len,
+    ) = predicted_src
+    
+    src_len = src_len[0].item()
+    src_gt_mel_lens = src_gt_mel_lens[0].item()
+
+    src_gt_mel = src_gt_mel[0, :src_gt_mel_lens].detach().transpose(0, 1)
+
+    mel_prediction = mel_prediction[0, :mel_len].detach().transpose(0, 1)
+    
+    src_gt_duration = src_gt_duration[0, :src_len].detach().cpu().numpy()
+    if preprocess_config["preprocessing"]["pitch"]["feature"] == "phoneme_level":
+        src_gt_pitch = src_gt_pitch[0, :src_len].detach().cpu().numpy()
+        src_gt_pitch = expand(src_gt_pitch, src_gt_duration)
+    else:
+        src_gt_pitch = src_gt_pitch[0, :mel_len].detach().cpu().numpy()
+    if preprocess_config["preprocessing"]["energy"]["feature"] == "phoneme_level":
+        src_gt_energy = src_gt_energy[0, :src_len].detach().cpu().numpy()
+        src_gt_energy = expand(src_gt_energy, src_gt_duration)
+    else:
+        src_gt_energy = src_gt_energy[0, :mel_len].detach().cpu().numpy()
+
+    with open(
+        os.path.join(preprocess_config["path"]["preprocessed_path"], "stats.json")
+    ) as f:
+        stats = json.load(f)
+        stats = stats["pitch"] + stats["energy"][:2]
+
+    fig = plot_mel(
+        [
+            (tgt_mel_prediction.cpu().numpy(), pitch, energy),
+            (src_mel_prediction.cpu().numpy(), src_gt_pitch, src_gt_energy),
+            (src_gt_mel.cpu().numpy(), src_gt_pitch, src_gt_energy),
+            
+        ],
+        stats,
+        ["Synthetized TGT Spectrogram", "Synthesized SRC Spectrogram", "Ground-Truth Spectrogram"],
+    )
+
+    if vocoder is not None:
+        from .model import vocoder_infer
+
+        wav_reconstruction = vocoder_infer(
+            mel_target.unsqueeze(0),
+            vocoder,
+            model_config,
+            preprocess_config,
+        )[0]
+        wav_prediction = vocoder_infer(
+            mel_prediction.unsqueeze(0),
+            vocoder,
+            model_config,
+            preprocess_config,
+        )[0]
+    else:
+        wav_reconstruction = wav_prediction = None
+
+    return fig, wav_reconstruction, wav_prediction, basename
+
+
+def synth_one_sample_pretrain(targets, predictions, vocoder, model_config, preprocess_config):    
     (   basename, 
         mel_target, 
         pitch_target, 
@@ -391,7 +483,7 @@ def flip_mapping(tgt_to_src_mappings, src_seq_len):
         batch = []
         for tgt_to_src_mapping in tgt_to_src_mappings:
             # Initialize a list of lists to store the target to source mappings
-            src_to_tgt_mapping = [[] for _ in range(src_seq_len)]
+            src_to_tgt_mapping = [[] for _ in range(src_seq_len - 1)]
             
             # Iterate through each source index and its corresponding target indices
             for tgt_idx, src_indices in enumerate(tgt_to_src_mapping):
@@ -408,8 +500,17 @@ def flip_mapping(tgt_to_src_mappings, src_seq_len):
 
 
 def realign_p_e_d(alignments, p_e_d):
-        new_ped = torch.zeros(p_e_d.size(0), len(alignments[0]), device=p_e_d.device)
+        new_ped = torch.zeros(p_e_d.size(0), len(alignments[0])+1, device=p_e_d.device)
         for b, alignment in enumerate(alignments):
             for j, src_indices in enumerate(alignment):
-                new_ped[b][j] = torch.mean(torch.tensor([p_e_d[b][i] for i in src_indices], dtype=torch.float32))
+                new_ped[b][j+1] = torch.mean(torch.tensor([p_e_d[b][i] for i in src_indices], dtype=torch.float32))
         return new_ped
+
+
+def custom_round(x):
+    # Round x in (0, .5] up to 1, keep 0 as is
+    mask = (x <= 0.5) & (x > 0)
+    x[mask] = torch.ceil(x[mask])
+    # Add pos/neg eps randomely so half the .5's round up and half down
+    eps = (torch.rand_like(x) - .5)/100
+    return torch.round(x + eps).int()

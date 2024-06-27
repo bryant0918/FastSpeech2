@@ -77,9 +77,7 @@ class FastSpeech2Pros(nn.Module):
         output = self.encoder(texts, tgt_masks)  # torch.Size([Batch, seq_len, 256])
 
         speaker_embs = speaker_embs.unsqueeze(1).expand(-1, output.size()[1], -1)
-        print("Speaker embeddings shape: ", speaker_embs.shape, torch.isnan(speaker_embs).any())
-        print("Output shape: ", output.shape, torch.isnan(output).any())
-
+        
         # h_sd = output + speaker_embs  # torch.Size([Batch, tgt_seq_len, 256])
         h_sd = torch.cat((output, speaker_embs), dim=-1)
         # print("h_sd shape: ", h_sd.shape, torch.isnan(h_sd).any())
@@ -91,19 +89,14 @@ class FastSpeech2Pros(nn.Module):
         # print("e_tgt[1] (mu) shape: ", e_tgt[1].shape)
                 
         mels = mels.unsqueeze(1) # mels shape is [batch_size, 1, melspec W, melspec H]
-
         enhanced_mels = self.prosody_extractor.add_lang_emb(mels, langs)
         
         e_src = self.prosody_extractor(enhanced_mels)   # e is [batch_size, melspec H, melspec W, 128]
-        print("e_src shape: ", e_src.shape, torch.isnan(e_src).any())
-        print("h_sd shape: ", h_sd.shape, torch.isnan(h_sd).any())
-        
+                
         # Split phone pros embeddings by phone duration
         # [batch_size (list), phoneme_sequence_length (list), melspec H (tensor), melspec W (tensor), 128 (tensor)]        
         e_k_src = self.prosody_extractor.split_phones(e_src, d_src)  
-        print("e_k_src shape: ", len(e_k_src), len(e_k_src[0]), e_k_src[0][0].shape)  # 2 58 torch.Size([80, 12, 256])
-        print("d_src[0][0]", d_src[0][0], torch.isnan(d_src).any())
-
+        
         # For calculating Lpp loss:
         agg_extracted_prosody = torch.zeros(batch_size, src_seq_length, 256).to(device)
         for b in range(batch_size):
@@ -119,13 +112,11 @@ class FastSpeech2Pros(nn.Module):
         h_sd = self.h_sd_downsize(h_sd) # 512 to 256
         if pretraining:
             h_sd = torch.cat((h_sd, agg_extracted_prosody), dim=-1) # torch.Size([Batch, tgt_seq_len, 512]
+        else: # Full training
+            # TODO: Allow for new predicted_prosodies_tgt shape
+            tgt_samp = self.prosody_predictor.sample2(e_tgt) # torch.Size([2, 88, 256])
+            # print("tgt_samp shape: ", tgt_samp.shape, torch.isnan(tgt_samp).any())  
 
-
-        # TODO: Allow for new predicted_prosodies_tgt shape
-        tgt_samp = self.prosody_predictor.sample2(e_tgt) # torch.Size([2, 88, 256])
-        # print("tgt_samp shape: ", tgt_samp.shape, torch.isnan(tgt_samp).any())  
-        
-        if not pretraining:
             # print("alignments shape: ", alignments.shape)  # TODO: unpad alignments for realigner otherwise everything mapped to 0.
             adjusted_e_tgt = self.prosody_predictor.prosody_realigner(alignments, tgt_samp, e_k_src, self.beta)
             # print("alignments nan", torch.isnan(alignments).any())

@@ -10,11 +10,11 @@ from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm
 
 from utils.model import get_model, get_vocoder, get_param_num, vocoder_infer
-from utils.tools import to_device, log, synth_one_sample
+from utils.tools import to_device, log, synth_one_sample_pretrain
 from model import FastSpeech2Loss
 from dataset import PreTrainDataset
 
-from evaluate import evaluate
+from evaluate import evaluate_pretrain
 
 if torch.cuda.is_available():
     device = torch.device("cuda")
@@ -100,6 +100,7 @@ def main(args, configs):
                 print("\nFORWARD PASS: SRC to SRC")
                 output = model(*(input))
 
+                log_duration_targets = torch.log(batch[-1] + 1)
                 # For calculating Word Loss
                 if step % word_step == 0:
                     mels = [output[1][i, :output[9][i]].transpose(0,1) for i in range(batch_size)]
@@ -109,10 +110,10 @@ def main(args, configs):
                         model_config,
                         preprocess_config,
                     )
-                    loss_input = (batch[1],) + (batch[7],) + batch[11:]
+                    loss_input = (batch[1],) + batch[7:9] + batch[11:13] + (log_duration_targets,)
                     loss_predictions = output + (wav_predictions,)
                 else:
-                    loss_input = (None, batch[7]) + batch[11:]
+                    loss_input = (None,) + batch[7:9] + batch[11:13] + (log_duration_targets,)
                     loss_predictions = output + (None,)
                 
                 # Calculate loss for Src to Tgt
@@ -136,7 +137,7 @@ def main(args, configs):
                 if step % log_step == 0:
                     losses = [l.item() for l in losses]
                     message1 = "Step {}/{}, ".format(step, total_step)
-                    message2 = "Total Loss: {:.4f}, Mel Loss: {:.4f}, Mel PostNet Loss: {:.4f}, Pitch Loss: {:.4f}, Energy Loss: {:.4f}, Duration Loss: {:.4f}, Prosody Loss: {:.4f}, Word Loss: {:.4f}".format(
+                    message2 = "Total Loss: {:.4f}, Mel Loss: {:.4f}, Mel PostNet Loss: {:.4f}, Pitch Loss: {:.4f}, Energy Loss: {:.4f}, Duration Loss: {:.4f}, Prosody Loss: {:.4f}, Word Loss: {:.4f}, Full Duration Loss: {:.4f}".format(
                         *losses
                     )
 
@@ -150,7 +151,7 @@ def main(args, configs):
                 if step % synth_step == 0:
                     targets = (batch[0],) +(batch[7],) + batch[11:]
                     predictions = (output[1],) + output[8:10]
-                    fig, wav_reconstruction, wav_prediction, tag = synth_one_sample(
+                    fig, wav_reconstruction, wav_prediction, tag = synth_one_sample_pretrain(
                         targets,
                         predictions,
                         vocoder,
@@ -180,7 +181,7 @@ def main(args, configs):
 
                 if step % val_step == 0:
                     model.eval()
-                    message = evaluate(model, step, configs, val_logger, vocoder, True)
+                    message = evaluate_pretrain(model, step, configs, val_logger, vocoder)
                     with open(os.path.join(val_log_path, "log.txt"), "a") as f:
                         f.write(message + "\n")
                     outer_bar.write(message)

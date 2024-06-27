@@ -88,6 +88,8 @@ def vocoder_infer(mels, vocoder, model_config, preprocess_config, lengths=None):
     if isinstance(mels, list):
         wavs = []
         for mel in mels:
+            if mel.shape[1] == 0:
+                continue
             if name == "MelGAN":
                 wav = vocoder.inverse(mel / np.log(10))
             elif name == "HiFi-GAN":

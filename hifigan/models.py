@@ -147,7 +147,13 @@ class Generator(torch.nn.Module):
         self.conv_post.apply(init_weights)
 
     def forward(self, x):
-        x = self.conv_pre(x)
+        try:
+            x = self.conv_pre(x)
+        except RuntimeError as e:
+            print("Error: ", e)
+            print("Input shape: ", x.shape)
+            print("Conv1d shape: ", self.conv_pre)
+            raise e  # Probably when audio is too short (duration < 1s)
         for i in range(self.num_upsamples):
             x = F.leaky_relu(x, LRELU_SLOPE)
             x = self.ups[i](x)

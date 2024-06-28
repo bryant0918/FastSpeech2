@@ -60,7 +60,7 @@ The generated utterances will be put in ``output/result/``.
 To copy from remote server back to local machine:
 ```commandline
 scp "ditto@136.36.160.77:/home/ditto/Documents/ProsodyCloning/FastSpeech2/output/result/LJSpeech/<name of file>" /Users/bryantmcarthur/Downloads/
-scp "ditto@136.36.160.77:/home/ditto/Documents/ProsodyCloning/FastSpeech2/output/result/LJSpeech/Hi my name is ditto and this is what I sound like.wav" /Users/bryantmcarthur/Downloads/
+scp "ditto@Emotiv:/home/ditto/Datasets/Speech/es/tedx_spanish_corpus/files/Speaker_Info.xls" /Users/bryant/Documents/Ditto/
 ```
 
 Here is an example of synthesized mel-spectrogram of the sentence "Printing, in the only sense with which we are at present concerned, differs from most if not from all the arts and crafts represented in the Exhibition", with the English single-speaker TTS model.  

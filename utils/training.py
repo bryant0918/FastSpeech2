@@ -6,6 +6,7 @@ from utils.model import vocoder_infer
 
 
 def loop(preprocess_config, model_config, batch, model, Loss, vocoder, step, word_step):
+    batch_size = len(batch[0])
     # Forward pass: Src to Tgt
     input = (batch[4],) + batch[12:15] + batch[8:11] + batch[15:17] + batch[20:] + (batch[19],)
     output_tgt = model(*(input))

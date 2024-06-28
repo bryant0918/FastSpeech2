@@ -96,6 +96,8 @@ def vocoder_infer(mels, vocoder, model_config, preprocess_config, lengths=None):
                 wav = vocoder(mel).squeeze(1).squeeze(0)
             # wav = wav * preprocess_config["preprocessing"]["audio"]["max_wav_value"]     
             wavs.append(wav)
+        if len(wavs) == 0:
+            return None
 
     else:
         with torch.no_grad():
@@ -108,7 +110,8 @@ def vocoder_infer(mels, vocoder, model_config, preprocess_config, lengths=None):
             wavs.cpu().numpy()
             * preprocess_config["preprocessing"]["audio"]["max_wav_value"]
         ).astype("int16")
-        wavs = [wav for wav in wavs]
+        
+        wavs = [wav for wav in wavs if np.shape(wav)[0] > 0]
 
         for i in range(len(mels)):
             if lengths is not None:

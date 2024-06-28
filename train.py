@@ -195,9 +195,9 @@ def main(args, configs):
 
                 if step % synth_step == 0:
                     # Want to see all 3 mels
-                    src_gt = (batch[0], batch[6]) + (batch[8:10]) + batch[17:]
+                    src_gt = (batch[0], batch[6]) + batch[8:10] + batch[17:20]
                     tgt_targets = (batch[8], batch[13]) + batch[20:]
-                    src_targets = (batch[8],) + batch[17:]
+                    src_targets = (batch[8],) + batch[17:20]
                     predicted_tgt = (output_tgt[1],) + output_tgt[8:10]
                     predicted_src = (output_src[1],) + output_src[8:10]
 

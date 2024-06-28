@@ -43,7 +43,7 @@ def to_device(data, device):
         pitches = pitches.to(device)
         energies = energies.to(device)
         durations = durations.to(device)
-        realigend_p = realigned_p.to(device)
+        realigned_p = realigned_p.to(device)
         realigned_e = realigned_e.to(device)
         realigned_d = realigned_d.to(device)
 

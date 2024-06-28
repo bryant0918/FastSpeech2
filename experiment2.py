@@ -152,6 +152,9 @@ def custom_round(x):
     x[mask] = torch.ceil(x[mask])
     return torch.round(x + eps)
     
+def test_mfa():
+    
+
 
 if __name__ == "__main__":
     x = torch.tensor([0, .25, 0.5, 1.5, 2.5, 3.5, 4.5, 0.5, 0])

@@ -27,7 +27,8 @@ pip3 install -r requirements.txt
 ```
 then
 ```commandline
-conda install conda-forge::pyworld
+conda install -c conda-forge pyworld montreal-forced-aligner
+conda instal conda-forge::charset-normalizer
 ```
 
 Then you must unzip the vocoders
@@ -96,6 +97,9 @@ The supported datasets are
 
 ```wget https://data.keithito.com/data/speech/LJSpeech-1.1.tar.bz2```
 
+- Spanish: Ted Talk spanish audio clips with multiple different speakers
+and transcripts, approximately 24 hours in total.
+
 - [AISHELL-3](http://www.aishelltech.com/aishell_3): a Mandarin TTS dataset with 218 male and female speakers, roughly 85 hours in total.
 - [LibriTTS](https://research.google/tools/datasets/libri-tts/): a multi-speaker English dataset containing 585 hours of speech by 2456 speakers.
 
@@ -117,7 +121,7 @@ python3 prepare_align.py config/LJSpeech/preprocess.yaml
 ```
 nohup python3 prepare_align.py config/LJSpeech/preprocess.yaml &
 
-ps -ef | grep 89466
+ps -ef | grep 2014664
 ```
 
 ### Get the TextGrid Files
@@ -136,16 +140,14 @@ You have to unzip the files in ``preprocessed_data/LJSpeech/TextGrid/``.
 
 ```unzip preprocessed_data/LJSpeech/LJSpeech.zip -d preprocessed_data/LJSpeech/```
 
+For new Datasets you will need to generate TextGrid files yourself. Instructions are [here](https://montreal-forced-aligner.readthedocs.io/en/latest/installation.html) for installation and [here](https://montreal-forced-aligner.readthedocs.io/en/latest/first_steps/index.html#first-steps-align-pretrained) for aligning.
 
-Alternately, you can align the corpus by yourself to get the TextGrid Files. 
-Download the official MFA package and run
+
+Alternately, you can download the official MFA package and run
 ```
 ./montreal-forced-aligner/bin/mfa_align raw_data/LJSpeech/ lexicon/librispeech-lexicon.txt english preprocessed_data/LJSpeech
 ```
 
-```
-./montreal-forced-aligner/bin/mfa_align raw_data/Bryant/ lexicon/librispeech-lexicon.txt english preprocessed_data/Bryant
-```
 or
 ```
 ./montreal-forced-aligner/bin/mfa_train_and_align raw_data/LJSpeech/ lexicon/librispeech-lexicon.txt preprocessed_data/LJSpeech

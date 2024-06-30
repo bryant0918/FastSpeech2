@@ -170,10 +170,9 @@ ps -ef | grep 112675
 ```
 
 ### Get Speaker Embeddings
-For now use this one if not already there:
-```
-scp preprocessed_data/LJSpeech/speaker_emb/LJSpeech.pkl_emb.pkl ditto@Emotiv:/home/ditto/Ditto/FastSpeech2/preprocessed_data/LJSpeech/speaker_emb/LJSpeech.pkl_emb.pkl
-```
+This can be done in parallel with preprocessing script since it just reads audio files and computes embeddings. That's why it is split to two different scripts to speed up processing.
+
+
 
 
 ## PreTrain

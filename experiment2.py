@@ -152,8 +152,10 @@ def custom_round(x):
     x[mask] = torch.ceil(x[mask])
     return torch.round(x + eps)
     
-def test_mfa():
+def test_speaker_encoder():
     
+
+
 
 
 if __name__ == "__main__":

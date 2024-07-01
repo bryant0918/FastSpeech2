@@ -17,6 +17,7 @@ from singing_girl import sing
 from text.ipadict import db
 from text.tools import split_with_tie_bar
 import audio as Audio
+from text.cmudict import CMUDict
 
 
 class Preprocessor:
@@ -27,6 +28,7 @@ class Preprocessor:
         self.val_size = config["preprocessing"]["val_size"]
         self.sampling_rate = config["preprocessing"]["audio"]["sampling_rate"]
         self.hop_length = config["preprocessing"]["stft"]["hop_length"]
+        self.target_lang = config["preprocessing"]["text"]["target_language"]
 
         assert config["preprocessing"]["pitch"]["feature"] in [
             "phoneme_level",
@@ -56,6 +58,11 @@ class Preprocessor:
             config["preprocessing"]["mel"]["mel_fmax"],
         )
 
+        if self.target_lang == "en":
+            self.cmu = CMUDict("lexicon/librispeech-lexicon.txt")
+        elif self.target_lang == "es":
+            self.epi = epitran.Epitran('spa-Latn')
+
     def build_from_path(self):
         os.makedirs((os.path.join(self.out_dir, "mel")), exist_ok=True)
         os.makedirs((os.path.join(self.out_dir, "pitch")), exist_ok=True)
@@ -72,10 +79,6 @@ class Preprocessor:
         # Compute pitch, energy, duration, and mel-spectrogram
         speakers = {}
         for i, speaker in enumerate(tqdm(os.listdir(self.in_dir))):
-            # TODO: Get Speaker Embedding
-
-            
-
             speakers[speaker] = i
             for j, wav_name in enumerate(tqdm(os.listdir(os.path.join(self.in_dir, speaker)))):
                 if ".wav" not in wav_name:
@@ -87,7 +90,10 @@ class Preprocessor:
                     ret = self.process_utterance(speaker, basename)
                     if ret is None:
                         continue
+                    elif ret is IndexError:
+                        continue
                     else:
+                        # print("Ret: ", ret)
                         info, pitch, energy, n = ret
                     out.append(info)
                 else:
@@ -179,6 +185,8 @@ class Preprocessor:
         textgrid = tgt.io.read_textgrid(tg_path)
 
         src_phones, duration, start, end = self.get_alignment(textgrid)
+        if src_phones is None:
+            return None
 
         # To flatten phones
         flat_phones = list(chain.from_iterable(src_phones))
@@ -192,23 +200,39 @@ class Preprocessor:
         with open(translation_path, "r") as f:
             raw_translation = f.readline().strip("\n")
 
-        epi = epitran.Epitran('spa-Latn') # TODO: Change based on language
+        # Get Phonetic Transcription
+        if self.target_lang == "es":
+            tgt_phones = self.epi.transliterate(raw_translation)
+            tgt_phones = tgt_phones.split()
+            tgt_phones = [split_with_tie_bar(word) for word in tgt_phones]
+            # Flatten tgt_phones to save to train.txt, val.txt
+            flat_phones = list(chain.from_iterable(tgt_phones))
+        
+        elif self.target_lang == "en":
+            tgt_phones = []
+            flat_phones = []
+            for word in raw_translation.split():
+                try:
+                    tgt_phones.append(self.cmu.lookup(word)[0])
+                    flat_phones.extend(self.cmu.lookup(word)[0].split())
+                except TypeError:
+                    print("Word", word, self.cmu.lookup(word), translation_path)
+                    continue
+            
+        # print("tgt_phones", tgt_phones, len(raw_translation.split()))
+        # print("flat_phones", flat_phones, len(raw_translation.split()))
+        # gt_phones ['kalkɾaft', 'siɾbjo', 'en', 'la', 'siudad', 'de', 'londɾes', 'asta', 'mil', 'ot͡ʃosientos', 
+        #            'setenta', 'i', 'kwatɾo', 'kwando', 'ɾesibjo', 'una', 'pensjon', 'de', 'beintisinko', 
+        #            't͡ʃelines', 'poɾ', 'semana'] 22
 
-        tgt_phones = epi.transliterate(raw_translation)
-        tgt_phones = tgt_phones.split()
-
-        if len(tgt_phones) != len(raw_translation.split()): # TODO: Figure this out
+        if len(tgt_phones) != len(raw_translation.split()):
             # So far only loses singular 'h' like for middle initial because h is silent in spanish
             # Can check and insert myself.
-            print(f"{basename} Length of raw translation does not equal length of phonemes! ",
-                  raw_translation, tgt_phones, "Continuing...")
+
+            # TODO: Also happens when there is no pronunciation for a word in lexicon.
+            # Can use MFA arpabet dictionary
+            print(f"{basename} Length of raw translation does not equal length of phonemes! Continuing...")
             return None
-
-        # tgt_phones = [[char for char in word] for word in tgt_phones]
-        tgt_phones = [split_with_tie_bar(word) for word in tgt_phones]
-
-        # Flatten tgt_phones to save to train.txt, val.txt
-        flat_phones = list(chain.from_iterable(tgt_phones))
 
         translation = "{" + " ".join(flat_phones) + "}"
 
@@ -216,6 +240,10 @@ class Preprocessor:
         word_alignments = np.load(word_alignment_path)
 
         # Get src tgt phone alignments
+        # Read raw text
+        with open(text_path, "r") as f:
+            raw_text = f.readline().strip("\n")
+        
         phone_alignments = self.get_phoneme_alignment(word_alignments, src_phones, tgt_phones)
 
         # Read and trim wav files
@@ -229,7 +257,7 @@ class Preprocessor:
             print(text_path)
             print("raw text", raw_text)
             print("raw translation", raw_translation)  # right here on motorcycle
-            print(epi.transliterate(raw_translation).split())
+            # print(self.epi.transliterate(raw_translation).split())
             print("tgt_phones", len(tgt_phones), tgt_phones)
             return IndexError
 
@@ -237,9 +265,9 @@ class Preprocessor:
             print(text_path)
             print("raw text", raw_text)
             print("raw translation", raw_translation)  # right here on motorcycle
-            print(epi.transliterate(raw_translation).split())
+            # print(self.epi.transliterate(raw_translation).split())
             print("tgt_phones", len(tgt_phones), tgt_phones)
-            raise IndexError
+            return IndexError
 
         # Compute fundamental frequency
         pitch, t = pw.dio(
@@ -320,6 +348,8 @@ class Preprocessor:
         phones_tier = textgrid.get_tier_by_name("phones")
         words_tier = textgrid.get_tier_by_name("words")
         word_end_times = [w.end_time for w in words_tier._objects]
+        # print("Word end times", word_end_times)
+        # print("Num words: ", len(words_tier._objects))
 
         sil_phones = ["sil", "sp"]  # Not 'spn'
 
@@ -336,6 +366,7 @@ class Preprocessor:
             # Trim leading silences
             if not all_phones and not word_phones:
                 if p in sil_phones:
+                    # print("Continuing: ", p)
                     continue
                 else:
                     start_time = s
@@ -355,6 +386,7 @@ class Preprocessor:
                     if word_idx == len(words_tier.intervals) - 1:  # That was the last word
                         durations.append(int(np.round(e * self.sampling_rate / self.hop_length) -
                                  np.round(s * self.sampling_rate / self.hop_length)))
+                        # print("Breaking: ", s,e,p)
                         break
                     word_idx += 1
 
@@ -366,8 +398,15 @@ class Preprocessor:
             # durations.append(int(np.round(e * 22050 / 256) - np.round(s * 22050 / 256)))
 
         # Trim tailing silences
+        # print("Num words: ", num_words)
         phones = all_phones[:num_words]
         durations = durations[:end_idx]
+        # print("Phones", phones)
+        # print("Phones", all_phones)
+
+        # TODO: Likely due to phones not detected for 1 or more words.
+        if num_words != len(words_tier._objects):
+            return None, None, None, None
 
         return phones, durations, start_time, end_time
 
@@ -402,9 +441,16 @@ class Preprocessor:
 
             if i == 0:
                 flat_src_phones_idx = 0
-            
             else:
-                flat_src_phones_idx = src_phone_cumsums[i-1]
+                try:
+                    flat_src_phones_idx = src_phone_cumsums[i-1]
+                except IndexError:
+                    print("src_phone_cumsums", len(src_phone_cumsums), src_phone_cumsums)
+                    print("src_phones", i, len(src_phones), src_phones)
+                    print("tgt_phones", j, len(tgt_phones), tgt_phones)
+                    print("word_alignment", word_alignment)
+                    raise IndexError
+            
 
             if j == 0:
                 flat_tgt_phones_idx = 0
@@ -533,3 +579,35 @@ class Preprocessor:
 
         return min_value, max_value
 
+
+
+if __name__ == "__main__":
+        # intervals [12]:
+        #     xmin = 2.46 
+        #     xmax = 2.51 
+        #     text = "y" 
+        # intervals [13]:
+        #     xmin = 2.51 
+        #     xmax = 3.3 
+        #     text = "etonces" 
+        
+        # # Problem is phones for "entonces" and "volvio" are not detected in TextGrid.
+        # # I should skip when this happens since alignment relies on having all phones for all words.
+
+        # intervals [36]:
+        #     xmin = 3.76 
+        #     xmax = 3.82 
+        #     text = "a" 
+        # intervals [37]:
+        #     xmin = 3.82 
+        #     xmax = 3.9 
+        #     text = "s" 
+        # intervals [38]:
+        #     xmin = 3.9 
+        #     xmax = 3.96 
+        #     text = "u" 
+        # intervals [39]:
+        #     xmin = 3.96 
+        #     xmax = 4.03 
+        #     text = "r" 
+        pass

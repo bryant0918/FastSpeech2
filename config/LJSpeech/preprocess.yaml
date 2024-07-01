@@ -13,6 +13,7 @@ preprocessing:
   text:
     text_cleaners: ["english_cleaners"]
     language: "en"
+    target_language: "es"
   audio:
     sampling_rate: 22050
     max_wav_value: 32768.0

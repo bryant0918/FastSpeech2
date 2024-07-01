@@ -11,6 +11,7 @@ preprocessing:
   text:
     text_cleaners: ["spanish_cleaners"]
     language: "es"
+    target_language: "en"
   audio:
     sampling_rate: 22050
     max_wav_value: 32768.0

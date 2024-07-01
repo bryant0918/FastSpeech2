@@ -161,9 +161,7 @@ After that, run the preprocessing script by
 ```
 python3 preprocess.py config/LJSpeech/preprocess.yaml
 ```
-```
-python3 preprocess.py config/Bryant/preprocess.yaml
-```
+
 ```
 nohup python3 preprocess.py config/LJSpeech/preprocess.yaml &
 ps -ef | grep 112675

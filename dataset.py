@@ -193,18 +193,37 @@ class TrainDataset(Dataset):
 
 class PreTrainDataset(Dataset):
     def __init__(
-        self, filename, preprocess_config, train_config, sort=False, drop_last=False
+        self, filename, preprocess_config1, preprocess_config2, train_config, sort=False, drop_last=False
     ):
-        self.dataset_name = preprocess_config["dataset"]
-        self.preprocessed_path = preprocess_config["path"]["preprocessed_path"]
-        self.cleaners = preprocess_config["preprocessing"]["text"]["text_cleaners"]
+        self.preprocessed_path = {}
+        self.cleaners = {}
+
+        c1_lang = preprocess_config1['preprocessing']['text']['language']
+        c2_lang = preprocess_config2['preprocessing']['text']['language']
+
+        self.preprocessed_path[c1_lang] = preprocess_config1["path"]["preprocessed_path"]
+        self.preprocessed_path[c2_lang] = preprocess_config2["path"]["preprocessed_path"]
+
+        self.parent_dir = os.path.dirname(self.preprocessed_path[c1_lang])
+
+        self.cleaners[c1_lang] = preprocess_config1["preprocessing"]["text"]["text_cleaners"]
+        self.cleaners[c2_lang] = preprocess_config2["preprocessing"]["text"]["text_cleaners"]
+
         self.batch_size = train_config["optimizer"]["batch_size"]
 
         self.src_lang, _, self.basename, self.speaker, self.text, self.raw_text, _, _ = self.process_meta(
             filename
         )
-        with open(os.path.join(self.preprocessed_path, "speakers.json")) as f:
+
+        # Get combined speaker map
+        with open(os.path.join(self.preprocessed_path[c1_lang], "speakers.json")) as f:
             self.speaker_map = json.load(f)
+        max_speaker_id = max(self.speaker_map.values())
+        with open(os.path.join(self.preprocessed_path[c2_lang], "speakers.json")) as f:
+            speaker_map2 = json.load(f)
+        for key in speaker_map2:
+            self.speaker_map[key] = speaker_map2[key] + max_speaker_id + 1
+        
         self.sort = sort
         self.drop_last = drop_last
 
@@ -216,32 +235,33 @@ class PreTrainDataset(Dataset):
         speaker = self.speaker[idx]
         speaker_id = self.speaker_map[speaker]
         raw_text = self.raw_text[idx]
-        src_lang = lang_to_id[self.src_lang[idx]]
-        
-        phone = np.array(text_to_sequence(self.text[idx], self.cleaners, self.src_lang[idx]))
+        src_lang = self.src_lang[idx]
+        src_lang_id = lang_to_id[src_lang]
+
+        phone = np.array(text_to_sequence(self.text[idx], self.cleaners[src_lang], src_lang))
         
         mel_path = os.path.join(
-            self.preprocessed_path,
+            self.preprocessed_path[src_lang],
             "mel",
             "{}-mel-{}.npy".format(speaker, basename),
         )
         mel = np.load(mel_path)
         pitch_path = os.path.join(
-            self.preprocessed_path,
+            self.preprocessed_path[src_lang],
             "pitch",
             "{}-pitch-{}.npy".format(speaker, basename),
         )
         # Prepend zero for language token
         pitch = np.insert(np.load(pitch_path), 0, 0)
         energy_path = os.path.join(
-            self.preprocessed_path,
+            self.preprocessed_path[src_lang],
             "energy",
             "{}-energy-{}.npy".format(speaker, basename),
         )
         # Prepend zero for language token
         energy = np.insert(np.load(energy_path), 0, 0)
         duration_path = os.path.join(
-            self.preprocessed_path,
+            self.preprocessed_path[src_lang],
             "duration",
             "{}-duration-{}.npy".format(speaker, basename),
         )
@@ -249,11 +269,11 @@ class PreTrainDataset(Dataset):
         duration = np.insert(np.load(duration_path), 0, 0)
         
         # Get Speaker Embedding
-        speaker_emb_path_mean = os.path.join(self.preprocessed_path, "speaker_emb", speaker, "{}.pkl".format(speaker))        
-        speaker_emb_path_indiv = os.path.join(self.preprocessed_path, "speaker_emb", speaker, "{}.pkl_emb.pkl".format(basename))
+        speaker_emb_path_mean = os.path.join(self.preprocessed_path[src_lang], "speaker_emb", speaker, "{}.pkl".format(speaker))        
+        speaker_emb_path_indiv = os.path.join(self.preprocessed_path[src_lang], "speaker_emb", speaker, "{}.pkl".format(basename))
         
         with open(speaker_emb_path_mean, 'rb') as f:
-            emb_dict = pickle.load(f)
+            emb_dict = pickle.load(f)        
         mean_embedding = torch.from_numpy(emb_dict["mean"])
 
         with open(speaker_emb_path_indiv, 'rb') as f:
@@ -265,7 +285,7 @@ class PreTrainDataset(Dataset):
         sample = {
             "id": basename,
             "speaker": speaker_id,
-            "text_lang": src_lang,
+            "text_lang": src_lang_id,
             "text": phone,
             "raw_text": raw_text,
             "mel": mel,
@@ -279,7 +299,7 @@ class PreTrainDataset(Dataset):
 
     def process_meta(self, filename):
         src_lang, tgt_lang, name, speaker, text, raw_text, translation, raw_translation = [], [], [], [], [], [], [], []
-        with open(os.path.join(self.preprocessed_path, filename), "r", encoding="utf-8") as f:
+        with open(os.path.join(self.parent_dir, filename), "r", encoding="utf-8") as f:
 
             for line in f.readlines():
                 sl, tl, n, s, t, r, tr, rtr = line.strip("\n").split("|")

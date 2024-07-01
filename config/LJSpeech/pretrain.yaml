@@ -14,9 +14,9 @@ optimizer:
   anneal_rate: 0.3
 step:
   total_step: 900000
-  log_step: 2     # 100
-  synth_step: 3  # 1000
-  val_step: 4    # 1000
-  save_step: 4  # 100000
-  word_step: 2   # 10
+  log_step: 100     # 100
+  synth_step: 100  # 1000
+  val_step: 100    # 1000
+  save_step: 10000  # 100000
+  word_step: 10   # 10
 pretrain: True

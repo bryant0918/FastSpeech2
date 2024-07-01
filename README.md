@@ -171,6 +171,10 @@ ps -ef | grep 112675
 This can be done in parallel with preprocessing script since it just reads audio files and computes embeddings. That's why it is split to two different scripts to speed up processing.
 
 ```
+python SpeakerEncoder/compute_embeddings.py --output_path preprocessed_data/LJSpeech/speaker_emb --input_path raw_data/LJSpeech
+```
+
+```
 python SpeakerEncoder/compute_embeddings.py --output_path preprocessed_data/Spanish/speaker_emb --input_path raw_data/Spanish
 ```
 

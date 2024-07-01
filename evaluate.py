@@ -111,11 +111,11 @@ def evaluate(model, step, configs, logger=None, vocoder=None):
     return message
 
 def evaluate_pretrain(model, step, configs, logger=None, vocoder=None):
-    preprocess_config, model_config, train_config = configs
+    preprocess_config, preprocess2_config, model_config, train_config = configs
 
     # Get dataset
     dataset = PreTrainDataset(
-        "val.txt", preprocess_config, train_config, sort=False, drop_last=False
+        "val.txt", preprocess_config, preprocess2_config, train_config, sort=False, drop_last=False
     )
     
     batch_size = train_config["optimizer"]["batch_size"]

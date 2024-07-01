@@ -32,7 +32,7 @@ def main(args, configs):
     preprocess_config, preprocess_config2, model_config, train_config = configs
 
     # Get dataset
-    dataset = PreTrainDataset("train.txt", preprocess_config, train_config, sort=True, drop_last=True)
+    dataset = PreTrainDataset("train.txt", preprocess_config, preprocess_config2, train_config, sort=True, drop_last=True)
     batch_size = train_config["optimizer"]["batch_size"]
     group_size = 1  # Set this larger than 1 (4) to enable sorting in Dataset
     # assert batch_size * group_size < len(dataset)
@@ -44,7 +44,7 @@ def main(args, configs):
     )
 
     # Prepare model
-    model, optimizer = get_model(args, configs, device, train=True)
+    model, optimizer = get_model(args, configs[1:], device, train=True)
     model = nn.DataParallel(model)
     num_param = get_param_num(model)
     Loss = FastSpeech2Loss(preprocess_config, model_config).to(device)
@@ -226,6 +226,6 @@ if __name__ == "__main__":
     preprocess2_config = yaml.load(open(args.preprocess_config2, "r"), Loader=yaml.FullLoader)
     model_config = yaml.load(open(args.model_config, "r"), Loader=yaml.FullLoader)
     train_config = yaml.load(open(args.train_config, "r"), Loader=yaml.FullLoader)
-    configs = (preprocess_config, model_config, train_config)
+    configs = (preprocess_config, preprocess2_config, model_config, train_config)
 
     main(args, configs)

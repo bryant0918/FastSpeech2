@@ -28,6 +28,7 @@ class Preprocessor:
         self.val_size = config["preprocessing"]["val_size"]
         self.sampling_rate = config["preprocessing"]["audio"]["sampling_rate"]
         self.hop_length = config["preprocessing"]["stft"]["hop_length"]
+        self.source_lang = config["preprocessing"]["text"]["language"]
         self.target_lang = config["preprocessing"]["text"]["target_language"]
 
         assert config["preprocessing"]["pitch"]["feature"] in [
@@ -338,7 +339,7 @@ class Preprocessor:
             pickle.dump(phone_alignments, f)
 
         return (
-            "|".join([basename, speaker, text, raw_text, translation, raw_translation]),
+            "|".join([self.source_lang, self.target_lang, basename, speaker, text, raw_text, translation, raw_translation]),
             self.remove_outlier(pitch),
             self.remove_outlier(energy),
             mel_spectrogram.shape[1],

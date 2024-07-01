@@ -151,15 +151,26 @@ def custom_round(x):
     eps = (torch.rand_like(x) - .5)/100
     x[mask] = torch.ceil(x[mask])
     return torch.round(x + eps)
-    
-def test_speaker_encoder():
-    
 
+def test_speaker_emb():
+    import numpy as np
+    import pickle
 
+    speaker_emb_path_mean = "preprocessed_data/Spanish/speaker_emb/F001/F001.pkl"       
+    speaker_emb_path_indiv = "preprocessed_data/Spanish/speaker_emb/F001/TEDX_F_001_SPA_0001.pkl"
+    
+    with open(speaker_emb_path_mean, 'rb') as f:
+        emb_dict = pickle.load(f)
+    mean_embedding = torch.from_numpy(emb_dict["mean"])
+
+    with open(speaker_emb_path_indiv, 'rb') as f:
+        emb_dict = pickle.load(f)
+    indiv_embedding = torch.from_numpy(emb_dict["default"])
+
+    embedding = np.mean([mean_embedding, indiv_embedding], axis=0)
+    print("Embedding shape:", np.shape(embedding))
 
 
 if __name__ == "__main__":
-    x = torch.tensor([0, .25, 0.5, 1.5, 2.5, 3.5, 4.5, 0.5, 0])
-    x = custom_round(x)
-    print(x)
+    test_speaker_emb()
     pass

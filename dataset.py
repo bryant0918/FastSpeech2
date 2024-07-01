@@ -248,12 +248,20 @@ class PreTrainDataset(Dataset):
         # Prepend zero for language token
         duration = np.insert(np.load(duration_path), 0, 0)
         
-        # TODO: Get Speaker Embedding
-        speaker_emb_path = os.path.join(self.preprocessed_path, "speaker_emb", "{}.pkl_emb.pkl".format(speaker))        
-        with open(speaker_emb_path, 'rb') as f:
+        # Get Speaker Embedding
+        speaker_emb_path_mean = os.path.join(self.preprocessed_path, "speaker_emb", speaker, "{}.pkl".format(speaker))        
+        speaker_emb_path_indiv = os.path.join(self.preprocessed_path, "speaker_emb", speaker, "{}.pkl_emb.pkl".format(basename))
+        
+        with open(speaker_emb_path_mean, 'rb') as f:
             emb_dict = pickle.load(f)
-        embedding = torch.from_numpy(emb_dict["default"])
+        mean_embedding = torch.from_numpy(emb_dict["mean"])
 
+        with open(speaker_emb_path_indiv, 'rb') as f:
+            emb_dict = pickle.load(f)
+        indiv_embedding = torch.from_numpy(emb_dict["default"])
+
+        embedding = np.mean([mean_embedding, indiv_embedding], axis=0)
+        
         sample = {
             "id": basename,
             "speaker": speaker_id,

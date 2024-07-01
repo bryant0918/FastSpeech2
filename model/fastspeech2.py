@@ -84,7 +84,7 @@ class FastSpeech2Pros(nn.Module):
 
         h_si = output
 
-        e_tgt = self.prosody_predictor(h_sd, h_si)  # TODO: prev_e here doesn't make sense.
+        e_tgt = self.prosody_predictor(h_sd, h_si)
         # print("e_tgt[0] (log_pi) shape: ", e_tgt[0].shape)  # torch.Size([Batch, tgt_seq_len, N_Components])
         # print("e_tgt[1] (mu) shape: ", e_tgt[1].shape)
                 

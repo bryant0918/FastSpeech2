@@ -91,7 +91,7 @@ def main(args, configs):
                 # batch = (ids, raw_texts, speakers, langs, texts, src_lens, max_src_len, mels, mel_lens, max_mel_len, 
                 #           speaker_embeddings, pitches, energies, durations)
 
-                if step == 5:
+                if step == 100:
                     raise NotImplementedError
                 
                 input = batch[3:11] + (None,) + batch[11:]

@@ -191,7 +191,9 @@ python3 pretrain.py -p config/LJSpeech/preprocess.yaml -m config/LJSpeech/model.
 ```
 
 ```
-python3 pretrain.py -p config/LJSpeech/preprocess.yaml -p2 config/LJSpeech/preprocess_es.yaml -m config/LJSpeech/model.yaml -t config/LJSpeech/pretrain.yaml
+nohup python3 pretrain.py -p config/LJSpeech/preprocess.yaml -p2 config/LJSpeech/preprocess_es.yaml -m config/LJSpeech/model.yaml -t config/LJSpeech/pretrain.yaml &
+
+646376
 ```
 
 ## Train Synthesizer

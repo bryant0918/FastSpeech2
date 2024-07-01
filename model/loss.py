@@ -171,60 +171,38 @@ class ProsLoss(nn.Module):
             Negative log-likelihood of the phone sequence given the prosody features
         """
         log_pi, mu, sigma = x
-        sigma = sigma + 1e-8
+
+        print("Log_pi", torch.min(log_pi).item(), torch.max(log_pi).item())  # Range: (-inf, 0)
+        print("Mu", torch.min(mu).item(), torch.max(mu).item())              # Range: (-inf, inf)
+        print("Sigma", torch.min(sigma).item(), torch.max(sigma).item())     # Range: (0, 1)
+
         batch_size = mu.shape[0]
 
         z_score = (y.unsqueeze(2) - mu) / sigma                 # torch.Size([2, seq, 8, 256])
-        normal_loglik = (-0.5 * torch.einsum("bkih,bkih->bki", z_score, z_score)
+        print("z_score", torch.min(z_score).item(), torch.max(z_score).item()) # Range: (-inf, inf)
+
+        print("einsum", torch.min(torch.einsum("bkih,bkih->bki", z_score, z_score)).item()) # Should be positive
+        print("sum of log", torch.max(torch.sum(torch.log(sigma), dim=-1)).item())  # Should be negative
+
+        normal_loglik = (-0.5 * torch.einsum("bkih,bkih->bki", z_score, z_score)  # Should be negative
                          - torch.sum(torch.log(sigma), dim=-1))  # torch.Size([2, seq, 256])
-        loglik = torch.logsumexp(log_pi + normal_loglik, dim=-1) # torch.Size([2, seq]
+        print("normal_loglik", torch.min(normal_loglik).item(), torch.max(normal_loglik).item()) # Range: (-inf, 0)
+        loglik = torch.logsumexp(log_pi + normal_loglik, dim=-1) # torch.Size([2, seq] # Should be negative
+        print("Loglik", torch.min(loglik).item(), torch.max(loglik).item()) # Range: (-inf, 0)
+
+        #TODO: NOT MAKING SENSE: If logsumexp is always positive no matter what then negloglik will always be negative no matter what.
+        
+
+
         negloglik = -loglik.masked_select(src_masks)
+
+        print("negloglik", negloglik)
+
+        print("Negloglik", torch.min(negloglik).item(), torch.max(negloglik).item()) # Range: (0, 1)
+
         nlls = torch.sum(negloglik)
 
         return nlls / batch_size
-
-    def pros_loss2(self, x, y):
-        """
-        ERROR: Gives wrong results (log_sum_exp) should be probabilities
-        Calculate the negative log-likelihood of the phone sequence given the prosody features
-        Input:
-            x: (h_sd, h_si, prev_e)
-            y: prosody embeddings e_k from prosody extractor
-        Output:
-            -loglik: Negative log-likelihood of the phone sequence given the prosody features
-        """
-
-        log_pi, mu, sigma = x
-        n_batches, n_samples, n_components, n_features = mu.shape
-        n_components = log_pi.shape[-1]
-        
-        # Initialize the log likelihoods for each batch
-        log_likelihoods = torch.zeros((n_batches, n_samples, n_components)).to(log_pi.device)
-        
-        # This needs to be per phone as well.
-        for b in range(n_batches):
-            for k in range(n_samples):
-                for i in range(n_components):
-                    # Create a multivariate normal distribution for the k-th component
-                    mvn = dist.MultivariateNormal(loc=mu[b,k,i], covariance_matrix=torch.diag(sigma[b,k,i]))
-
-                    if torch.isnan(y[b,k]).any():
-                        continue
-                    
-                    # Compute the log likelihood for each point in the batch for the k-th component
-                    log_likelihoods[b, k, i] = mvn.log_prob(y[b,k])
-        
-        # Compute the log of the weighted sum of the probabilities
-        weighted_log_likelihoods = log_likelihoods + log_pi
-        print("weighted_log_likelihoods shape: ", weighted_log_likelihoods.shape) # weighted_log_likelihoods shape:  torch.Size([2, seq, 8]
-        
-        log_sum_exp = torch.logsumexp(weighted_log_likelihoods, dim=2)
-        print("Log_sum_exp shape: ", log_sum_exp.shape) # Log_sum_exp shape:  torch.Size([2, seq])
-        print(log_sum_exp)
-        # Compute the negative log-likelihood for each batch
-        nlls = -torch.sum(log_sum_exp, dim=1)
-        print("nlls:", nlls)
-        return torch.mean(nlls)
 
 
 class WordLoss(nn.Module):

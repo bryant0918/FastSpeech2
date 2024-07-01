@@ -344,8 +344,8 @@ class ProsodyPredictor(nn.Module):
         mu = self.linear2(torch.tanh(torch.multiply(a, mu) + b))
         v = self.linear3(torch.tanh(torch.multiply(c, v) + d))
 
-        # Add Noise (Don't know if necessary, can set eps=0)
-        sigma = torch.exp(v + eps)
+        
+        sigma = torch.exp(v)
 
         log_pi = torch.log_softmax(alphas, dim=-1) # [batch_size, text_sequence_length, n_components]
 

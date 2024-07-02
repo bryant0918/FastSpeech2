@@ -136,6 +136,7 @@ def main(args, configs):
                     )
                     log(
                         train_logger,
+                        step,
                         fig=fig,
                         tag="Training/step_{}_{}".format(step, tag),
                     )
@@ -144,12 +145,14 @@ def main(args, configs):
                     ]
                     log(
                         train_logger,
+                        step,
                         audio=wav_reconstruction,
                         sampling_rate=sampling_rate,
                         tag="Training/step_{}_{}_reconstructed".format(step, tag),
                     )
                     log(
                         train_logger,
+                        step,
                         audio=wav_prediction,
                         sampling_rate=sampling_rate,
                         tag="Training/step_{}_{}_synthesized".format(step, tag),

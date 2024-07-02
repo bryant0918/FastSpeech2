@@ -125,6 +125,8 @@ ps -ef | grep 2014664
 ```
 
 ### Get the TextGrid Files
+
+#### For Datasets with existing TextGrid files
 As described in the paper, [Montreal Forced Aligner](https://montreal-forced-aligner.readthedocs.io/en/latest/) (MFA) is used to obtain the alignments between the utterances and the phoneme sequences.
 Alignments of the supported datasets are provided [here](https://drive.google.com/drive/folders/1DBRkALpPd6FL9gjHMmMEdHODmkgNIIK4?usp=sharing).
 
@@ -140,20 +142,54 @@ You have to unzip the files in ``preprocessed_data/LJSpeech/TextGrid/``.
 
 ```unzip preprocessed_data/LJSpeech/LJSpeech.zip -d preprocessed_data/LJSpeech/```
 
+#### For New Datasets without Existing TextGrid Files
 For new Datasets you will need to generate TextGrid files yourself. Instructions are [here](https://montreal-forced-aligner.readthedocs.io/en/latest/installation.html) for installation and [here](https://montreal-forced-aligner.readthedocs.io/en/latest/first_steps/index.html#first-steps-align-pretrained) for aligning.
 
+Create new conda (mamba) environment for all mfa stuff
+```
+conda activate base
+conda install -c conda-forge mamba
+mamba create -n aligner -c conda-forge montreal-forced-aligner
+mamba activate aligner
+conda install pytorch torchvision torchaudio pytorch-cuda=11.7 -c pytorch -c nvidia
+pip install speechbrain
+```
 
-Alternately, you can download the official MFA package and run
+Next download the models you will need.
+I will use english_us_arpa in the ReadMe but find whichever language models you need on the website.
 ```
-./montreal-forced-aligner/bin/mfa_align raw_data/LJSpeech/ lexicon/librispeech-lexicon.txt english preprocessed_data/LJSpeech
-```
-
-or
-```
-./montreal-forced-aligner/bin/mfa_train_and_align raw_data/LJSpeech/ lexicon/librispeech-lexicon.txt preprocessed_data/LJSpeech
+mfa model download acoustic <english_us_arpa>
+mfa model download dictionary <english_us_arpa>
+mfa model download g2p <english_us_arpa>
 ```
 
-to align the corpus.
+You should be able to run `mfa model inspect acoustic <english_us_arpa>` and it will output information about the <english_us_arpa> acoustic model. Same goes for dictionary and g2p models.
+
+We have one more step to make sure our dataset directory is properly setup to run MFA:
+run `create_mfa_directory(raw_dir)` in `mfa.py`
+
+Now validate your dataset by (note: <english_us_arpa> here is referring to acoustic and dictionary models):
+```
+mfa validate raw_dir <english_us_arpa> <english_us_arpa>
+```
+
+Next you will want to get all the out of vocabulary words from the dataset and use the G2P model to add the pronounciation to the dictionary model.
+
+From `mfa.py` first run `get_oov_words(oov_log_file, dict, oov_words)` to get the out of vocabulary words in a list. Next use the G2P model to generate a dictionary for those words:
+```
+mfa g2p path/to/oov_words.txt <english_us_arpa> path/to/generated_dictionary.txt
+```
+
+Then from `mfa.py` run `merge_dictionaries(pretrained_dict_path, generated_dict_path)`
+
+Now you are ready to revalidate and align the corpus. First remove the MFA corpus directory in MFA: `rm -r '/home/ditto/Documents/MFA/<corpus>`. \<corpus\> here will be the folder name of raw_dir. Then validate and align:
+```
+mfa validate raw_dir <english_us_arpa> <english_us_arpa>
+
+mfa align raw_dir <english_us_arpa> <english_us_arpa> preprocessed_data_dir/TextGrid
+```
+
+You should now see TextGrid files in preprocessed_data_dir
 
 ### Preprocessing Script
 
@@ -164,7 +200,7 @@ python3 preprocess.py config/LJSpeech/preprocess.yaml
 
 ```
 nohup python3 preprocess.py config/LJSpeech/preprocess.yaml &
-ps -ef | grep 112675
+ps -ef | grep 961918
 ```
 
 ### Get Speaker Embeddings

@@ -11,6 +11,7 @@ from tqdm import tqdm
 
 from utils.model import get_model, get_vocoder, get_param_num, vocoder_infer
 from utils.tools import to_device, log, synth_one_sample_pretrain
+from utils.training import pretrain_loop
 from model import FastSpeech2Loss
 from dataset import PreTrainDataset
 
@@ -94,33 +95,8 @@ def main(args, configs):
                 # if step == 100:
                 #     raise NotImplementedError
                 
-                input = batch[3:11] + (None,) + batch[11:]
-
-                # Forward pass: Src to Src
-                print("\nFORWARD PASS: SRC to SRC")
-                output = model(*(input))
-
-                log_duration_targets = torch.log(batch[-1] + 1)
-                # For calculating Word Loss
-                if step % word_step == 0:
-                    mels = [output[1][i, :output[9][i]].transpose(0,1) for i in range(batch_size)]
-                    wav_predictions = vocoder_infer(
-                        mels,
-                        vocoder,
-                        model_config,
-                        preprocess_config,
-                    )
-                    loss_input = (batch[1],) + batch[7:9] + batch[11:13] + (log_duration_targets,)
-                    loss_predictions = output + (wav_predictions,)
-                else:
-                    loss_input = (None,) + batch[7:9] + batch[11:13] + (log_duration_targets,)
-                    loss_predictions = output + (None,)
-                
-                # Calculate loss for Src to Tgt
-                losses = Loss(loss_input, loss_predictions, "to_src")
-                total_loss = losses[0]
-                print("Total Loss: ", total_loss)
-                print()
+                # Forward
+                losses, output = pretrain_loop(preprocess_config, model_config, batch, model, Loss, vocoder, step, word_step)
 
                 # Backward
                 total_loss = total_loss / grad_acc_step

@@ -63,3 +63,29 @@ def loop(preprocess_config, model_config, batch, model, Loss, vocoder, step, wor
     # Calculate loss for Tgt to Src
     losses_tgt_to_src = Loss(loss_input, loss_predictions, "to_src")
     return losses_src_to_tgt, losses_tgt_to_src, output_tgt, output_src
+
+def pretrain_loop(preprocess_config, model_config, batch, model, Loss, vocoder, step, word_step):
+    input = batch[3:11] + (None,) + batch[11:]
+
+    # Forward pass: Src to Src
+    output = model(*(input))
+
+    log_duration_targets = torch.log(batch[-1] + 1)
+    # For calculating Word Loss
+    if step % word_step == 0:
+        mels = [output[1][i, :output[9][i]].transpose(0,1) for i in range(batch_size)]
+        wav_predictions = vocoder_infer(
+            mels,
+            vocoder,
+            model_config,
+            preprocess_config,
+        )
+        loss_input = (batch[1],) + batch[7:9] + batch[11:13] + (log_duration_targets,)
+        loss_predictions = output + (wav_predictions,)
+    else:
+        loss_input = (None,) + batch[7:9] + batch[11:13] + (log_duration_targets,)
+        loss_predictions = output + (None,)
+    
+    # Calculate loss for Src to Tgt
+    losses = Loss(loss_input, loss_predictions, "to_src")
+    return losses, output

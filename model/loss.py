@@ -110,7 +110,7 @@ class FastSpeech2Loss(nn.Module):
             postnet_mel_loss = self.mae_loss(postnet_mel_predictions, mel_targets)
 
             # TODO: Figure out best beta value
-            beta = .2
+            beta = .25
             pros_loss = self.pros_loss(predicted_e, extracted_e, src_masks)*beta
 
             # print("Mel Loss: ", mel_loss)
@@ -179,7 +179,7 @@ class ProsLoss(nn.Module):
         # print("Mu", torch.min(mu).item(), torch.max(mu).item())              # Range: (-inf, inf)
         # print("Sigma", torch.min(sigma).item(), torch.max(sigma).item())     # Range: (0, 1)
 
-        batch_size = mu.shape[0]
+        batch_size, max_seq_len = mu.shape[0], mu.shape[1]
 
         # print("y shape", y.shape) # Shape torch.Size([2, 83, 256])
         # print("mu shape", mu.shape) # Shape torch.Size([2, 83, 8, 256])
@@ -198,21 +198,23 @@ class ProsLoss(nn.Module):
         # loglik = torch.logsumexp(log_pi + normal_loglik, dim=-1) # torch.Size([2, seq] # Should be negative
         # print("Loglik", torch.min(loglik).item(), torch.max(loglik).item()) # Range: (-inf, 0)
 
-
+        
         normal_loglik = (torch.exp(-0.5 * torch.einsum("bkih,bkih->bki", z_score, z_score))  # Should be negative
                         / torch.sum(sigma, dim=-1))  # torch.Size([2, seq, 8])
         
+        if torch.isnan(normal_loglik).any():
+            print("Normal Loglik contains NaNs")
         # normal_loglik = 1/torch.sqrt(torch.sum(sigma, dim=-1)) * torch.exp(-0.5 * ((y.unsqueeze(2) - mu)**2 / sigma))
-
 
         # print("normal_loglik", torch.min(normal_loglik).item(), torch.max(normal_loglik).item(), normal_loglik.shape) # Range: (-inf, 0)
         
         # print("shape of log_pi*normal_loglike", (torch.exp(log_pi)*normal_loglik).shape) # Shape
         
-        loglik = torch.log(torch.sum(torch.exp(log_pi)*normal_loglik, dim=-1))
+        # Getting RuntimeError: Function 'MulBackward0' returned nan values in its 0th output.
+        loglik = torch.log(torch.clamp(torch.sum(torch.exp(log_pi)*normal_loglik, dim=-1), min=1e-10))
         # print("Loglik", torch.min(loglik).item(), torch.max(loglik).item(), loglik.shape) # Range: (-inf, 0)
 
-        #TODO: NOT MAKING SENSE: If logsumexp is always positive no matter what then negloglik will always be negative no matter what.
+        # # TODO: NOT MAKING SENSE: If logsumexp is always positive no matter what then negloglik will always be negative no matter what.
 
         negloglik = -loglik.masked_select(src_masks)
 
@@ -220,7 +222,7 @@ class ProsLoss(nn.Module):
 
         # print("Negloglik", torch.min(negloglik).item(), torch.max(negloglik).item()) # Range: (0, 1)
 
-        nlls = torch.sum(negloglik)
+        nlls = torch.sum(negloglik)/max_seq_len
 
         return nlls / batch_size
 

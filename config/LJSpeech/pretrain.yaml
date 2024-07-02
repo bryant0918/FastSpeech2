@@ -17,6 +17,6 @@ step:
   log_step: 100     # 100
   synth_step: 1000  # 1000
   val_step: 1000    # 1000
-  save_step: 10000  # 100000
+  save_step: 5000  # 100000
   word_step: 10   # 10
 pretrain: True

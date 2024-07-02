@@ -65,6 +65,7 @@ def loop(preprocess_config, model_config, batch, model, Loss, vocoder, step, wor
     return losses_src_to_tgt, losses_tgt_to_src, output_tgt, output_src
 
 def pretrain_loop(preprocess_config, model_config, batch, model, Loss, vocoder, step, word_step):
+    batch_size = len(batch[0])
     input = batch[3:11] + (None,) + batch[11:]
 
     # Forward pass: Src to Src

@@ -139,7 +139,7 @@ def evaluate_pretrain(model, step, configs, logger=None, vocoder=None):
             with torch.no_grad():
                 # Forward
                 losses, output = pretrain_loop(preprocess_config, model_config, batch, model, Loss, vocoder, step, word_step)
-                
+
                 for i in range(len(losses)):
                     loss_sums[i] += losses[i].item() * len(batch[0])
                 
@@ -166,18 +166,21 @@ def evaluate_pretrain(model, step, configs, logger=None, vocoder=None):
         log(logger, train_step, losses=loss_means)
         log(
             logger,
+            train_step,
             fig=fig,
             tag="Validation/step_{}_{}".format(train_step, tag),
         )
         sampling_rate = preprocess_config["preprocessing"]["audio"]["sampling_rate"]
         log(
             logger,
+            train_step,
             audio=wav_reconstruction,
             sampling_rate=sampling_rate,
             tag="Validation/step_{}_{}_reconstructed".format(train_step, tag),
         )
         log(
             logger,
+            train_step,
             audio=wav_prediction,
             sampling_rate=sampling_rate,
             tag="Validation/step_{}_{}_synthesized".format(train_step, tag),

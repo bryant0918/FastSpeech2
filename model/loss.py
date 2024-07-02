@@ -171,38 +171,59 @@ class ProsLoss(nn.Module):
             Negative log-likelihood of the phone sequence given the prosody features
         """
         log_pi, mu, sigma = x
+        # sigma = torch.sqrt(sigma)
 
-        print("Log_pi", torch.min(log_pi).item(), torch.max(log_pi).item())  # Range: (-inf, 0)
-        print("Mu", torch.min(mu).item(), torch.max(mu).item())              # Range: (-inf, inf)
-        print("Sigma", torch.min(sigma).item(), torch.max(sigma).item())     # Range: (0, 1)
+        # print("sum log_pi", torch.sum(torch.exp(log_pi)).item(), log_pi.shape) # Checks out (sums to 1)
+
+        # print("Log_pi", torch.min(log_pi).item(), torch.max(log_pi).item())  # Range: (-inf, 0)
+        # print("Mu", torch.min(mu).item(), torch.max(mu).item())              # Range: (-inf, inf)
+        # print("Sigma", torch.min(sigma).item(), torch.max(sigma).item())     # Range: (0, 1)
 
         batch_size = mu.shape[0]
 
-        z_score = (y.unsqueeze(2) - mu) / sigma                 # torch.Size([2, seq, 8, 256])
-        print("z_score", torch.min(z_score).item(), torch.max(z_score).item()) # Range: (-inf, inf)
+        # print("y shape", y.shape) # Shape torch.Size([2, 83, 256])
+        # print("mu shape", mu.shape) # Shape torch.Size([2, 83, 8, 256])
+        # print("sigma shape", sigma.shape) # Shape torch.Size([2, 83, 8, 256])
 
-        print("einsum", torch.min(torch.einsum("bkih,bkih->bki", z_score, z_score)).item()) # Should be positive
-        print("sum of log", torch.max(torch.sum(torch.log(sigma), dim=-1)).item())  # Should be negative
+        z_score = (y.unsqueeze(2) - mu) / torch.sqrt(sigma)                # torch.Size([2, seq, 8, 256])
+        # print("z_score", torch.min(z_score).item(), torch.max(z_score).item()) # Range: (-inf, inf)
 
-        normal_loglik = (-0.5 * torch.einsum("bkih,bkih->bki", z_score, z_score)  # Should be negative
-                         - torch.sum(torch.log(sigma), dim=-1))  # torch.Size([2, seq, 256])
-        print("normal_loglik", torch.min(normal_loglik).item(), torch.max(normal_loglik).item()) # Range: (-inf, 0)
-        loglik = torch.logsumexp(log_pi + normal_loglik, dim=-1) # torch.Size([2, seq] # Should be negative
-        print("Loglik", torch.min(loglik).item(), torch.max(loglik).item()) # Range: (-inf, 0)
+        # print("einsum", torch.min(torch.einsum("bkih,bkih->bki", z_score, z_score)).item()) # Should be positive
+        # print("sum of log", torch.max(torch.sum(torch.log(sigma), dim=-1)).item())  # Should be negative
+
+        # normal_loglik = (-0.5 * torch.einsum("bkih,bkih->bki", z_score, z_score)  # Should be negative
+        #                  - torch.sum(torch.log(sigma), dim=-1))  # torch.Size([2, seq, 256])
+        
+        # print("normal_loglik", torch.min(normal_loglik).item(), torch.max(normal_loglik).item()) # Range: (-inf, 0)
+        # loglik = torch.logsumexp(log_pi + normal_loglik, dim=-1) # torch.Size([2, seq] # Should be negative
+        # print("Loglik", torch.min(loglik).item(), torch.max(loglik).item()) # Range: (-inf, 0)
+
+
+        normal_loglik = (torch.exp(-0.5 * torch.einsum("bkih,bkih->bki", z_score, z_score))  # Should be negative
+                        / torch.sum(sigma, dim=-1))  # torch.Size([2, seq, 8])
+        
+        # normal_loglik = 1/torch.sqrt(torch.sum(sigma, dim=-1)) * torch.exp(-0.5 * ((y.unsqueeze(2) - mu)**2 / sigma))
+
+
+        # print("normal_loglik", torch.min(normal_loglik).item(), torch.max(normal_loglik).item(), normal_loglik.shape) # Range: (-inf, 0)
+        
+        # print("shape of log_pi*normal_loglike", (torch.exp(log_pi)*normal_loglik).shape) # Shape
+        
+        loglik = torch.log(torch.sum(torch.exp(log_pi)*normal_loglik, dim=-1))
+        # print("Loglik", torch.min(loglik).item(), torch.max(loglik).item(), loglik.shape) # Range: (-inf, 0)
 
         #TODO: NOT MAKING SENSE: If logsumexp is always positive no matter what then negloglik will always be negative no matter what.
-        
-
 
         negloglik = -loglik.masked_select(src_masks)
 
-        print("negloglik", negloglik)
+        # print("negloglik", negloglik.shape) # Shape
 
-        print("Negloglik", torch.min(negloglik).item(), torch.max(negloglik).item()) # Range: (0, 1)
+        # print("Negloglik", torch.min(negloglik).item(), torch.max(negloglik).item()) # Range: (0, 1)
 
         nlls = torch.sum(negloglik)
 
         return nlls / batch_size
+
 
 
 class WordLoss(nn.Module):

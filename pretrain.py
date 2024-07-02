@@ -99,7 +99,7 @@ def main(args, configs):
                 losses, output = pretrain_loop(preprocess_config, model_config, batch, model, Loss, vocoder, step, word_step)
 
                 # Backward
-                total_loss = total_loss / grad_acc_step
+                total_loss = losses[0] / grad_acc_step
                 total_loss.backward()
 
                 if step % grad_acc_step == 0:

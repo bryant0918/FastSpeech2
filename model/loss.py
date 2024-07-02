@@ -202,8 +202,15 @@ class ProsLoss(nn.Module):
         normal_loglik = (torch.exp(-0.5 * torch.einsum("bkih,bkih->bki", z_score, z_score))  # Should be negative
                         / torch.sum(sigma, dim=-1))  # torch.Size([2, seq, 8])
         
-        if torch.isnan(normal_loglik).any():
-            print("Normal Loglik contains NaNs")
+        if torch.isnan(normal_loglik).any() or torch.isinf(normal_loglik).any():
+            print("Normal Loglik contains NaNs or infs")
+            print(normal_loglik)
+            raise ValueError
+        
+        if torch.isnan(log_pi).any() or torch.isinf(log_pi).any():
+            print("log_pi contains NaNs or infs")
+            print(log_pi)
+            raise ValueError
         # normal_loglik = 1/torch.sqrt(torch.sum(sigma, dim=-1)) * torch.exp(-0.5 * ((y.unsqueeze(2) - mu)**2 / sigma))
 
         # print("normal_loglik", torch.min(normal_loglik).item(), torch.max(normal_loglik).item(), normal_loglik.shape) # Range: (-inf, 0)

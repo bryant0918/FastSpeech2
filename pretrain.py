@@ -26,7 +26,6 @@ else:
 
 print("Device", device)
 
-
 def main(args, configs):
     print("Prepare training ...")
 
@@ -37,11 +36,14 @@ def main(args, configs):
     batch_size = train_config["optimizer"]["batch_size"]
     group_size = 1  # Set this larger than 1 (4) to enable sorting in Dataset
     # assert batch_size * group_size < len(dataset)
+    # sampler = torch.utils.data.distributed.DistributedSampler(dataset)
     loader = DataLoader(
         dataset,
         batch_size=batch_size * group_size,
         shuffle=True,
         collate_fn=dataset.collate_fn,
+        num_workers=args.num_workers,
+        # sampler=sampler,
     )
 
     # Prepare model
@@ -198,6 +200,7 @@ if __name__ == "__main__":
                         help="path to second preprocess.yaml for other language")
     parser.add_argument("-m", "--model_config", type=str, required=True, help="path to model.yaml")
     parser.add_argument("-t", "--train_config", type=str, required=True, help="path to train.yaml")
+    parser.add_argument("-w", "--num_workers", type=int, default=4, help="number of cpu workers for dataloader")
     args = parser.parse_args()
 
     # Read Configs
@@ -208,3 +211,6 @@ if __name__ == "__main__":
     configs = (preprocess_config, preprocess2_config, model_config, train_config)
 
     main(args, configs)
+
+    # sed -i '/# assert batch_size \* group_size < len(dataset)/a \    sampler = torch.utils.data.distributed.DistributedSampler(dataset)' pretrain.py
+    # sed -i '/num_workers=args.num_workers,/a \        sampler=sampler,' pretrain.py

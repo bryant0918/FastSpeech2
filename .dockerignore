@@ -7,4 +7,7 @@ LJSpeech-1.1.tar.bz2
 nohup.out
 
 # Previously Built docker image
-fastspeech2_1-0-0.tar
+*_1-0-0.tar
+
+# Unneeded Models
+*.tar.zip

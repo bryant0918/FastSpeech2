@@ -97,20 +97,26 @@ scp -i path/to/key.pem -r path/to/local/folder ubuntu@hostIP:path/to/remote/fold
 
 scp -i ~/.ssh/lambda-labs.pem -r preprocessed_data ubuntu@104.171.203.36:/home/ubuntu/emotiv-data-NTX
 
-rsync -az -e "ssh -i ~/.ssh/lambda-labs.pem" --ignore-existing preprocessed_data/ ubuntu@104.171.203.36:/home/ubuntu/emotiv-data-TX/preprocessed_data
+rsync -az -e "ssh -i ~/.ssh/lambda-labs.pem" --ignore-existing preprocessed_data/ ubuntu@192.222.52.239:/home/ubuntu/emotiv-data-NTX/preprocessed_data
 ```
 
 also transfer the pull_docker.sh file.
 ```
-scp -i ~/.ssh/lambda-labs.pem pull_docker.sh ubuntu@104.171.203.36:/home/ubuntu/emotiv-data-NTX/pull_docker.sh
+scp -i ~/.ssh/lambda-labs.pem pull_docker.sh ubuntu@192.222.52.239:/home/ubuntu/emotiv-data-NTX/pull_docker.sh
 ```
 
 Next ssh into the server `ssh -i ~/.ssh/lambda-labs.pem ubuntu@IPaddress`
 
+Configure AWS with `aws configure` have key and secret key handy.
+
+Then install jq with `sudo apt-get install jq`.
+
 Then you can pull the docker .tar file onto the filesystem.
 ```
-bash emotiv-data-NTX/pull_docker.sh
+sudo bash emotiv-data-NTX/pull_docker.sh
 ```
+
+remember to move it to the filesystem `mv fastspeech2_1-0-0.tar emotiv-data-NTX/`
 
 Now when you stop the instance and restart it the data and dockerized image will already be available.
 
@@ -133,13 +139,17 @@ sudo bash pull_docker.sh
 
 If the docker image already on the filesystem is good then just load it:
 ```
-sudo docker load -i fastspeech2_<version>.tar
+sudo docker load -i fastspeech2_1-0-0.tar
 ```
 
 Now you should be ready to train. Make sure config files are up-to-date with new paths to preprocessed_data on filesystem.
 
 ```
-sudo docker run -it --gpus all --entrypoint /bin/bash -v /home/ubuntu/emotiv-data-TX:/emotiv-data-TX fastspeech2
+sudo docker run -it -p 6006:6006 --gpus all --entrypoint /bin/bash -v /home/ubuntu/emotiv-data-NTX:/emotiv-data-NTX fastspeech2
+```
+
+```
+sudo docker run -it --gpus all --entrypoint /bin/bash -v /home/ubuntu/emotiv-data-NTX:/emotiv-data-NTX fastspeech2
 ```
 
 Don't forget to `conda activate Emotiv` and you should be good to go.
@@ -284,14 +294,24 @@ python3 pretrain.py -p config/LJSpeech/preprocess.yaml -m config/LJSpeech/model.
 ```
 
 ```
-nohup python3 pretrain.py -p config/LJSpeech/preprocess.yaml -p2 config/LJSpeech/preprocess_es.yaml -m config/LJSpeech/model.yaml -t config/LJSpeech/pretrain.yaml &
+nohup python3 pretrain.py -p config/LJSpeech/preprocess.yaml -p2 config/LJSpeech/preprocess_es.yaml -m config/LJSpeech/model.yaml -t config/LJSpeech/pretrain.yaml -w 16 &
+
+4094
 ```
 
 ```
-nohup python3 pretrain.py --restore_step 160000 -p config/LJSpeech/preprocess.yaml -p2 config/LJSpeech/preprocess_es.yaml -m config/LJSpeech/model.yaml -t config/LJSpeech/pretrain.yaml &
+nohup python3 pretrain.py --restore_step 165000 -p config/LJSpeech/preprocess.yaml -p2 config/LJSpeech/preprocess_es.yaml -m config/LJSpeech/model.yaml -t config/LJSpeech/pretrain.yaml -w 16 &
 
-3572406
+1825072
 ```
+
+### On GPU
+```
+nohup python3 pretrain.py -p config/LJSpeech/LL_preprocess.yaml -p2 config/LJSpeech/LL_preprocess_es.yaml -m config/LJSpeech/model.yaml -t config/LJSpeech/LL_pretrain.yaml -w 104 &
+
+19
+```
+
 
 ## Train Synthesizer
 Train your model with
@@ -319,6 +339,9 @@ tensorboard --logdir output/log/LJSpeech
 or to transfer from the server
 ```commandline
 tensorboard --logdir=output/log/LJSpeech --bind_all
+```
+```commandline
+tensorboard --logdir=/emotiv-data-NTX/output/log/LJSpeech --bind_all
 ```
 Then on local machine go to http://127.0.0.1:6006.
 

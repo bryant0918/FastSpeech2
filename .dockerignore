@@ -1,0 +1,10 @@
+preprocessed_data/
+raw_data/
+output/
+
+# Random stuff in here
+LJSpeech-1.1.tar.bz2
+nohup.out
+
+# Previously Built docker image
+fastspeech2_1-0-0.tar

@@ -1,0 +1,6 @@
+{
+    "name": "fastspeech2",
+    "version": "1.0.0",
+    "description": "The FastSpeech2 worker is for cloning speech with prosodic features.",
+    "author": "Bryant McArthur"
+}

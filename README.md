@@ -86,6 +86,63 @@ python3 synthesize.py --text "YOUR_DESIRED_TEXT" --restore_step 900000 --mode si
 ```
 python3 synthesize.py --text "Hi my name is Ditto and this is my voice" --restore_step 900000 --mode single -p config/LJSpeech/preprocess.yaml -m config/LJSpeech/model.yaml -t config/LJSpeech/train.yaml --duration_control .8 --energy_control .8
 ```
+# Set up and Connect to Instance
+
+## Create Filesystem
+You must first create a filesystem in the region that contains the GPU instances you will use. Create the filesystem and then launch in instance.
+
+Once it is booted up and running you can copy your preprocessed data to the filesystem using scp:
+```
+scp -i path/to/key.pem -r path/to/local/folder ubuntu@hostIP:path/to/remote/folder
+
+scp -i ~/.ssh/lambda-labs.pem -r preprocessed_data ubuntu@104.171.203.36:/home/ubuntu/emotiv-data-NTX
+
+rsync -az -e "ssh -i ~/.ssh/lambda-labs.pem" --ignore-existing preprocessed_data/ ubuntu@104.171.203.36:/home/ubuntu/emotiv-data-TX/preprocessed_data
+```
+
+also transfer the pull_docker.sh file.
+```
+scp -i ~/.ssh/lambda-labs.pem pull_docker.sh ubuntu@104.171.203.36:/home/ubuntu/emotiv-data-NTX/pull_docker.sh
+```
+
+Next ssh into the server `ssh -i ~/.ssh/lambda-labs.pem ubuntu@IPaddress`
+
+Then you can pull the docker .tar file onto the filesystem.
+```
+bash emotiv-data-NTX/pull_docker.sh
+```
+
+Now when you stop the instance and restart it the data and dockerized image will already be available.
+
+## Set up Repo
+
+Make sure you are uploading your most recent versions to docker.
+
+```
+docker build -t fastspeech2 .
+bash docker_upload.sh
+```
+
+ssh into the server: `ssh -i ~/.ssh/lambda-labs.pem ubuntu@IPaddress`
+
+If you need to pull down a more recent docker version:
+```
+cd emotiv-data-NTX
+sudo bash pull_docker.sh
+```
+
+If the docker image already on the filesystem is good then just load it:
+```
+sudo docker load -i fastspeech2_<version>.tar
+```
+
+Now you should be ready to train. Make sure config files are up-to-date with new paths to preprocessed_data on filesystem.
+
+```
+sudo docker run -it --gpus all --entrypoint /bin/bash -v /home/ubuntu/emotiv-data-TX:/emotiv-data-TX fastspeech2
+```
+
+Don't forget to `conda activate Emotiv` and you should be good to go.
 
 # Training
 
@@ -228,8 +285,12 @@ python3 pretrain.py -p config/LJSpeech/preprocess.yaml -m config/LJSpeech/model.
 
 ```
 nohup python3 pretrain.py -p config/LJSpeech/preprocess.yaml -p2 config/LJSpeech/preprocess_es.yaml -m config/LJSpeech/model.yaml -t config/LJSpeech/pretrain.yaml &
+```
 
-826656
+```
+nohup python3 pretrain.py --restore_step 160000 -p config/LJSpeech/preprocess.yaml -p2 config/LJSpeech/preprocess_es.yaml -m config/LJSpeech/model.yaml -t config/LJSpeech/pretrain.yaml &
+
+3572406
 ```
 
 ## Train Synthesizer

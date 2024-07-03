@@ -1,0 +1,33 @@
+name: Emotiv
+channels:
+  - defaults
+  - conda-forge
+dependencies:
+  - python=3.10.9
+  - pyworld
+  - montreal-forced-aligner
+  - charset-normalizer
+  - pip:
+    - deep-translator >= 1.11.4
+    - epitran >= 1.25
+    - g2p-en >= 2.1.0
+    - g2pk >= 0.9.4
+    - inflect >= 4.1.0
+    - jamo >= 0.4.1
+    - librosa == 0.10.2.post1
+    - matplotlib == 3.9.0
+    - numba == 0.59.1
+    - numpy == 1.26.4
+    - openai-whisper
+    - pypinyin>=0.39.0
+    - PyYAML
+    - scikit-learn
+    - scipy
+    - singing-girl == 0.0.5
+    - simalign >= 0.4
+    - soundfile>=0.10.3.post1
+    - tensorboard >= 2.2.2
+    - tgt >= 1.4.4
+    - torch
+    - tqdm>=4.46.1
+    - unidecode >= 1.1.1

@@ -7,8 +7,6 @@ def combine_datasets(dir1, dir2):
         train1 = f.readlines()
     with open(os.path.join(dir1, "val.txt"), "r") as f:
         val1 = f.readlines()
-
-    print(len(val1), type(val1))
     
     with open(os.path.join(dir2, "train.txt"), "r") as f:
         train2 = f.readlines()
@@ -23,6 +21,8 @@ def combine_datasets(dir1, dir2):
         
     with open("preprocessed_data/train.txt", "w") as f:
         f.writelines(all_lines[len(val1):])
+
+    print("Done.")
 
 if __name__ == "__main__":
     preprocessed_dir1 = "preprocessed_data/LJSpeech"

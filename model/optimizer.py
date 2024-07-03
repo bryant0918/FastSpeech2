@@ -49,3 +49,7 @@ class ScheduledOptim:
 
         for param_group in self._optimizer.param_groups:
             param_group["lr"] = lr
+
+    def get_lr(self):
+        return self._optimizer.param_groups[0]["lr"]
+    

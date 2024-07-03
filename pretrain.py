@@ -122,7 +122,7 @@ def main(args, configs):
 
                     outer_bar.write(message1 + message2)
 
-                    log(train_logger, step, losses=losses)
+                    log(train_logger, step, losses=losses, lr=optimizer.get_lr())
 
                 if step % synth_step == 0:
                     targets = (batch[0],) +(batch[7],) + batch[11:]

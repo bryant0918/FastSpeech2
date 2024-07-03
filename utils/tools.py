@@ -105,7 +105,7 @@ def to_device(data, device):
 
 
 def log(
-    logger, step=None, losses=None, fig=None, audio=None, sampling_rate=22050, tag=""
+    logger, step=None, losses=None, fig=None, lr=None, audio=None, sampling_rate=22050, tag=""
 ):
     if losses is not None:
         logger.add_scalar("Loss/total_loss", losses[0], step)
@@ -117,6 +117,9 @@ def log(
         logger.add_scalar("Loss/prosody_loss", losses[6], step)
         logger.add_scalar("Loss/word_loss", losses[7], step)
         logger.add_scalar("Loss/full_duration_loss", losses[8], step)
+
+    if lr is not None:
+        logger.add_scalar("Learning_rate", lr, step)
 
     if fig is not None:
         logger.add_figure(tag, fig, global_step=step)

@@ -116,3 +116,9 @@ output/
 *.npy
 TextGrid/
 hifigan/*.pth.tar
+*.pkl
+*nohup.out
+*.pth.tar
+*.tar.bz2
+LJSpeech.zip
+*copy.txt

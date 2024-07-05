@@ -5,6 +5,7 @@ import torch
 import numpy as np
 
 import hifigan
+import bigvgan
 from model import FastSpeech2, ScheduledOptim, FastSpeech2Pros, ProsLearner
 
 
@@ -65,6 +66,7 @@ def get_vocoder(config, device):
             )
         vocoder.mel2wav.eval()
         vocoder.mel2wav.to(device)
+
     elif name == "HiFi-GAN":
         with open("hifigan/config.json", "r") as f:
             config = json.load(f)
@@ -75,6 +77,18 @@ def get_vocoder(config, device):
         elif speaker == "universal":
             ckpt = torch.load("hifigan/generator_universal.pth.tar", map_location=device)
         vocoder.load_state_dict(ckpt["generator"])
+        vocoder.eval()
+        vocoder.remove_weight_norm()
+        vocoder.to(device)
+
+    elif name == "bigVGAN":
+        with open("bigvgan/config.json", "r") as f:
+            config = json.load(f)
+        config = bigvgan.AttrDict(config)
+        vocoder = bigvgan.Generator(config)
+        ckpt = torch.load("bigvgan/g_05000000", map_location=device)
+
+        vocoder.load_state_dict(ckpt['generator'])
         vocoder.eval()
         vocoder.remove_weight_norm()
         vocoder.to(device)

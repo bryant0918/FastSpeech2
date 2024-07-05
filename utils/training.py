@@ -29,6 +29,7 @@ def loop(preprocess_config, model_config, batch, model, Loss, vocoder, step, wor
     
     # Calculate loss for Src to Tgt
     losses_src_to_tgt = Loss(loss_input, loss_predictions, "to_tgt")
+    losses_src_to_tgt[7] = losses_src_to_tgt[7] * word_step
     
     alignments = flip_mapping(batch[16], batch[5].shape[1])
 
@@ -62,6 +63,8 @@ def loop(preprocess_config, model_config, batch, model, Loss, vocoder, step, wor
 
     # Calculate loss for Tgt to Src
     losses_tgt_to_src = Loss(loss_input, loss_predictions, "to_src")
+    losses_tgt_to_src[7] = losses_tgt_to_src[7] * word_step
+
     return losses_src_to_tgt, losses_tgt_to_src, output_tgt, output_src
 
 def pretrain_loop(preprocess_config, model_config, batch, model, Loss, vocoder, step, word_step):
@@ -89,4 +92,5 @@ def pretrain_loop(preprocess_config, model_config, batch, model, Loss, vocoder, 
     
     # Calculate loss for Src to Tgt
     losses = Loss(loss_input, loss_predictions, "to_src")
+    losses[7] = losses[7] * word_step
     return losses, output

@@ -127,6 +127,7 @@ speaker_emb/
 *copy.txt
 
 *.tar
+*_05000000
 
 # logs
 nohup.out

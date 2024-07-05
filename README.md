@@ -296,13 +296,13 @@ python3 pretrain.py -p config/LJSpeech/preprocess.yaml -m config/LJSpeech/model.
 ```
 nohup python3 pretrain.py -p config/LJSpeech/preprocess.yaml -p2 config/LJSpeech/preprocess_es.yaml -m config/LJSpeech/model.yaml -t config/LJSpeech/pretrain.yaml -w 16 &
 
-4094
+8739
 ```
 
 ```
-nohup python3 pretrain.py --restore_step 165000 -p config/LJSpeech/preprocess.yaml -p2 config/LJSpeech/preprocess_es.yaml -m config/LJSpeech/model.yaml -t config/LJSpeech/pretrain.yaml -w 16 &
+nohup python3 pretrain.py --restore_step 195000 -p config/LJSpeech/preprocess.yaml -p2 config/LJSpeech/preprocess_es.yaml -m config/LJSpeech/model.yaml -t config/LJSpeech/pretrain.yaml -w 16 &
 
-1825072
+3322
 ```
 
 ### On GPU

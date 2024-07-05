@@ -34,7 +34,7 @@ class FastSpeech2Loss(nn.Module):
 
         self.word_loss = WordLoss(model_config)
 
-    def forward(self, inputs, predictions, direction="to_tgt"):
+    def forward(self, inputs, predictions, direction="to_tgt", word_step=10):
         """
         When going to_tgt everything should be in tgt space.
         When going to_src everything should be in src space.
@@ -126,7 +126,7 @@ class FastSpeech2Loss(nn.Module):
         
         # word_loss  (Requires extracting predicted phonemes from mel Spectrogram) whisper
         if audio is not None:
-            word_loss = self.word_loss(audio, text)
+            word_loss = self.word_loss(audio, text) * word_step
         else:
             word_loss = torch.tensor([0]).to(device)
 

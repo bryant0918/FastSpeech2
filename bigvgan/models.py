@@ -13,7 +13,7 @@ from torch.nn.utils import weight_norm, remove_weight_norm, spectral_norm
 
 from .activations import Snake, SnakeBeta
 from .utils import init_weights, get_padding
-from alias_free_torch import *
+from .alias_free_torch import *
 
 LRELU_SLOPE = 0.1
 

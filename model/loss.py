@@ -19,8 +19,8 @@ class FastSpeech2Loss(nn.Module):
         self.mse_loss = nn.MSELoss()
         self.mae_loss = nn.L1Loss()
         self.pros_loss = ProsLoss()
-
         self.word_loss = WordLoss(model_config)
+        self.bce_loss = nn.BCELoss()
 
     def forward(self, inputs, predictions, direction="to_tgt", word_step=10):
         """
@@ -50,6 +50,7 @@ class FastSpeech2Loss(nn.Module):
             extracted_e,
             predicted_e,
             audio,
+            pred_generated
         ) = predictions
         device = mel_masks.device
         src_masks = ~src_masks
@@ -141,7 +142,6 @@ class FastSpeech2Loss(nn.Module):
         energy_loss = energy_loss * alpha
 
         # Calculate discriminator loss for generator
-        pred_generated = self.discriminator(postnet_mel_predictions)
         g_loss = self.bce_loss(pred_generated, torch.ones_like(pred_generated))
 
         total_loss = (

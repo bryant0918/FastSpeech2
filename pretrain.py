@@ -57,7 +57,9 @@ def main(args, configs):
     discriminator = Discriminator(preprocess_config).to(device)
     criterion_d = nn.BCELoss()
     optimizer_d = torch.optim.Adam(discriminator.parameters(), lr=0.0002, betas=(0.5, 0.999))
-
+    discriminator_params = get_param_num(discriminator)
+    print("Number of Discriminator Parameters:", discriminator_params)
+    
     # Load vocoder
     vocoder = get_vocoder(model_config, device)
     print("Vocoder Loaded")

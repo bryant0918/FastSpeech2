@@ -103,10 +103,10 @@ def pretrain_loop(preprocess_config, model_config, batch, model, Loss, discrimin
             preprocess_config,
         )
         loss_input = (batch[1],) + batch[7:9] + batch[11:13] + (log_duration_targets,)
-        loss_predictions = output + (wav_predictions,)
+        loss_predictions = output + (wav_predictions,pred_generated)
     else:
         loss_input = (None,) + batch[7:9] + batch[11:13] + (log_duration_targets,)
-        loss_predictions = output + (None,)
+        loss_predictions = output + (None,pred_generated)
     
     # Calculate loss for Src to Tgt
     losses = Loss(loss_input, loss_predictions, "to_src", word_step)

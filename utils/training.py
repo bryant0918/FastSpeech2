@@ -74,7 +74,7 @@ def pretrain_loop(preprocess_config, model_config, batch, model, Loss, discrimin
     fake_labels = torch.zeros(batch_size, 1, device=device)
 
     # Train Discriminator with real data
-    real_outputs = discriminator(real_mels)
+    real_outputs = discriminator(batch[7])
     d_loss_real = criterion_d(real_outputs, real_labels)
 
     # Generator Forward pass: Src to Src
@@ -84,13 +84,14 @@ def pretrain_loop(preprocess_config, model_config, batch, model, Loss, discrimin
     fake_outputs = discriminator(output[1].detach())  # detach to avoid backpropagating through the Generator
     d_loss_fake = criterion_d(fake_outputs, fake_labels)
     d_loss = d_loss_real + d_loss_fake
+    print("Discriminator Loss: ", d_loss.item())
     
     if training:
         optimizer_d.zero_grad()
         d_loss.backward()
         optimizer_d.step()
 
-    pred_generated = discriminator(fake_data)
+    pred_generated = discriminator(output[1])
 
     log_duration_targets = torch.log(batch[-1] + 1)
     # For calculating Word Loss

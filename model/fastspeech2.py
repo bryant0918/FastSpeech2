@@ -158,7 +158,7 @@ class Discriminator(nn.Module):
 
         # Define the layers for your Discriminator
         self.conv_layers = nn.Sequential(
-            nn.Conv2d(in_channels=preprocess_config["preprocessing"]["mel"]["n_mel_channels"], out_channels=32, kernel_size=3, stride=2, padding=1),
+            nn.Conv2d(in_channels=1, out_channels=32, kernel_size=3, stride=2, padding=1),
             nn.LeakyReLU(0.2, inplace=True),
             nn.Conv2d(32, 64, 3, 2, 1),
             nn.BatchNorm2d(64),
@@ -169,11 +169,28 @@ class Discriminator(nn.Module):
             nn.Conv2d(128, 256, 3, 2, 1),
             nn.BatchNorm2d(256),
             nn.LeakyReLU(0.2, inplace=True),
-            nn.Conv2d(256, 1, 3, 1, 1),
+            nn.Conv2d(256, 512, 3, 1, 1),
+            nn.BatchNorm2d(512),
+            nn.LeakyReLU(0.2, inplace=True),
+        )
+
+        # Adding adaptive pooling layer
+        self.adaptive_pool = nn.AdaptiveAvgPool2d((5, 5))
+
+        self.fc_layers = nn.Sequential(
+            nn.Linear(512*5*5, 1024),
+            nn.LeakyReLU(0.2, inplace=True),
+            nn.Dropout(0.3),
+            nn.Linear(1024, 1),
             nn.Sigmoid()  # Output will be between 0 and 1
         )
 
     def forward(self, mels):
+        mels = mels.unsqueeze(1).permute(0, 1, 3, 2) # [batch_size, n_mel_channels, mel_length]
+        
         # Forward pass through the network
         out = self.conv_layers(mels)
+        out = self.adaptive_pool(out)
+        out = out.view(out.size(0), -1)
+        out = self.fc_layers(out)
         return out

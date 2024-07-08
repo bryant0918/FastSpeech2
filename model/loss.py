@@ -123,8 +123,6 @@ class FastSpeech2Loss(nn.Module):
         
         # word_loss  (Requires extracting predicted phonemes from mel Spectrogram) whisper
         if audio is not None:
-            print("text: ", text)
-            text.requires_grad = False
             word_loss = self.word_loss(audio, text)
         else:
             word_loss = torch.tensor([0]).to(device)
@@ -144,8 +142,6 @@ class FastSpeech2Loss(nn.Module):
 
         # Calculate discriminator loss for generator
         g_loss = self.bce_loss(pred_generated, torch.ones_like(pred_generated))
-
-        print("G_Loss", g_loss)
 
         total_loss = (
             mel_loss + postnet_mel_loss + duration_loss + pitch_loss + energy_loss 

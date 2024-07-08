@@ -59,7 +59,8 @@ def main(args, configs):
     optimizer_d = torch.optim.Adam(discriminator.parameters(), lr=0.0002, betas=(0.5, 0.999))
     discriminator_params = get_param_num(discriminator)
     print("Number of Discriminator Parameters:", discriminator_params)
-    
+    print("Total Parameters:", num_param + discriminator_params)
+
     # Load vocoder
     vocoder = get_vocoder(model_config, device)
     print("Vocoder Loaded")
@@ -106,7 +107,7 @@ def main(args, configs):
                 #     raise Exception("Stop")
 
                 # Forward
-                losses, output = pretrain_loop(preprocess_config, model_config, batch, model, Loss, discriminator, 
+                losses, output, d_loss = pretrain_loop(preprocess_config, model_config, batch, model, Loss, discriminator, 
                                                criterion_d, optimizer_d, vocoder, step, word_step, device, training=True)
 
                 # Backward
@@ -123,8 +124,9 @@ def main(args, configs):
 
                 if step % log_step == 0:
                     losses = [l.item() for l in losses]
+                    losses.append(d_loss.item())
                     message1 = "Step {}/{}, ".format(step, total_step)
-                    message2 = "Total Loss: {:.4f}, Mel Loss: {:.4f}, Mel PostNet Loss: {:.4f}, Pitch Loss: {:.4f}, Energy Loss: {:.4f}, Duration Loss: {:.4f}, Prosody Loss: {:.4f}, Word Loss: {:.4f}, Full Duration Loss: {:.4f}".format(
+                    message2 = "Total Loss: {:.4f}, Mel Loss: {:.4f}, Mel PostNet Loss: {:.4f}, Pitch Loss: {:.4f}, Energy Loss: {:.4f}, Duration Loss: {:.4f}, Prosody Loss: {:.4f}, Word Loss: {:.4f}, Full Duration Loss: {:.4f}, G Loss: {:.4f}, D Loss: {:.4f}".format(
                         *losses
                     )
 

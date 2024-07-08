@@ -84,7 +84,6 @@ def pretrain_loop(preprocess_config, model_config, batch, model, Loss, discrimin
     fake_outputs = discriminator(output[1].detach())  # detach to avoid backpropagating through the Generator
     d_loss_fake = criterion_d(fake_outputs, fake_labels)
     d_loss = d_loss_real + d_loss_fake
-    print("Discriminator Loss: ", d_loss.item())
     
     if training:
         optimizer_d.zero_grad()
@@ -111,4 +110,4 @@ def pretrain_loop(preprocess_config, model_config, batch, model, Loss, discrimin
     
     # Calculate loss for Src to Tgt
     losses = Loss(loss_input, loss_predictions, "to_src", word_step)
-    return losses, output
+    return losses, output, d_loss.item()

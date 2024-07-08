@@ -96,15 +96,15 @@ class FastSpeech2Loss(nn.Module):
             mel_targets = mel_targets.masked_select(mel_masks.unsqueeze(-1))
 
             # Penalize later parts of sequence more:
-            position_weights = torch.linspace(0.25, 1, mel_masks.shape[1]).unsqueeze(-1).to(device).requires_grad_(False)
-            position_weights /= torch.sum(position_weights)
+            # position_weights = torch.linspace(0.25, 1, mel_masks.shape[1]).unsqueeze(-1).to(device).requires_grad_(False)
+            # position_weights /= torch.sum(position_weights)
 
             mel_loss = self.mae_loss(mel_predictions, mel_targets)
             postnet_mel_loss = self.mae_loss(postnet_mel_predictions, mel_targets)
 
             # Multiply by position weights and sum to get scalar loss
-            mel_loss = torch.sum(mel_loss * position_weights)
-            postnet_mel_loss = torch.sum(postnet_mel_loss * position_weights)
+            # mel_loss = torch.sum(mel_loss * position_weights)
+            # postnet_mel_loss = torch.sum(postnet_mel_loss * position_weights)
 
             # TODO: Figure out best beta value
             beta = .3
@@ -136,7 +136,7 @@ class FastSpeech2Loss(nn.Module):
         # print("Duration Loss: ", duration_loss)
         # print("Full Duration Loss: ", full_duration_loss) # Will be 0 during pretraining.
 
-        alpha = .2
+        alpha = .5
         pitch_loss = pitch_loss * alpha
         energy_loss = energy_loss * alpha
 

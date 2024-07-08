@@ -300,9 +300,9 @@ nohup python3 pretrain.py -p config/LJSpeech/preprocess.yaml -p2 config/LJSpeech
 ```
 
 ```
-nohup python3 pretrain.py --restore_step 195000 -p config/LJSpeech/preprocess.yaml -p2 config/LJSpeech/preprocess_es.yaml -m config/LJSpeech/model.yaml -t config/LJSpeech/pretrain.yaml -w 16 &
+nohup python3 pretrain.py --restore_step 560000 -p config/LJSpeech/preprocess.yaml -p2 config/LJSpeech/preprocess_es.yaml -m config/LJSpeech/model.yaml -t config/LJSpeech/pretrain.yaml -w 16 &
 
-3322
+1512818
 ```
 
 ### On GPU
@@ -339,6 +339,10 @@ tensorboard --logdir output/log/LJSpeech
 or to transfer from the server
 ```commandline
 tensorboard --logdir=output/log/LJSpeech --bind_all
+
+tensorboard --logdir=output/log/LJSpeech/pretrain/latest --bind_all
+
+
 ```
 ```commandline
 tensorboard --logdir=/emotiv-data-NTX/output/log/LJSpeech --bind_all

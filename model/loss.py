@@ -3,18 +3,6 @@ import torch.nn as nn
 import torch.distributions as dist
 from transformers import BertModel, BertTokenizer
 import whisper
-
-
-class ProsLearnerLoss(nn.Module):
-    def __init__(self, preprocess_config, model_config):
-        super(ProsLearnerLoss, self).__init__()
-        self.mse_loss = nn.MSELoss()
-        self.mae_loss = nn.L1Loss()
-
-    def forward(self, inputs, predictions):
-        
-
-        return None
     
 
 class FastSpeech2Loss(nn.Module):
@@ -154,9 +142,13 @@ class FastSpeech2Loss(nn.Module):
         pitch_loss = pitch_loss * alpha
         energy_loss = energy_loss * alpha
 
+        # Calculate discriminator loss for generator
+        pred_generated = self.discriminator(postnet_mel_predictions)
+        g_loss = self.bce_loss(pred_generated, torch.ones_like(pred_generated))
+
         total_loss = (
             mel_loss + postnet_mel_loss + duration_loss + pitch_loss + energy_loss 
-            + pros_loss + word_loss + full_duration_loss
+            + pros_loss + word_loss + full_duration_loss + g_loss
         )
 
         return (
@@ -169,6 +161,7 @@ class FastSpeech2Loss(nn.Module):
             pros_loss,
             word_loss,
             full_duration_loss,
+            g_loss,
         )
 
 

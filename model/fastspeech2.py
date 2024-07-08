@@ -152,85 +152,28 @@ class FastSpeech2Pros(nn.Module):
                 mel_masks, text_lens, mel_lens, agg_extracted_prosody, e_tgt)
 
 
-class FastSpeech2(nn.Module):
-    """ FastSpeech2 """
+class Discriminator(nn.Module):
+    def __init__(self, preprocess_config):
+        super(Discriminator, self).__init__()
 
-    def __init__(self, preprocess_config, model_config):
-        super(FastSpeech2, self).__init__()
-        self.model_config = model_config
-
-        self.encoder = Encoder(model_config)
-        self.variance_adaptor = VarianceAdaptor(preprocess_config, model_config)
-        self.decoder = Decoder(model_config)
-        self.mel_linear = nn.Linear(
-            model_config["transformer"]["decoder_hidden"],
-            preprocess_config["preprocessing"]["mel"]["n_mel_channels"],
-        )
-        self.postnet = PostNet()
-
-        self.speaker_emb = None
-        if model_config["multi_speaker"]:
-            with open(
-                    os.path.join(
-                        preprocess_config["path"]["preprocessed_path"], "speakers.json"
-                    ),
-                    "r",
-            ) as f:
-                n_speaker = len(json.load(f))
-            self.speaker_emb = nn.Embedding(
-                n_speaker,
-                model_config["transformer"]["encoder_hidden"],
-            )
-
-    def forward(
-            self,
-            speakers,
-            texts,
-            src_lens,
-            max_src_len,
-            mels=None,
-            mel_lens=None,
-            max_mel_len=None,
-            p_targets=None,
-            e_targets=None,
-            d_targets=None,
-            p_control=1.0,
-            e_control=1.0,
-            d_control=1.0,
-    ):
-
-        src_masks = get_mask_from_lengths(src_lens, max_src_len)
-        mel_masks = (
-            get_mask_from_lengths(mel_lens, max_mel_len)
-            if mel_lens is not None
-            else None
+        # Define the layers for your Discriminator
+        self.conv_layers = nn.Sequential(
+            nn.Conv2d(in_channels=preprocess_config["preprocessing"]["mel"]["n_mel_channels"], out_channels=32, kernel_size=3, stride=2, padding=1),
+            nn.LeakyReLU(0.2, inplace=True),
+            nn.Conv2d(32, 64, 3, 2, 1),
+            nn.BatchNorm2d(64),
+            nn.LeakyReLU(0.2, inplace=True),
+            nn.Conv2d(64, 128, 3, 2, 1),
+            nn.BatchNorm2d(128),
+            nn.LeakyReLU(0.2, inplace=True),
+            nn.Conv2d(128, 256, 3, 2, 1),
+            nn.BatchNorm2d(256),
+            nn.LeakyReLU(0.2, inplace=True),
+            nn.Conv2d(256, 1, 3, 1, 1),
+            nn.Sigmoid()  # Output will be between 0 and 1
         )
 
-        output = self.encoder(texts, src_masks)
-
-        # This speaker embedding is just an embedding of the speaker ID (Not allowing for zero-shot voice cloning)
-        if self.speaker_emb is not None:
-            output = output + self.speaker_emb(speakers).unsqueeze(1).expand(-1, max_src_len, -1)
-
-        (output, p_predictions, e_predictions, log_d_predictions, d_rounded, mel_lens, mel_masks,) = \
-            self.variance_adaptor(output, src_masks, mel_masks, max_mel_len, p_targets, e_targets, d_targets, p_control,
-                                  e_control, d_control, )
-
-        output, mel_masks = self.decoder(output, mel_masks)
-
-        output = self.mel_linear(output)
-
-        postnet_output = self.postnet(output) + output
-
-        return (
-            output,
-            postnet_output,
-            p_predictions,
-            e_predictions,
-            log_d_predictions,
-            d_rounded,
-            src_masks,
-            mel_masks,
-            src_lens,
-            mel_lens,
-        )
+    def forward(self, mels):
+        # Forward pass through the network
+        out = self.conv_layers(mels)
+        return out

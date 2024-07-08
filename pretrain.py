@@ -13,7 +13,7 @@ import multiprocessing as mp
 from utils.model import get_model, get_vocoder, get_param_num, vocoder_infer
 from utils.tools import to_device, log, synth_one_sample_pretrain
 from utils.training import pretrain_loop
-from model import FastSpeech2Loss
+from model import FastSpeech2Loss, Discriminator
 from dataset import PreTrainDataset
 
 from evaluate import evaluate_pretrain
@@ -53,6 +53,10 @@ def main(args, configs):
     num_param = get_param_num(model)
     Loss = FastSpeech2Loss(preprocess_config, model_config).to(device)
     print("Number of FastSpeech2 Parameters:", num_param)
+
+    discriminator = Discriminator(preprocess_config).to(device)
+    criterion_d = nn.BCELoss()
+    optimizer_d = torch.optim.Adam(discriminator.parameters(), lr=0.0002, betas=(0.5, 0.999))
 
     # Load vocoder
     vocoder = get_vocoder(model_config, device)
@@ -100,7 +104,8 @@ def main(args, configs):
                 #     raise Exception("Stop")
 
                 # Forward
-                losses, output = pretrain_loop(preprocess_config, model_config, batch, model, Loss, vocoder, step, word_step)
+                losses, output = pretrain_loop(preprocess_config, model_config, batch, model, Loss, discriminator, 
+                                               criterion_d, optimizer_d, vocoder, step, word_step, device, training=True)
 
                 # Backward
                 total_loss = losses[0] / grad_acc_step

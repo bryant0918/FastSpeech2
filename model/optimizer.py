@@ -48,8 +48,8 @@ class ScheduledOptim:
         lr = self.init_lr * self._get_lr_scale()
 
         for param_group in self._optimizer.param_groups:
-            # param_group["lr"] = lr
-            param_group['lr'] = .0001
+            param_group["lr"] = lr
+            # param_group['lr'] = .0001
 
     def get_lr(self):
         return self._optimizer.param_groups[0]["lr"]

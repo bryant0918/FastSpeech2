@@ -65,8 +65,9 @@ def loop(preprocess_config, model_config, batch, model, Loss, vocoder, step, wor
 
     return losses_src_to_tgt, losses_tgt_to_src, output_tgt, output_src
 
-def pretrain_loop(preprocess_config, model_config, batch, model, Loss, discriminator, 
-                  criterion_d, optimizer_d, vocoder, step, word_step, device, training=False):
+def pretrain_loop(preprocess_config, model_config, batch, model, Loss, discriminator, criterion_d,
+                    vocoder, step, word_step, device, training=False,
+                    optimizer_d=None):
     batch_size = len(batch[0])
     input = batch[3:11] + (None,) + batch[11:]
 
@@ -108,6 +109,6 @@ def pretrain_loop(preprocess_config, model_config, batch, model, Loss, discrimin
         loss_input = (None,) + batch[7:9] + batch[11:13] + (log_duration_targets,)
         loss_predictions = output + (None,pred_generated)
     
-    # Calculate loss for Src to Tgt
+    # Calculate loss for Src to Src
     losses = Loss(loss_input, loss_predictions, "to_src", word_step)
     return losses, output, d_loss.item()

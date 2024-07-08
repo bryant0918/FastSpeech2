@@ -107,8 +107,8 @@ def main(args, configs):
                 #     raise Exception("Stop")
 
                 # Forward
-                losses, output, d_loss = pretrain_loop(preprocess_config, model_config, batch, model, Loss, discriminator, 
-                                               criterion_d, optimizer_d, vocoder, step, word_step, device, training=True)
+                losses, output, d_loss = pretrain_loop(preprocess_config, model_config, batch, model, Loss, discriminator, criterion_d,
+                                                        vocoder, step, word_step, device, True, optimizer_d)
 
                 # Backward
                 total_loss = losses[0] / grad_acc_step
@@ -173,7 +173,7 @@ def main(args, configs):
 
                 if step % val_step == 0:
                     model.eval()
-                    message = evaluate_pretrain(model, step, configs, val_logger, vocoder)
+                    message = evaluate_pretrain(model, discriminator, step, configs, val_logger, vocoder)
                     with open(os.path.join(val_log_path, "log.txt"), "a") as f:
                         f.write(message + "\n")
                     outer_bar.write(message)

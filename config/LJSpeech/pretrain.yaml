@@ -3,7 +3,7 @@ path:
   log_path: "./output/log/LJSpeech/pretrain"
   result_path: "./output/result/LJSpeech/pretrain"
 optimizer:
-  batch_size: 4
+  batch_size: 6
   betas: [0.9, 0.98]
   eps: 0.000000001
   weight_decay: 0.0
@@ -14,9 +14,9 @@ optimizer:
   anneal_rate: 0.4
 step:
   total_step: 900000
-  log_step: 200     # 100
-  synth_step: 2000  # 1000
+  log_step: 200     # 200
+  synth_step: 2000  # 2000
   val_step: 1000    # 1000
-  save_step: 5000  # 100000
+  save_step: 5000  # 5000
   word_step: 10   # 10
 pretrain: True

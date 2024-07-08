@@ -109,7 +109,7 @@ def evaluate(model, step, configs, logger=None, vocoder=None):
 
     return message
 
-def evaluate_pretrain(model, step, configs, logger=None, vocoder=None):
+def evaluate_pretrain(model, discriminator, step, configs, logger=None, vocoder=None):
     preprocess_config, preprocess2_config, model_config, train_config = configs
     train_step = step
 
@@ -128,17 +128,19 @@ def evaluate_pretrain(model, step, configs, logger=None, vocoder=None):
 
     # Get loss function
     Loss = FastSpeech2Loss(preprocess_config, model_config).to(device)
+    criterion_d = nn.BCELoss()
 
     word_step = train_config["step"]["word_step"]
 
     # Evaluation
-    loss_sums = [0 for _ in range(9)]
+    loss_sums = [0 for _ in range(10)]
     for batches in loader:
         for batch in batches:
             batch = to_device(batch, device)
             with torch.no_grad():
                 # Forward
-                losses, output, d_loss = pretrain_loop(preprocess_config, model_config, batch, model, Loss, vocoder, step, word_step)
+                losses, output, d_loss = pretrain_loop(preprocess_config, model_config, batch, model, Loss, discriminator, criterion_d,
+                                                        vocoder, step, word_step, device, training=False)
 
                 for i in range(len(losses)):
                     loss_sums[i] += losses[i].item() * len(batch[0])

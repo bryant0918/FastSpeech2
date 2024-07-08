@@ -105,19 +105,16 @@ def test_whisper_STT():
     import librosa
     import time
 
-    audio_path = "raw_data/LJSpeech/LJSpeech/LJ001-0004.wav"
+    audio_path = "output/result/LJSpeech/pretrain/hifigan_target9.wav"
     wav, _ = librosa.load(audio_path)
     wav = torch.from_numpy(wav)
-
     model = whisper.load_model("base").to('cpu')
-
     text = model.transcribe(wav)
-
     print(text)
-    audio_path = "output/test2.wav"
+
+    audio_path = "output/result/LJSpeech/pretrain/hifigan_prediction9.wav"
     wav, _ = librosa.load(audio_path)
     wav = torch.from_numpy(wav).to('cpu')
-    print("wav shape", wav.shape, wav.dtype, wav.device, wav.min(), wav.max())
     
     start = time.time()
     text = model.transcribe(wav)
@@ -125,11 +122,10 @@ def test_whisper_STT():
     print(text)
     print(text['text'])
 
-    model = whisper.load_model("base").to('cuda')
-    wav = torch.randn(120000).to(torch.float32).to("cuda")
-    start = time.time()
-    text = model.transcribe(wav)
-    print("Time taken: ", time.time() - start)
+    # model = whisper.load_model("base").to('cuda')
+    # wav = torch.randn(120000).to(torch.float32).to("cuda")
+    # start = time.time()
+    # text = model.transcribe(wav)
 
 def new_train_val_file():
     filepaths = ["preprocessed_data/LJSpeech/train.txt",
@@ -170,7 +166,98 @@ def test_speaker_emb():
     embedding = np.mean([mean_embedding, indiv_embedding], axis=0)
     print("Embedding shape:", np.shape(embedding))
 
+def test_vocoder():
+    import time
+    from utils.model import get_vocoder, vocoder_infer
+    from scipy.io.wavfile import write
+    import json
+    import numpy as np
+    import hifigan
+    import bigvgan
+    import yaml
+
+    device = torch.device("cuda")
+
+    model_config = "config/LJSpeech/model.yaml"
+    model_config = yaml.load(open(model_config, "r"), Loader=yaml.FullLoader)
+    preprocess_config = "config/LJSpeech/preprocess.yaml"
+    preprocess_config = yaml.load(open(preprocess_config, "r"), Loader=yaml.FullLoader)
+
+    with open("hifigan/config.json", "r") as f:
+        config = json.load(f)
+    config = hifigan.AttrDict(config)
+    hifi = hifigan.Generator(config)
+    ckpt = torch.load("hifigan/generator_universal.pth.tar", map_location=device)
+    hifi.load_state_dict(ckpt["generator"])
+    hifi.eval()
+    hifi.remove_weight_norm()
+    hifi.to(device)
+
+    with open("bigvgan/config.json", "r") as f:
+        config = json.load(f)
+    config = bigvgan.AttrDict(config)
+    bigv = bigvgan.Generator(config)
+    ckpt = torch.load("bigvgan/g_05000000", map_location=device)
+    bigv.load_state_dict(ckpt['generator'])
+    bigv.eval()
+    bigv.remove_weight_norm()
+    bigv.to(device)
+
+    hifi_times, bigv_times = [], []
+
+    for i in range(10):
+        mel_target_path = f'output/result/LJSpeech/pretrain/mel_target{i}.npy'
+        mel_prediction_path = f'output/result/LJSpeech/pretrain/mel_prediction{i}.npy'
+        hifigan_target_path = f'output/result/LJSpeech/pretrain/hifigan_target{i}.wav'
+        hifigan_prediction_path = f'output/result/LJSpeech/pretrain/hifigan_prediction{i}.wav'
+        bigvgan_target_path = f'output/result/LJSpeech/pretrain/bigvgan_target{i}.wav'
+        bigvgan_prediction_path = f'output/result/LJSpeech/pretrain/bigvgan_prediction{i}.wav'
+
+        mel_target = torch.from_numpy(np.load(mel_target_path)).to(device)
+        mel_prediction = torch.from_numpy(np.load(mel_prediction_path)).to(device)
+
+        start = time.time()
+        hifi_target = vocoder_infer(
+            mel_target.unsqueeze(0),
+            hifi,
+            model_config,
+            preprocess_config,
+        )[0]
+        hifi_times.append(time.time() - start)
+        write(hifigan_target_path, 22050, hifi_target)
+
+        start = time.time()
+        hifi_prediction = vocoder_infer(
+            mel_prediction.unsqueeze(0),
+            hifi,
+            model_config,
+            preprocess_config,
+        )[0]
+        hifi_times.append(time.time() - start)
+        write(hifigan_prediction_path, 22050, hifi_prediction)
+
+        start = time.time()
+        bigv_target = vocoder_infer(
+            mel_target.unsqueeze(0),
+            bigv,
+            model_config,
+            preprocess_config,
+        )[0]
+        bigv_times.append(time.time() - start)
+        write(bigvgan_target_path, 22050, bigv_target)
+
+        start = time.time()
+        bigv_prediction = vocoder_infer(
+            mel_prediction.unsqueeze(0),
+            bigv,
+            model_config,
+            preprocess_config,
+        )[0]
+        bigv_times.append(time.time() - start)
+        write(bigvgan_prediction_path, 22050, bigv_prediction)
+    
+    print("Done")
 
 if __name__ == "__main__":
-    test_speaker_emb()
+    test_whisper_STT()
     pass

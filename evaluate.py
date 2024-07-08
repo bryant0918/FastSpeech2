@@ -146,6 +146,7 @@ def evaluate_pretrain(model, step, configs, logger=None, vocoder=None):
             step += 1
 
     loss_means = [loss_sum / len(dataset) for loss_sum in loss_sums]
+    loss_means[7] = loss_means[7] * word_step
 
     message = "Validation Step {}, Total Loss: {:.4f}, Mel Loss: {:.4f}, Mel PostNet Loss: {:.4f}, Pitch Loss: {:.4f}, Energy Loss: {:.4f}, Duration Loss: {:.4f}, Prosody Loss: {:.4f}, Word Loss: {:.4f}, Full Duration Loss: {:.4f}".format(
                 *([train_step] + [l for l in loss_means])

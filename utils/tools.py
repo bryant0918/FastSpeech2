@@ -303,6 +303,13 @@ def synth_one_sample_pretrain(targets, predictions, vocoder, model_config, prepr
         stats = json.load(f)
         stats = stats["pitch"] + stats["energy"][:2]
 
+    # # To Test BigVGAN vs HIFI-GAN ## BigVGAN Not better
+    # id = torch.randint(0,10,(1,)).item()
+    # with open(f'output/result/LJSpeech/pretrain/mel_prediction{id}.npy', 'wb') as f:
+    #     np.save(f, mel_prediction.cpu().numpy())
+    # with open(f'output/result/LJSpeech/pretrain/mel_target{id}.npy', 'wb') as f:
+    #     np.save(f, mel_target.cpu().numpy())
+    
     fig = plot_mel(
         [
             (mel_prediction.cpu().numpy(), pitch, energy),
@@ -327,6 +334,12 @@ def synth_one_sample_pretrain(targets, predictions, vocoder, model_config, prepr
             model_config,
             preprocess_config,
         )[0]
+
+        # id = torch.randint(0,10,(1,)).item()
+        # # Save audio file
+        # wavfile.write(f'output/result/LJSpeech/pretrain/wav_reconstruction{id}.wav', preprocess_config["preprocessing"]["audio"]["sampling_rate"], wav_reconstruction)
+        # wavfile.write(f'output/result/LJSpeech/pretrain/wav_prediction{id}.wav', preprocess_config["preprocessing"]["audio"]["sampling_rate"], wav_prediction)
+
     else:
         wav_reconstruction = wav_prediction = None
 

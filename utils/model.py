@@ -81,7 +81,7 @@ def get_vocoder(config, device):
         vocoder.remove_weight_norm()
         vocoder.to(device)
 
-    elif name == "bigVGAN":
+    elif name == "BigVGAN":
         with open("bigvgan/config.json", "r") as f:
             config = json.load(f)
         config = bigvgan.AttrDict(config)
@@ -108,6 +108,8 @@ def vocoder_infer(mels, vocoder, model_config, preprocess_config, lengths=None):
                 wav = vocoder.inverse(mel / np.log(10))
             elif name == "HiFi-GAN":
                 wav = vocoder(mel).squeeze(1).squeeze(0)
+            elif name == "BigVGAN":
+                wav = vocoder(mel.unsqueeze(0)).squeeze(1).squeeze(0)
             # wav = wav * preprocess_config["preprocessing"]["audio"]["max_wav_value"]     
             wavs.append(wav)
         if len(wavs) == 0:

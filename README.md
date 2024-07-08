@@ -300,9 +300,9 @@ nohup python3 pretrain.py -p config/LJSpeech/preprocess.yaml -p2 config/LJSpeech
 ```
 
 ```
-nohup python3 pretrain.py --restore_step 195000 -p config/LJSpeech/preprocess.yaml -p2 config/LJSpeech/preprocess_es.yaml -m config/LJSpeech/model.yaml -t config/LJSpeech/pretrain.yaml -w 16 &
+nohup python3 pretrain.py --restore_step 560000 -p config/LJSpeech/preprocess.yaml -p2 config/LJSpeech/preprocess_es.yaml -m config/LJSpeech/model.yaml -t config/LJSpeech/pretrain.yaml -w 16 &
 
-3322
+1487488
 ```
 
 ### On GPU
@@ -342,6 +342,7 @@ tensorboard --logdir=output/log/LJSpeech --bind_all
 ```
 ```commandline
 tensorboard --logdir=/emotiv-data-NTX/output/log/LJSpeech --bind_all
+
 ```
 Then on local machine go to http://127.0.0.1:6006.
 

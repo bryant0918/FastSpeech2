@@ -97,11 +97,18 @@ class Encoder(nn.Module):
                                                       ].expand(batch_size, -1, -1)
 
         for enc_layer in self.layer_stack:
+            # enc_output, enc_slf_attn = enc_layer(enc_output, mask=mask, slf_attn_mask=slf_attn_mask)
+            # if return_attns:
+            #     enc_slf_attn_list += [enc_slf_attn]
+
+            enc_output_resid = enc_output  # Store the input for the residual connection
             enc_output, enc_slf_attn = enc_layer(enc_output, mask=mask, slf_attn_mask=slf_attn_mask)
+            enc_output += enc_output_resid  # Add residual connection
+            enc_output = torch.relu(enc_output)  # Apply non-linearity (ReLU) after the residual connection
             if return_attns:
                 enc_slf_attn_list += [enc_slf_attn]
         return enc_output
-
+    
 
 class Decoder(nn.Module):
     """ Decoder """
@@ -165,9 +172,19 @@ class Decoder(nn.Module):
             slf_attn_mask = slf_attn_mask[:, :, :max_len]
 
         for dec_layer in self.layer_stack:
+            # dec_output, dec_slf_attn = dec_layer(
+            #     dec_output, mask=mask, slf_attn_mask=slf_attn_mask
+            # )
+            # if return_attns:
+            #     dec_slf_attn_list += [dec_slf_attn]
+
+            # Add residuals
+            dec_output_resid = dec_output  # Store the input for the residual connection
             dec_output, dec_slf_attn = dec_layer(
                 dec_output, mask=mask, slf_attn_mask=slf_attn_mask
             )
+            dec_output += dec_output_resid  # Add residual connection
+            dec_output = torch.relu(dec_output)  # Apply non-linearity (ReLU) after the residual connection
             if return_attns:
                 dec_slf_attn_list += [dec_slf_attn]
 

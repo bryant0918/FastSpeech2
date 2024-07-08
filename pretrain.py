@@ -8,6 +8,7 @@ import torch.nn as nn
 from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm
+import multiprocessing as mp
 
 from utils.model import get_model, get_vocoder, get_param_num, vocoder_infer
 from utils.tools import to_device, log, synth_one_sample_pretrain
@@ -93,10 +94,11 @@ def main(args, configs):
                 batch = to_device(batch, device)
                 # batch = (ids, raw_texts, speakers, langs, texts, src_lens, max_src_len, mels, mel_lens, max_mel_len, 
                 #           speaker_embeddings, pitches, energies, durations)
-
-                # if step == 100:
-                #     raise NotImplementedError
                 
+
+                # if step == 560020:
+                #     raise Exception("Stop")
+
                 # Forward
                 losses, output = pretrain_loop(preprocess_config, model_config, batch, model, Loss, vocoder, step, word_step)
 

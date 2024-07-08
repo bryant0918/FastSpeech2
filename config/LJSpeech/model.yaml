@@ -47,7 +47,7 @@ multi_speaker: False
 max_seq_len: 1000
 
 vocoder:
-  model: "HiFi-GAN" # support 'HiFi-GAN', 'MelGAN'
+  model: "HiFi-GAN" # support 'HiFi-GAN', 'MelGAN', 'BigVGAN'
   speaker: "universal" # support  'LJSpeech', 'universal'
 
 synthesizer:

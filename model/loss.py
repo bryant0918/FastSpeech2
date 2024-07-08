@@ -106,11 +106,21 @@ class FastSpeech2Loss(nn.Module):
             )
             mel_targets = mel_targets.masked_select(mel_masks.unsqueeze(-1))
 
+            # Penalize later parts of sequence more:
+            # position_weights = torch.linspace(0.25, 1, mel_masks.shape[1]).unsqueeze(-1).to(device).requires_grad_(False)
+            # position_weights /= torch.sum(position_weights)
+
             mel_loss = self.mae_loss(mel_predictions, mel_targets)
             postnet_mel_loss = self.mae_loss(postnet_mel_predictions, mel_targets)
 
+            print("mel_loss: ", mel_loss)
+
+            # If multiply by position weights:
+            # mel_loss = mel_loss * position_weights
+            # postnet_mel_loss = postnet_mel_loss * position_weights
+
             # TODO: Figure out best beta value
-            beta = .25
+            beta = .3
             pros_loss = self.pros_loss(predicted_e, extracted_e, src_masks)*beta
 
             # print("Mel Loss: ", mel_loss)
@@ -126,7 +136,8 @@ class FastSpeech2Loss(nn.Module):
         
         # word_loss  (Requires extracting predicted phonemes from mel Spectrogram) whisper
         if audio is not None:
-            word_loss = self.word_loss(audio, text) * word_step
+            text.requires_grad = False
+            word_loss = self.word_loss(audio, text)
         else:
             word_loss = torch.tensor([0]).to(device)
 
@@ -138,6 +149,10 @@ class FastSpeech2Loss(nn.Module):
         # print("Energy Loss: ", energy_loss)
         # print("Duration Loss: ", duration_loss)
         # print("Full Duration Loss: ", full_duration_loss) # Will be 0 during pretraining.
+
+        alpha = .2
+        pitch_loss = pitch_loss * alpha
+        energy_loss = energy_loss * alpha
 
         total_loss = (
             mel_loss + postnet_mel_loss + duration_loss + pitch_loss + energy_loss 
@@ -232,7 +247,6 @@ class ProsLoss(nn.Module):
         nlls = torch.sum(negloglik)/max_seq_len
 
         return nlls / batch_size
-
 
 
 class WordLoss(nn.Module):

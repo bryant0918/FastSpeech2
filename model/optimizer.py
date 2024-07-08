@@ -20,6 +20,7 @@ class ScheduledOptim:
         self.init_lr = np.power(model_config["transformer"]["encoder_hidden"], -0.5)
 
     def step_and_update_lr(self):
+        print("Current lr: ", self.get_lr())
         self._update_learning_rate()
         self._optimizer.step()
 
@@ -48,8 +49,8 @@ class ScheduledOptim:
         lr = self.init_lr * self._get_lr_scale()
 
         for param_group in self._optimizer.param_groups:
-            param_group["lr"] = lr
+            # param_group["lr"] = lr
+            param_group['lr'] = .0001
 
     def get_lr(self):
         return self._optimizer.param_groups[0]["lr"]
-    

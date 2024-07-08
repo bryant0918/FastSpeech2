@@ -338,7 +338,7 @@ tensorboard --logdir output/log/LJSpeech
 
 or to transfer from the server
 ```commandline
-tensorboard --logdir=output/log/LJSpeech --bind_all
+tensorboard --logdir=output/log/LJSpeech/pretrain --bind_all
 
 tensorboard --logdir=output/log/LJSpeech/pretrain/latest --bind_all
 

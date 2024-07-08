@@ -6,7 +6,7 @@ import numpy as np
 
 import hifigan
 import bigvgan
-from model import FastSpeech2, ScheduledOptim, ScheduledOptim2, FastSpeech2Pros, ProsLearner
+from model import FastSpeech2, ScheduledOptim, FastSpeech2Pros, ProsLearner
 
 
 def get_model(args, configs, device, train=False):

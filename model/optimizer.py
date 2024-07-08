@@ -20,7 +20,6 @@ class ScheduledOptim:
         self.init_lr = np.power(model_config["transformer"]["encoder_hidden"], -0.5)
 
     def step_and_update_lr(self):
-        print("Current lr: ", self.get_lr())
         self._update_learning_rate()
         self._optimizer.step()
 

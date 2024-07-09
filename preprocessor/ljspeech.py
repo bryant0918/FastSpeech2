@@ -22,7 +22,6 @@ def prepare_align(config):
     speaker = "LJSpeech"
 
     os.makedirs((os.path.join(preprocessed_dir, "alignments", "word")), exist_ok=True)
-
     word_aligner = SentenceAligner(model="bert", token_type="bpe", matching_methods="m")
 
     with open(os.path.join(in_dir, "metadata.csv"), encoding="utf-8") as f:

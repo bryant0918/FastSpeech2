@@ -6,14 +6,23 @@ from scipy.io import wavfile
 from tqdm import tqdm
 
 from text import _clean_text
+from text.cleaners import spanish_cleaners
+
+from deep_translator import GoogleTranslator
+from simalign import SentenceAligner
 
 
 def prepare_align(config):
     in_dir = config["path"]["corpus_path"]
     out_dir = config["path"]["raw_path"]
+    preprocessed_dir = config["path"]["preprocessed_path"]
     sampling_rate = config["preprocessing"]["audio"]["sampling_rate"]
     max_wav_value = config["preprocessing"]["audio"]["max_wav_value"]
     cleaners = config["preprocessing"]["text"]["text_cleaners"]
+
+    os.makedirs((os.path.join(preprocessed_dir, "alignments", "word")), exist_ok=True)
+    word_aligner = SentenceAligner(model="bert", token_type="bpe", matching_methods="m")
+    
     for speaker in tqdm(os.listdir(in_dir)):
         for chapter in os.listdir(os.path.join(in_dir, speaker)):
             for file_name in os.listdir(os.path.join(in_dir, speaker, chapter)):

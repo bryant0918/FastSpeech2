@@ -131,7 +131,7 @@ def evaluate_pretrain(model, discriminator, step, configs, logger=None, vocoder=
     criterion_d = nn.BCELoss()
 
     word_step = train_config["step"]["word_step"]
-    warm_up_step = train_config["step"]["warm_up_step"]
+    warm_up_step = train_config["optimizer"]["warm_up_step"]
     discriminator_step = train_config["step"]["discriminator_step"]
 
     # Evaluation

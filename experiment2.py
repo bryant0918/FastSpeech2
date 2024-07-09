@@ -258,6 +258,80 @@ def test_vocoder():
     
     print("Done")
 
+def test_miipher():
+    from miipher.dataset.preprocess_for_infer import PreprocessForInfer
+    from miipher.lightning_module import MiipherLightningModule
+    from lightning_vocoders.models.hifigan.xvector_lightning_module import HiFiGANXvectorLightningModule
+    import torch
+    import torchaudio
+    import hydra
+
+    miipher_path = "miipher/miipher_v2.ckpt"
+    miipher = MiipherLightningModule.load_from_checkpoint(miipher_path,map_location='cpu')
+    vocoder = HiFiGANXvectorLightningModule.load_from_checkpoint("miipher/vocoder_finetuned_v2.ckpt",map_location='cpu')
+    xvector_model = hydra.utils.instantiate(vocoder.cfg.data.xvector.model)
+    xvector_model = xvector_model.to('cpu')
+    preprocessor = PreprocessForInfer(miipher.cfg)
+    preprocessor.cfg.preprocess.text2phone_model.is_cuda=False
+    
+    @torch.inference_mode()
+    def main(wav_path, output_path, transcript=None, lang_code=None, phones=None):
+        wav,sr =torchaudio.load(wav_path)
+        wav = wav[0].unsqueeze(0)
+        batch = preprocessor.process(
+            'test',
+            (torch.tensor(wav),sr),
+            word_segmented_text=transcript,
+            lang_code=lang_code,
+            phoneme_text=phones
+        )
+
+        
+
+        miipher.feature_extractor(batch)
+        (
+            phone_feature,
+            speaker_feature,
+            degraded_ssl_feature,
+            _,
+        ) = miipher.feature_extractor(batch)
+        
+
+        cleaned_ssl_feature, _ = miipher(phone_feature,speaker_feature,degraded_ssl_feature)
+        vocoder_xvector = xvector_model.encode_batch(batch['degraded_wav_16k'].view(1,-1).cpu()).squeeze(1)
+        cleaned_wav = vocoder.generator_forward({"input_feature": cleaned_ssl_feature, "xvector": vocoder_xvector})[0].T
+        # with tempfile.NamedTemporaryFile(suffix='.wav', delete=False) as fp:
+        #     torchaudio.save(fp,cleaned_wav.view(1,-1), sample_rate=22050,format='wav')
+        #     return fp.name
+        
+        torchaudio.save(output_path,cleaned_wav.view(1,-1), sample_rate=22050,format='wav')
+    
+    audio_file = "/home/ditto/Ditto/FastSpeech2/raw_data/Spanish/M043/TEDX_M_043_SPA_0070.wav"
+    output_path = "output/result/test_miipher.wav"
+    phones = "i e s o s e p a ɾ a m i s e s e p w e ð e r e ð u s i ɾ e n c e e n u n d̪ e s p e r t̪ a ɾ d̪ e l a k o n θ j e n θ j a u m a n a ɡ ɾ a θ j a s"
+    
+    main(audio_file, output_path, phones=phones)
+    
+    # # Load the model and feature extractor
+    # model_name = "miipher"
+    # model = AutoModelForAudioFrameClassification.from_pretrained(model_name)
+    # feature_extractor = AutoFeatureExtractor.from_pretrained(model_name)
+
+    # audio_file = "/home/ditto/Ditto/FastSpeech2/raw_data/Spanish/F001/TEDX_F_001_SPA_0001.wav"
+    # output_path = "output/result/test_miipher.wav"
+
+    # waveform, sample_rate = torchaudio.load(audio_file)
+
+    # inputs = feature_extractor(waveform, sampling_rate=sample_rate, return_tensors="pt")
+
+    # inputs = {k: v.to(model.device) for k, v in inputs.items()}
+    # with torch.no_grad():
+    #     outputs = model(**inputs)
+    # enhanced_waveform = outputs['logits'].cpu().numpy()
+    
+    # torchaudio.save(output_path, enhanced_waveform, sample_rate)
+
+
 if __name__ == "__main__":
-    test_whisper_STT()
+    test_miipher()
     pass

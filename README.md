@@ -170,6 +170,8 @@ and transcripts, approximately 24 hours in total.
 - [AISHELL-3](http://www.aishelltech.com/aishell_3): a Mandarin TTS dataset with 218 male and female speakers, roughly 85 hours in total.
 - [LibriTTS](https://research.google/tools/datasets/libri-tts/): a multi-speaker English dataset containing 585 hours of speech by 2456 speakers.
 
+```wget https://www.openslr.org/resources/141/train_clean_360.tar.gz```
+
 We take LJSpeech as an example hereafter.
 
 ## Preprocessing

@@ -29,3 +29,7 @@ preprocessing:
   energy:
     feature: "phoneme_level" # support 'phoneme_level' or 'frame_level'
     normalization: True
+  miipher:
+    miipher_path: "miipher/miipher_v2.ckpt"
+    vocoder_path: "miipher/vocoder_finetuned_v2.ckpt"
+    

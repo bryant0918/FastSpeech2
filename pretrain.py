@@ -56,10 +56,29 @@ def main(args, configs):
 
     discriminator = Discriminator(preprocess_config).to(device)
     criterion_d = nn.BCELoss()
-    optimizer_d = torch.optim.Adam(discriminator.parameters(), lr=0.0002, betas=(0.5, 0.999))
+    # optimizer_d = torch.optim.Adam(discriminator.parameters(), lr=0.0001, betas=(0.6, 0.999))
     discriminator_params = get_param_num(discriminator)
     print("Number of Discriminator Parameters:", discriminator_params)
     print("Total Parameters:", num_param + discriminator_params)
+    # Define the discriminator optimizer with a low initial learning rate
+    d_initial_lr, d_max_lr = 1e-6, 1e-3
+    d_optimizer = torch.optim.Adam(discriminator.parameters(), lr=d_initial_lr, betas=(0.6, 0.999))
+    warm_up_step = train_config['optimizer']['warm_up_step']
+
+    # Define a lambda function to increase the learning rate up to 10,000 steps and then decrease
+    def lr_lambda(step):
+        if step < warm_up_step:
+            # Linearly increase the learning rate to max_lr
+            return d_initial_lr + (d_max_lr - d_initial_lr) * (step / warm_up_step)
+        elif step < warm_up_step*10:
+            # Linearly decrease the learning rate back to initial_lr
+            return d_max_lr - (d_max_lr - d_initial_lr) * ((step - warm_up_step) / (warm_up_step*10 - warm_up_step))
+        else:
+            # After total_steps, maintain the initial learning rate
+            return d_initial_lr
+    
+    # Define the learning rate scheduler
+    d_scheduler = torch.optim.lr_scheduler.LambdaLR(d_optimizer, lr_lambda)
 
     # Load vocoder
     vocoder = get_vocoder(model_config, device)
@@ -86,6 +105,8 @@ def main(args, configs):
     synth_step = train_config["step"]["synth_step"]
     val_step = train_config["step"]["val_step"]
     word_step = train_config["step"]["word_step"]
+    discriminator_step = train_config["step"]["discriminator_step"]
+    
 
     outer_bar = tqdm(total=total_step, desc="Training", position=0)
     outer_bar.n = args.restore_step
@@ -102,17 +123,18 @@ def main(args, configs):
                 # batch = (ids, raw_texts, speakers, langs, texts, src_lens, max_src_len, mels, mel_lens, max_mel_len, 
                 #           speaker_embeddings, pitches, energies, durations)
                 
-
-                # if step == 560020:
-                #     raise Exception("Stop")
+                if step == 50:
+                    raise Exception("Stop")
 
                 # Forward
                 losses, output, d_loss = pretrain_loop(preprocess_config, model_config, batch, model, Loss, discriminator, criterion_d,
-                                                        vocoder, step, word_step, device, True, optimizer_d)
+                                                        vocoder, step, word_step, device, True, d_optimizer, discriminator_step, warm_up_step)
 
                 # Backward
                 total_loss = losses[0] / grad_acc_step
                 total_loss.backward()
+
+                d_scheduler.step()
 
                 if step % grad_acc_step == 0:
                     # Clipping gradients to avoid gradient explosion
@@ -125,6 +147,7 @@ def main(args, configs):
                 if step % log_step == 0:
                     losses = [l.item() for l in losses]
                     losses.append(d_loss)
+                    print("d_loss", d_loss, losses[10])
                     message1 = "Step {}/{}, ".format(step, total_step)
                     message2 = "Total Loss: {:.4f}, Mel Loss: {:.4f}, Mel PostNet Loss: {:.4f}, Pitch Loss: {:.4f}, Energy Loss: {:.4f}, Duration Loss: {:.4f}, Prosody Loss: {:.4f}, Word Loss: {:.4f}, Full Duration Loss: {:.4f}, G Loss: {:.4f}, D Loss: {:.4f}".format(
                         *losses
@@ -173,12 +196,14 @@ def main(args, configs):
 
                 if step % val_step == 0:
                     model.eval()
+                    discriminator.eval()
                     message = evaluate_pretrain(model, discriminator, step, configs, val_logger, vocoder)
                     with open(os.path.join(val_log_path, "log.txt"), "a") as f:
                         f.write(message + "\n")
                     outer_bar.write(message)
 
                     model.train()
+                    discriminator.train()
 
                 if step % save_step == 0:
                     print("Saving checkpoint")

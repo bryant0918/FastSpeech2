@@ -140,8 +140,8 @@ class FastSpeech2Loss(nn.Module):
         pitch_loss = pitch_loss * alpha
         energy_loss = energy_loss * alpha
 
-        # Calculate discriminator loss for generator
-        g_loss = self.bce_loss(pred_generated, torch.ones_like(pred_generated))
+        # Calculate discriminator loss for generator with label smoothing
+        g_loss = self.bce_loss(pred_generated, torch.ones_like(pred_generated) * .95)
 
         total_loss = (
             mel_loss + postnet_mel_loss + duration_loss + pitch_loss + energy_loss 

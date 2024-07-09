@@ -19,4 +19,5 @@ step:
   val_step: 1000    # 1000
   save_step: 5000  # 5000
   word_step: 10   # 10
+  discriminator_step: 10
 pretrain: True

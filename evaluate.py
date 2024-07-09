@@ -131,6 +131,8 @@ def evaluate_pretrain(model, discriminator, step, configs, logger=None, vocoder=
     criterion_d = nn.BCELoss()
 
     word_step = train_config["step"]["word_step"]
+    warm_up_step = train_config["step"]["warm_up_step"]
+    discriminator_step = train_config["step"]["discriminator_step"]
 
     # Evaluation
     loss_sums = [0 for _ in range(10)]
@@ -144,7 +146,7 @@ def evaluate_pretrain(model, discriminator, step, configs, logger=None, vocoder=
 
                 for i in range(len(losses)):
                     loss_sums[i] += losses[i].item() * len(batch[0])
-                loss_sums.append(d_loss * len(batch[0]))
+                loss_sums.append(d_loss * len(batch[0]) * discriminator_step) if train_step < warm_up_step else loss_sums.append(d_loss * len(batch[0]))
                 
             step += 1
 

@@ -278,7 +278,7 @@ python3 preprocess.py config/LJSpeech/preprocess.yaml
 nohup python3 preprocess.py config/LJSpeech/preprocess.yaml &
 ps -ef | grep 961918
 nohup python3 preprocess.py config/LJSpeech/preprocess_es.yaml > preprocess.log 2>&1 &
-1728754
+1775009
 ```
 
 ### Get Speaker Embeddings
@@ -289,7 +289,8 @@ python SpeakerEncoder/compute_embeddings.py --output_path preprocessed_data/LJSp
 ```
 
 ```
-python SpeakerEncoder/compute_embeddings.py --output_path preprocessed_data/Spanish/speaker_emb --input_path raw_data/Spanish
+nohup python SpeakerEncoder/compute_embeddings.py --output_path preprocessed_data/Spanish/speaker_emb --input_path raw_data/Spanish > embeddings.log 2>&1 &
+1790201
 ```
 
 ### Combine two datasets to train on
@@ -311,9 +312,9 @@ nohup python3 pretrain.py -p config/LJSpeech/preprocess.yaml -p2 config/LJSpeech
 ```
 
 ```
-nohup python3 pretrain.py --restore_step 65000 -p config/LJSpeech/preprocess.yaml -p2 config/LJSpeech/preprocess_es.yaml -m config/LJSpeech/model.yaml -t config/LJSpeech/pretrain.yaml -w 16 &
+nohup python3 pretrain.py --restore_step 160000 -p config/LJSpeech/preprocess.yaml -p2 config/LJSpeech/preprocess_es.yaml -m config/LJSpeech/model.yaml -t config/LJSpeech/pretrain.yaml -w 16 &
 
-1487488
+1809534
 ```
 
 ### On GPU

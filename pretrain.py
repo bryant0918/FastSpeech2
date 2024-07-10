@@ -123,8 +123,8 @@ def main(args, configs):
                 # batch = (ids, raw_texts, speakers, langs, texts, src_lens, max_src_len, mels, mel_lens, max_mel_len, 
                 #           speaker_embeddings, pitches, energies, durations)
                 
-                if step == 50:
-                    raise Exception("Stop")
+                # if step == 50:
+                #     raise Exception("Stop")
 
                 # Forward
                 losses, output, d_loss = pretrain_loop(preprocess_config, model_config, batch, model, Loss, discriminator, criterion_d,

@@ -273,14 +273,12 @@ class PreTrainDataset(Dataset):
         speaker_emb_path_indiv = os.path.join(self.preprocessed_path[src_lang], "speaker_emb", speaker, "{}.pkl".format(basename))
         
         with open(speaker_emb_path_mean, 'rb') as f:
-            emb_dict = pickle.load(f)        
-        mean_embedding = torch.from_numpy(emb_dict["mean"])
+            mean_emb_dict = pickle.load(f)
 
         with open(speaker_emb_path_indiv, 'rb') as f:
-            emb_dict = pickle.load(f)
-        indiv_embedding = torch.from_numpy(emb_dict["default"])
+            indiv_emb_dict = pickle.load(f)
 
-        embedding = np.mean([mean_embedding, indiv_embedding], axis=0)
+        embedding = np.mean([mean_emb_dict['mean'], indiv_emb_dict['default']], axis=0)
         
         sample = {
             "id": basename,

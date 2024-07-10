@@ -83,7 +83,8 @@ def main(args):
                 embedd = executor.submit(speech_embedding.compute_embedding, 
                                          wav_file,
                                          itr,
-                                         len(wav_files))
+                                         len(wav_files),
+                                         False)
                 all_embdds.append((os.path.basename(wav_file), embedd))
 
             # Process outputs

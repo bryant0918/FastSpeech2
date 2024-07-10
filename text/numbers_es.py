@@ -55,10 +55,11 @@ def normalize_numbers_es(text):
 if __name__ == "__main__":
     print(sing(12))
     # raw_data/LJSpeech/LJSpeech/LJ001-0077_src.lab
-    en = "in england about this time an attempt was made notably by caslon who started business in london as a typefounder in seventeen twenty"
+    en = "in england about this time an attempt was made notably by caslon who started business in london as a typefounder in seventeen twenty, and he had forty-five apples"
     from deep_translator import GoogleTranslator
     translation = GoogleTranslator(source='auto', target='es').translate(en)
     print(translation)
     translation = normalize_numbers_es(translation)
     print(translation)
+
     pass

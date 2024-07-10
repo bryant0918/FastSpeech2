@@ -35,15 +35,18 @@ def prepare_align(config):
 
             text = _clean_text(text, cleaners)
 
-            # Skip if translation exists (pick up where you left off)
-            if os.path.exists(out_translation_path):
+            # Skip if file exists (pick up where you left off)
+            preprocessed_path = os.path.join(preprocessed_dir, "mel", "{}-mel-{}.npy".format(speaker, base_name))
+            if os.path.exists(preprocessed_path):
                 continue
+            else:
+                print("Processing: ", base_name)
 
             # TODO: handle api connection errors
             translation = GoogleTranslator(source='es', target='en').translate(text)
             translation = english_cleaners(translation)
 
-            wav_path = os.path.join(in_dir, "tedx_spanish_corpus", "speech", "{}.wav".format(base_name))
+            wav_path = os.path.join(in_dir, "speech", "{}.wav".format(base_name))
             if os.path.exists(wav_path):
                 os.makedirs(os.path.join(out_dir, speaker), exist_ok=True)
                 try:

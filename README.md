@@ -175,6 +175,12 @@ and transcripts, approximately 24 hours in total.
 We take LJSpeech as an example hereafter.
 
 ## Preprocessing
+
+### Clean Audio
+Use Miipher model to create high quality audio to train on. If not done already adjust so that can be run in tandem with prepare_align.py. 
+```
+nohup python3 clean_audio.py config/LJSpeech/preprocess_es.yaml > clean_audio.log 2>&1 &
+```
  
 ### Prepare Align
 First, we need to take the metadata csv files that contain the fileID, transcription as well as the 
@@ -189,8 +195,9 @@ python3 prepare_align.py config/LJSpeech/preprocess.yaml
 ```
 ```
 nohup python3 prepare_align.py config/LJSpeech/preprocess.yaml &
-
 ps -ef | grep 2014664
+nohup python3 prepare_align.py config/LJSpeech/preprocess_es.yaml > preprocess.log 2>&1 &
+1752078
 ```
 
 ### Get the TextGrid Files
@@ -205,7 +212,7 @@ wget --no-check-certificate 'https://drive.google.com/uc?export=download&id=1ukb
 or copy the file to the server by
 ```
 scp /Users/bryantmcarthur/Downloads/LJSpeech.zip ditto@136.36.160.77:/home/ditto/Documents/ProsodyCloning/FastSpeech2/preprocessed_data/LJSpeech
-scp /Users/bryantmcarthur/Downloads/LJSpeech.zip ditto@Emotiv:/home/ditto/Ditto/FastSpeech2/preprocessed_data/LJSpeech
+scp /Users/bryant/Downloads/LibriTTS.zip ditto@Emotiv:/home/ditto/Ditto/FastSpeech2/preprocessed_data/LibriTTS
 ```
 You have to unzip the files in ``preprocessed_data/LJSpeech/TextGrid/``.
 
@@ -270,6 +277,8 @@ python3 preprocess.py config/LJSpeech/preprocess.yaml
 ```
 nohup python3 preprocess.py config/LJSpeech/preprocess.yaml &
 ps -ef | grep 961918
+nohup python3 preprocess.py config/LJSpeech/preprocess_es.yaml > preprocess.log 2>&1 &
+1728754
 ```
 
 ### Get Speaker Embeddings

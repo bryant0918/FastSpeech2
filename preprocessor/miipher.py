@@ -79,7 +79,9 @@ class MiipherInference:
 
     # TODO: Change so that we process through miipher before prepare_align.py
     def process_directory(self):
-        for speaker in tqdm(os.listdir(self.input_dir)):
+        for i, speaker in enumerate(tqdm(os.listdir(self.input_dir))):
+            if i < 67:
+                continue
             for file_name in os.listdir(os.path.join(self.input_dir, speaker)):
                 if file_name.endswith('.wav'):
                     input_path = os.path.join(self.input_dir, speaker, file_name)

@@ -110,16 +110,12 @@ class FastSpeech2Loss(nn.Module):
             beta = .3
             pros_loss = self.pros_loss(predicted_e, extracted_e, src_masks)*beta
 
-            # print("Mel Loss: ", mel_loss)
-            # print("Postnet Mel Loss: ", postnet_mel_loss)
-            # print("Prosody Loss: ", pros_loss, pros_loss.shape) # Should be [Batch, 1] or [Batch]
-
-            # print("mel_duration_loss: ", mel_duration_loss)
-
-        
+        alpha = .5
         pitch_loss = self.mse_loss(pitch_predictions, pitch_targets)
         energy_loss = self.mse_loss(energy_predictions, energy_targets)
         duration_loss = self.mse_loss(log_duration_predictions, log_duration_targets)
+        pitch_loss = pitch_loss * alpha
+        energy_loss = energy_loss * alpha
         
         # word_loss  (Requires extracting predicted phonemes from mel Spectrogram) whisper
         if audio is not None:
@@ -130,15 +126,6 @@ class FastSpeech2Loss(nn.Module):
         # Full Duration Loss
         delta = .01
         full_duration_loss = self.mae_loss(mel_lens_predictions, mel_lens_targets.float()) * delta
-
-        # print("Pitch Loss: ", pitch_loss)
-        # print("Energy Loss: ", energy_loss)
-        # print("Duration Loss: ", duration_loss)
-        # print("Full Duration Loss: ", full_duration_loss) # Will be 0 during pretraining.
-
-        alpha = .5
-        pitch_loss = pitch_loss * alpha
-        energy_loss = energy_loss * alpha
 
         # Calculate discriminator loss for generator with label smoothing
         g_loss = self.bce_loss(pred_generated, torch.ones_like(pred_generated) * .95)

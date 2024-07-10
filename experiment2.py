@@ -25,9 +25,16 @@ def test_google_translate():
     # translation = _clean_text(translation, cleaners)
 
     print(translation)
-    from text.cleaners import remove_punctuation
+    from text.cleaners import remove_punctuation, english_cleaners
     translation = remove_punctuation(translation)
     print(translation)
+
+    text = "En Inglaterra, por esta época, Caslon hizo un intento en particular, quien comenzó su negocio en Londres como fundidor tipográfico en mil setecientos veinte y tenía cuarenta y cinco manzanas."
+    english = GoogleTranslator(source='es', target='en').translate(translation)
+    print(english)
+    english = english_cleaners(english)
+    print(english)
+
 
     return translation
 
@@ -333,5 +340,5 @@ def test_miipher():
 
 
 if __name__ == "__main__":
-    test_miipher()
+    test_google_translate()
     pass

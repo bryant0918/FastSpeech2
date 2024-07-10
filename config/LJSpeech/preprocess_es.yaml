@@ -1,7 +1,7 @@
 dataset: "Spanish"
 
 path:
-  corpus_path: "/home/ditto/Datasets/Speech/es"
+  corpus_path: "/home/ditto/Datasets/Speech/es/base/tedx_spanish_corpus"
   lexicon_path: ""  # Only used in synthesize.py
   raw_path: "raw_data/Spanish"
   preprocessed_path: "preprocessed_data/Spanish"

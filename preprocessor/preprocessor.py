@@ -84,7 +84,7 @@ class Preprocessor:
             for j, wav_name in enumerate(tqdm(os.listdir(os.path.join(self.in_dir, speaker)))):
                 if ".wav" not in wav_name:
                     continue
-
+                
                 basename = wav_name.split(".")[0]
                 tg_path = os.path.join(self.out_dir, "TextGrid", speaker, "{}.TextGrid".format(basename))
                 if os.path.exists(tg_path):
@@ -176,7 +176,7 @@ class Preprocessor:
 
     def process_utterance(self, speaker, basename):
         wav_path = os.path.join(self.in_dir, speaker, "{}.wav".format(basename))
-        text_path = os.path.join(self.in_dir, speaker, "{}_src.lab".format(basename))
+        text_path = os.path.join(self.in_dir, speaker, "{}.lab".format(basename))
         translation_path = os.path.join(self.in_dir, speaker, "{}_tgt.lab".format(basename))
         word_alignment_path = os.path.join(self.out_dir, "alignments", "word", "{}-word_alignment-{}.npy".format(speaker, basename))
 
@@ -214,17 +214,14 @@ class Preprocessor:
             flat_phones = []
             for word in raw_translation.split():
                 try:
-                    tgt_phones.append(self.cmu.lookup(word)[0])
+                    tgt_phones.append(self.cmu.lookup(word)[0].split(' '))
                     flat_phones.extend(self.cmu.lookup(word)[0].split())
                 except TypeError:
                     print("Word", word, self.cmu.lookup(word), translation_path)
                     continue
             
-        # print("tgt_phones", tgt_phones, len(raw_translation.split()))
-        # print("flat_phones", flat_phones, len(raw_translation.split()))
-        # gt_phones ['kalkɾaft', 'siɾbjo', 'en', 'la', 'siudad', 'de', 'londɾes', 'asta', 'mil', 'ot͡ʃosientos', 
-        #            'setenta', 'i', 'kwatɾo', 'kwando', 'ɾesibjo', 'una', 'pensjon', 'de', 'beintisinko', 
-        #            't͡ʃelines', 'poɾ', 'semana'] 22
+        # print("tgt_phones", tgt_phones, len(tgt_phones))
+        # print("flat_phones", flat_phones, len(flat_phones))
 
         if len(tgt_phones) != len(raw_translation.split()):
             # So far only loses singular 'h' like for middle initial because h is silent in spanish

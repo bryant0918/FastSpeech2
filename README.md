@@ -197,7 +197,7 @@ python3 prepare_align.py config/LJSpeech/preprocess.yaml
 nohup python3 prepare_align.py config/LJSpeech/preprocess.yaml &
 ps -ef | grep 2014664
 nohup python3 prepare_align.py config/LJSpeech/preprocess_es.yaml > preprocess.log 2>&1 &
-127711
+22835
 ```
 
 ### Get the TextGrid Files
@@ -328,10 +328,10 @@ nohup python3 pretrain.py -p config/LJSpeech/LL_preprocess.yaml -p2 config/LJSpe
 ## Train Synthesizer
 Train your model with
 ```
-python3 train.py -p config/LJSpeech/preprocess.yaml -m config/LJSpeech/model.yaml -t config/LJSpeech/train.yaml
+python3 train.py -p config/LJSpeech/preprocess.yaml -p2 config/LJSpeech/preprocess_es.yaml -m config/LJSpeech/model.yaml -t config/LJSpeech/train.yaml
 ```
 ```
-python3 train.py -p config/Bryant/preprocess.yaml -m config/Bryant/model.yaml -t config/Bryant/train.yaml
+
 ```
 
 The model takes less than 10k steps (less than 1 hour on my GTX1080Ti GPU) of training to generate audio samples with acceptable quality, which is much more efficient than the autoregressive models such as Tacotron2.

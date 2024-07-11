@@ -55,7 +55,7 @@ def prepare_align(config):
                     sampling_rate,
                     wav.astype(np.int16),
                 )
-                with open(os.path.join(out_dir, speaker, "{}_src.lab".format(base_name)), "w") as f1:
+                with open(os.path.join(out_dir, speaker, "{}.lab".format(base_name)), "w") as f1:
                     f1.write(text)
 
                 with open(out_translation_path, "w") as f1:

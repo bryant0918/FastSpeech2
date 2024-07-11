@@ -10,7 +10,7 @@ from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm
 import multiprocessing as mp
 
-from utils.model import get_model, get_vocoder, get_param_num, vocoder_infer
+from utils.model import get_model, get_vocoder, get_param_num, vocoder_infer, get_discriminator
 from utils.tools import to_device, log, synth_one_sample_pretrain
 from utils.training import pretrain_loop
 from model import FastSpeech2Loss, Discriminator
@@ -54,35 +54,16 @@ def main(args, configs):
     Loss = FastSpeech2Loss(preprocess_config, model_config).to(device)
     print("Number of FastSpeech2 Parameters:", num_param)
 
-    discriminator = Discriminator(preprocess_config).to(device)
+    # Prepare discriminator
+    discriminator, d_optimizer, d_scheduler = get_discriminator(args, configs[1:], device, train=True)
+    discriminator = nn.DataParallel(discriminator)
     criterion_d = nn.BCELoss()
-    # optimizer_d = torch.optim.Adam(discriminator.parameters(), lr=0.0001, betas=(0.6, 0.999))
     discriminator_params = get_param_num(discriminator)
     print("Number of Discriminator Parameters:", discriminator_params)
     print("Total Parameters:", num_param + discriminator_params)
-    # Define the discriminator optimizer with a low initial learning rate
-    d_initial_lr, d_max_lr = 1e-6, 1e-3
-    d_optimizer = torch.optim.Adam(discriminator.parameters(), lr=d_initial_lr, betas=(0.6, 0.999))
-    warm_up_step = train_config['optimizer']['warm_up_step']
-
-    # Define a lambda function to increase the learning rate up to 10,000 steps and then decrease
-    def lr_lambda(step):
-        if step < warm_up_step:
-            # Linearly increase the learning rate to max_lr
-            return d_initial_lr + (d_max_lr - d_initial_lr) * (step / warm_up_step)
-        elif step < warm_up_step*10:
-            # Linearly decrease the learning rate back to initial_lr
-            return d_max_lr - (d_max_lr - d_initial_lr) * ((step - warm_up_step) / (warm_up_step*10 - warm_up_step))
-        else:
-            # After total_steps, maintain the initial learning rate
-            return d_initial_lr
     
-    # Define the learning rate scheduler
-    d_scheduler = torch.optim.lr_scheduler.LambdaLR(d_optimizer, lr_lambda)
-
     # Load vocoder
     vocoder = get_vocoder(model_config, device)
-    print("Vocoder Loaded")
 
     # Init loggerc
     for p in train_config["path"].values():
@@ -106,7 +87,7 @@ def main(args, configs):
     val_step = train_config["step"]["val_step"]
     word_step = train_config["step"]["word_step"]
     discriminator_step = train_config["step"]["discriminator_step"]
-    
+    warm_up_step = train_config['optimizer']['warm_up_step']
 
     outer_bar = tqdm(total=total_step, desc="Training", position=0)
     outer_bar.n = args.restore_step
@@ -147,7 +128,6 @@ def main(args, configs):
                 if step % log_step == 0:
                     losses = [l.item() for l in losses]
                     losses.append(d_loss)
-                    print("d_loss", d_loss, losses[10])
                     message1 = "Step {}/{}, ".format(step, total_step)
                     message2 = "Total Loss: {:.4f}, Mel Loss: {:.4f}, Mel PostNet Loss: {:.4f}, Pitch Loss: {:.4f}, Energy Loss: {:.4f}, Duration Loss: {:.4f}, Prosody Loss: {:.4f}, Word Loss: {:.4f}, Full Duration Loss: {:.4f}, G Loss: {:.4f}, D Loss: {:.4f}".format(
                         *losses
@@ -206,7 +186,7 @@ def main(args, configs):
                     discriminator.train()
 
                 if step % save_step == 0:
-                    print("Saving checkpoint")
+                    print("Saving checkpoints")
                     torch.save(
                         {
                             "model": model.module.state_dict(),
@@ -215,6 +195,17 @@ def main(args, configs):
                         os.path.join(
                             train_config["path"]["ckpt_path"],
                             "{}.pth.tar".format(step),
+                        ),
+                    )
+
+                    torch.save(
+                        {
+                            "discriminator": discriminator.state_dict(),
+                            "optimizer": d_optimizer.state_dict(),
+                        },
+                        os.path.join(
+                            train_config["path"]["ckpt_path"],
+                            "disc_{}.pth.tar".format(step),
                         ),
                     )
 
@@ -247,6 +238,3 @@ if __name__ == "__main__":
     configs = (preprocess_config, preprocess2_config, model_config, train_config)
 
     main(args, configs)
-
-    # sed -i '/# assert batch_size \* group_size < len(dataset)/a \    sampler = torch.utils.data.distributed.DistributedSampler(dataset)' pretrain.py
-    # sed -i '/num_workers=args.num_workers,/a \        sampler=sampler,' pretrain.py

@@ -1,0 +1,1 @@
+tgt_phones ['HH W EH1 N', 'T R AY1 IH0 NG', 'T AH0', 'F IH1 L', 'AW1 T', 'DH AE1 T', 'DH AE1 T', 'L IH1 S T', 'AH0 V', 'TH IH1 NG Z', 'Y UW1', 'HH AE1 V', 'T AH0', 'D UW1', 'T AH0', 'B IY0', 'S AH0 K S EH1 S F AH0 L', 'AO1 R', 'HH AE1 P IY0', 'IH0 N', 'L AY1 F'] 22

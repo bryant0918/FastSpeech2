@@ -10,8 +10,7 @@ def create_mfa_directory(base_dir):
         for filename in os.listdir(os.path.join(base_dir, dir)):
             if filename.endswith("_src.lab"):
                 new_filename = filename.replace("_src.lab", ".lab")
-                shutil.copy(os.path.join(base_dir, dir, filename), os.path.join(base_dir, dir, new_filename))
-                
+                os.rename(os.path.join(base_dir, dir, filename), os.path.join(base_dir, dir, new_filename))                
 
 def get_oov_words(oov_log_file, dict, oov_words):
     import json
@@ -94,9 +93,8 @@ def merge_dictionaries(pretrained_dict_path, generated_dict_path):
 
 
 if __name__ == "__main__":
-    dir = "raw_data/Spanish"
-    new_dir = "raw_data/MFA"
-    # create_mfa_directory(dir)
+    dir = "raw_data/LJSpeech"
+    create_mfa_directory(dir)
 
     oov_file = "/home/ditto/Documents/MFA/Spanish_mfa/Spanish_mfa/split3/log/normalize_oov.log"
     dict = "/home/ditto/Documents/MFA/pretrained_models/dictionary/spanish_mfa.dict"
@@ -105,6 +103,6 @@ if __name__ == "__main__":
 
     pretrained_dict_path = '/home/ditto/Documents/MFA/pretrained_models/dictionary/spanish_mfa.dict'
     generated_dict_path = '/home/ditto/Documents/MFA/Spanish_mfa/dictionary/generated_dictionary.txt'
-    merge_dictionaries(pretrained_dict_path, generated_dict_path)
+    # merge_dictionaries(pretrained_dict_path, generated_dict_path)
 
     pass

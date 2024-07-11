@@ -27,8 +27,7 @@ def prepare_align(config):
     dataset_path = os.path.dirname(in_dir)
     sub_dataset_name = os.path.basename(in_dir)
     with open(os.path.join(dataset_path, "libritts_r_failed_speech_restoration_examples", f"{sub_dataset_name}_bad_sample_list.txt"), "r") as f:
-        bad_sample_list = f.readlines()
-
+        bad_sample_list = [line.strip() for line in f]
     
     for speaker in tqdm(os.listdir(in_dir)):
         for chapter in os.listdir(os.path.join(in_dir, speaker)):
@@ -36,13 +35,16 @@ def prepare_align(config):
                 if file_name[-4:] != ".wav":
                     continue
                 base_name = file_name[:-4]
-                text_path = os.path.join(
-                    in_dir, speaker, chapter, "{}.normalized.txt".format(base_name)
-                )
+                text_path = os.path.join(in_dir, speaker, chapter, "{}.normalized.txt".format(base_name))
+                if not os.path.exists(text_path):
+                    text_path = os.path.join(in_dir, speaker, chapter, "{}.original.txt".format(base_name))
+                    if not os.path.exists(text_path):
+                        text_path = os.path.join(os.path.dirname(dataset_path), "LibriTTS", sub_dataset_name, speaker, chapter, "{}.normalized.txt".format(base_name))
+
                 out_translation_path = os.path.join(out_dir, speaker, "{}_tgt.lab".format(base_name))
-                
+
                 if os.path.exists(out_translation_path):
-                    continue
+                        continue
 
                 # Get good wav path from right place
                 check_path = os.path.join('./', sub_dataset_name, speaker, chapter, file_name)
@@ -69,7 +71,7 @@ def prepare_align(config):
                     sampling_rate,
                     wav.astype(np.int16),
                 )
-                with open(os.path.join(out_dir, speaker, "{}_src.lab".format(base_name)), "w") as f1:
+                with open(os.path.join(out_dir, speaker, "{}.lab".format(base_name)), "w") as f1:
                     f1.write(text)
 
                 with open(out_translation_path, "w") as f1:

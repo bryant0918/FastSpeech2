@@ -12,6 +12,10 @@ optimizer:
   warm_up_step: 10000
   anneal_steps: [300000, 400000, 500000]
   anneal_rate: 0.4
+d_optimizer:
+  d_initial_lr: 0.000001
+  d_max_lr: 0.001
+  betas: [0.6, 0.998]
 step:
   total_step: 900000
   log_step: 200     # 200

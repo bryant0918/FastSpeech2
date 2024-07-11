@@ -6,7 +6,7 @@ import numpy as np
 
 import hifigan
 import bigvgan
-from model import ScheduledOptim, FastSpeech2Pros, ProsLearner
+from model import ScheduledOptim, FastSpeech2Pros, ProsLearner, Discriminator
 
 
 def get_model(args, configs, device, train=False):
@@ -40,6 +40,54 @@ def get_model(args, configs, device, train=False):
             scheduled_optim.load_state_dict(ckpt["optimizer"])
         model.train()
         return model, scheduled_optim
+
+    model.eval()
+    model.requires_grad_ = False
+    return model
+
+
+def get_discriminator(args, configs, device, train=False):
+    (preprocess_config, model_config, train_config) = configs
+
+    model = Discriminator(preprocess_config).to(device)
+
+    if args.restore_step:
+        ckpt_path = os.path.join(
+            train_config["path"]["ckpt_path"],
+            "disc_{}.pth.tar".format(args.restore_step),
+        )
+        ckpt = torch.load(ckpt_path, map_location=device)
+        model.load_state_dict(ckpt["discriminator"])
+
+    if train:
+        warm_up_step = train_config['optimizer']['warm_up_step']
+        d_initial_lr, d_max_lr = train_config["d_optimizer"]["d_initial_lr"], train_config["d_optimizer"]["d_max_lr"]
+        betas = train_config["d_optimizer"]["betas"]
+        optimizer = torch.optim.Adam(
+            model.parameters(),
+            lr=d_initial_lr,
+            betas=betas,
+        )
+        if args.restore_step:
+            optimizer.load_state_dict(ckpt["optimizer"])
+
+        # Define a lambda function to increase the learning rate up to 10,000 steps and then decrease
+        def lr_lambda(step):
+            if step < warm_up_step:
+                # Linearly increase the learning rate to max_lr
+                return d_initial_lr + (d_max_lr - d_initial_lr) * (step / warm_up_step)
+            elif step < warm_up_step*10:
+                # Linearly decrease the learning rate back to initial_lr
+                return d_max_lr - (d_max_lr - d_initial_lr) * ((step - warm_up_step) / (warm_up_step*10 - warm_up_step))
+            else:
+                # After total_steps, maintain the initial learning rate
+                return d_initial_lr
+            
+        # Define the learning rate scheduler
+        scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer, lr_lambda)
+
+        model.train()
+        return model, optimizer, scheduler
 
     model.eval()
     model.requires_grad_ = False

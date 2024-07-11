@@ -197,7 +197,7 @@ python3 prepare_align.py config/LJSpeech/preprocess.yaml
 nohup python3 prepare_align.py config/LJSpeech/preprocess.yaml &
 ps -ef | grep 2014664
 nohup python3 prepare_align.py config/LJSpeech/preprocess_es.yaml > preprocess.log 2>&1 &
-22835
+452521
 ```
 
 ### Get the TextGrid Files
@@ -278,7 +278,7 @@ python3 preprocess.py config/LJSpeech/preprocess.yaml
 nohup python3 preprocess.py config/LJSpeech/preprocess.yaml &
 ps -ef | grep 961918
 nohup python3 preprocess.py config/LJSpeech/preprocess_es.yaml > preprocess.log 2>&1 &
-1995436
+457999
 ```
 
 ### Get Speaker Embeddings

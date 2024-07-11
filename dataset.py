@@ -53,7 +53,6 @@ class TrainDataset(Dataset):
 
     def __getitem__(self, idx):
         basename = self.basename[idx]
-        print("Basename: ", basename)
         speaker = self.speaker[idx]
         speaker_id = self.speaker_map[speaker]
         raw_text = self.raw_text[idx]

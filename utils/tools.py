@@ -103,7 +103,6 @@ def to_device(data, device):
         return ids, raw_texts, speakers, texts, src_lens, max_src_len
 
 
-
 def log(
     logger, step=None, losses=None, fig=None, lr=None, audio=None, sampling_rate=22050, tag=""
 ):
@@ -154,7 +153,7 @@ def expand(values, durations):
     return np.array(out)
 
 
-def synth_one_sample(src_gt, tgt_targets, src_targets, predicted_tgt, predicted_src, vocoder, model_config, preprocess_config):    
+def synth_one_sample(src_gt, tgt_targets, predicted_tgt, predicted_src, vocoder, model_config, preprocess_config):    
     (   basename, 
         src_gt_len,
         src_gt_mel,
@@ -171,13 +170,6 @@ def synth_one_sample(src_gt, tgt_targets, src_targets, predicted_tgt, predicted_
         tgt_energy_target, 
         tgt_duration_target,
     ) = tgt_targets
-
-    (   
-        src_mel_target, 
-        src_pitch_target, 
-        src_energy_target, 
-        src_duration_target,
-    ) = src_targets
 
     (   tgt_mel_prediction,
         tgt_src_len,

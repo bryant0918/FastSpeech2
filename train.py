@@ -64,7 +64,6 @@ def main(args, configs):
 
     # Load vocoder
     vocoder = get_vocoder(model_config, device)
-    print("Vocoder Loaded")
 
     # Init loggerc
     for p in train_config["path"].values():
@@ -155,13 +154,12 @@ def main(args, configs):
                     # Want to see all 3 mels
                     src_gt = (batch[0], batch[6]) + batch[8:10] + batch[17:20]
                     tgt_targets = (batch[8], batch[13]) + batch[20:]
-                    src_targets = (batch[8],) + batch[17:20]
                     predicted_tgt = (output_tgt[1],) + output_tgt[8:10]
                     predicted_src = (output_src[1],) + output_src[8:10]
 
                     fig, tgt_wav_prediction, src_wav_prediction, wav_reconstruction, tag = synth_one_sample(
                         src_gt, 
-                        tgt_targets, src_targets,
+                        tgt_targets,
                         predicted_tgt, predicted_src,
                         vocoder,
                         model_config,

@@ -59,7 +59,7 @@ def evaluate(model, discriminator, step, configs, logger=None, vocoder=None):
                     output_src, 
                     d_loss 
                 ) = loop(preprocess_config, model_config, batch, model, Loss, discriminator, criterion_d, 
-                         vocoder, step, word_step, device, True)
+                         vocoder, step, word_step, device, False)
                                
                 losses = [(l1.item() + l2.item())/2 for l1, l2 in zip(losses_src_to_tgt, losses_tgt_to_src)]
 
@@ -80,13 +80,12 @@ def evaluate(model, discriminator, step, configs, logger=None, vocoder=None):
         # Want to see all 3 mels
         src_gt = (batch[0], batch[6]) + batch[8:10] + batch[17:20]
         tgt_targets = (batch[8], batch[13]) + batch[20:]
-        src_targets = (batch[8],) + batch[17:20]
         predicted_tgt = (output_tgt[1],) + output_tgt[8:10]
         predicted_src = (output_src[1],) + output_src[8:10]
 
         fig, tgt_wav_prediction, src_wav_prediction, wav_reconstruction, tag = synth_one_sample(
             src_gt, 
-            tgt_targets, src_targets,
+            tgt_targets,
             predicted_tgt, predicted_src,
             vocoder,
             model_config,

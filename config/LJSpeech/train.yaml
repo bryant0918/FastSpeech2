@@ -3,7 +3,7 @@ path:
   log_path: "./output/log/LJSpeech/train"
   result_path: "./output/result/LJSpeech/train"
 optimizer:
-  batch_size: 1
+  batch_size: 6
   betas: [0.9, 0.98]
   eps: 0.000000001
   weight_decay: 0.0

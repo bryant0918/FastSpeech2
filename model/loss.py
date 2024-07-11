@@ -250,8 +250,11 @@ class WordLoss(nn.Module):
         pred_texts = []
 
         for aud in audio:
-            predicted_text = self.transcriber.transcribe(aud)
-            pred_texts.append(predicted_text['text'])
+            if aud is None:
+                pred_texts.append("")
+            else:
+                predicted_text = self.transcriber.transcribe(aud)
+                pred_texts.append(predicted_text['text'])
 
         # Tokenize both predicted and reference text
         predicted_tokens = self.tokenizer(pred_texts, return_tensors='pt', padding=True, truncation=True, max_length=512)

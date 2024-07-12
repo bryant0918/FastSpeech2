@@ -22,6 +22,7 @@ def prepare_align(config):
 
     os.makedirs((os.path.join(preprocessed_dir, "alignments", "word")), exist_ok=True)
     word_aligner = SentenceAligner(model="bert", token_type="bpe", matching_methods="m")
+    translator  = GoogleTranslator(source='en', target='es')
 
     # Get list of files of failed speech restoration
     dataset_path = os.path.dirname(in_dir)
@@ -60,7 +61,7 @@ def prepare_align(config):
                     text = f.readline().strip("\n")
                 text = _clean_text(text, cleaners)
 
-                translation = GoogleTranslator(source='en', target='es').translate(text)
+                translation = translator.translate(text)
                 translation = spanish_cleaners(translation)
 
                 os.makedirs(os.path.join(out_dir, speaker), exist_ok=True)

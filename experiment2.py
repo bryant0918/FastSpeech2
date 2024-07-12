@@ -338,7 +338,198 @@ def test_miipher():
     
     # torchaudio.save(output_path, enhanced_waveform, sample_rate)
 
+def test_realign_ped():
+    durations = torch.tensor([ 0,  4,  5,  4,  4,  5,  2, 16, 14,  7, 10,  7,  5,  3,  6,  6,  6,  5,
+                              6, 15, 10, 15,  5, 14, 20, 10,  3,  6,  3,  4, 10, 10,  7,  3,  5,  4,
+                              9,  5,  4,  9,  7,  5,  7,  2,  9,  4,  4, 12,  6, 12,  5,  4,  4,  6,
+                              4,  3,  7,  3,  3, 10,  8,  8,  4,  7,  9,  7,  2,  9,  6,  3,  3, 10,
+                              5, 11,  3,  7,  9, 11,  8,  3,  3,  7,  3,  9, 10,  8,  8,  3, 22,  0,
+                              0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0], device='cuda:0')
+    
+    dur_list = [ 0,  4,  5,  4,  4,  5,  2, 16, 14,  7, 10,  7,  5,  3,  6,  6,  6,  5,
+                              6, 15, 10, 15,  5, 14, 20, 10,  3,  6,  3,  4, 10, 10,  7,  3,  5,  4,
+                              9,  5,  4,  9,  7,  5,  7,  2,  9,  4,  4, 12,  6, 12,  5,  4,  4,  6,
+                              4,  3,  7,  3,  3, 10,  8,  8,  4,  7,  9,  7,  2,  9,  6,  3,  3, 10,
+                              5, 11,  3,  7,  9, 11,  8,  3,  3,  7,  3,  9, 10,  8,  8,  3, 22,  0,
+                              0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0]
+    print("22 at: ", dur_list.index(22))
+
+    alignments = torch.tensor([[ 0,  0,  0,  0,  0],
+                               [ 1,  0,  0,  0,  0],
+                               [ 2,  0,  0,  0,  0],
+                               [ 3,  0,  0,  0,  0],
+                               [ 4,  0,  0,  0,  0],
+                               [ 5,  0,  0,  0,  0],
+                               [ 5,  6,  0,  0,  0],
+                               [ 6,  0,  0,  0,  0],
+                               [ 7,  0,  0,  0,  0],
+                               [ 7,  0,  0,  0,  0],
+                               [ 7,  0,  0,  0,  0],
+                               [ 7,  8,  0,  0,  0],
+                               [ 8,  0,  0,  0,  0],
+                               [ 8,  0,  0,  0,  0],
+                               [ 8,  9,  0,  0,  0],
+                               [ 9,  0,  0,  0,  0],
+                               [ 9,  0,  0,  0,  0],
+                               [ 9, 10,  0,  0,  0],
+                               [10,  0,  0,  0,  0],
+                               [10,  0,  0,  0,  0],
+                               [17,  0,  0,  0,  0],
+                               [18,  0,  0,  0,  0],
+                               [11,  0,  0,  0,  0],
+                               [11, 12,  0,  0,  0],
+                               [12, 13,  0,  0,  0],
+                               [13,  0,  0,  0,  0],
+                               [14,  0,  0,  0,  0],
+                               [14,  0,  0,  0,  0],
+                               [14, 15,  0,  0,  0],
+                               [15,  0,  0,  0,  0],
+                               [15,  0,  0,  0,  0],
+                               [15, 16,  0,  0,  0],
+                               [16,  0,  0,  0,  0],
+                               [16,  0,  0,  0,  0],
+                               [19,  0,  0,  0,  0],
+                               [20,  0,  0,  0,  0],
+                               [ 0,  0,  0,  0,  0],
+                               [ 0,  0,  0,  0,  0],
+                               [21,  0,  0,  0,  0],
+                               [21, 22,  0,  0,  0],
+                               [22,  0,  0,  0,  0],
+                               [22, 23,  0,  0,  0],
+                               [23,  0,  0,  0,  0],
+                               [24,  0,  0,  0,  0],
+                               [24, 25,  0,  0,  0],
+                               [25, 26,  0,  0,  0],
+                               [26,  0,  0,  0,  0],
+                               [27,  0,  0,  0,  0],
+                               [28,  0,  0,  0,  0],
+                               [29, 44, 45,  0,  0],
+                               [29, 30, 45, 46,  0],
+                               [30, 31, 46, 47,  0],
+                               [31, 32, 47, 48, 49],
+                               [32, 33, 49, 50,  0],
+                               [33, 34, 50, 51,  0],
+                               [34, 51, 52, 53,  0],
+                               [38, 39, 40,  0,  0],
+                               [41, 42, 43,  0,  0],
+                               [ 0,  0,  0,  0,  0],
+                               [ 0,  0,  0,  0,  0],
+                               [35,  0,  0,  0,  0],
+                               [35, 36,  0,  0,  0],
+                               [36, 37,  0,  0,  0],
+                               [37,  0,  0,  0,  0],
+                               [44, 45,  0,  0,  0],
+                               [45, 46,  0,  0,  0],
+                               [47, 48,  0,  0,  0],
+                               [48, 49,  0,  0,  0],
+                               [50, 51,  0,  0,  0],
+                               [51, 52,  0,  0,  0],
+                               [53,  0,  0,  0,  0],
+                               [54,  0,  0,  0,  0],
+                               [55,  0,  0,  0,  0],
+                               [56,  0,  0,  0,  0],
+                               [56, 57,  0,  0,  0],
+                               [57,  0,  0,  0,  0],
+                               [58, 83,  0,  0,  0],
+                               [59, 83, 84,  0,  0],
+                               [60, 84, 85,  0,  0],
+                               [61, 85,  0,  0,  0],
+                               [62, 85, 86,  0,  0],
+                               [63, 86, 87,  0,  0],
+                               [64, 87,  0,  0,  0],
+                               [65,  0,  0,  0,  0],
+                               [66,  0,  0,  0,  0],
+                               [67, 73,  0,  0,  0],
+                               [67, 68, 73, 74,  0],
+                               [68, 69, 74, 75,  0],
+                               [69, 70, 75,  0,  0],
+                               [70, 71, 75, 76,  0],
+                               [71, 72, 76, 77,  0],
+                               [72, 77, 78,  0,  0],
+                               [67,  0,  0,  0,  0],
+                               [67, 68,  0,  0,  0],
+                               [68,  0,  0,  0,  0],
+                               [68, 69,  0,  0,  0],
+                               [69, 70,  0,  0,  0],
+                               [70,  0,  0,  0,  0],
+                               [70, 71,  0,  0,  0],
+                               [71, 72,  0,  0,  0],
+                               [72,  0,  0,  0,  0],
+                               [78,  0,  0,  0,  0],
+                               [79,  0,  0,  0,  0],
+                               [80, 81,  0,  0,  0],
+                               [81, 82,  0,  0,  0],
+                               [83,  0,  0,  0,  0],
+                               [83, 84,  0,  0,  0],
+                               [84, 85,  0,  0,  0],
+                               [85,  0,  0,  0,  0],
+                               [85, 86,  0,  0,  0],
+                               [86, 87,  0,  0,  0],
+                               [87,  0,  0,  0,  0]], device='cuda:0', dtype=torch.int32)
+
+    durations = durations.unsqueeze(0)
+    alignments = alignments.unsqueeze(0)
+
+    # def realign_p_e_d(alignments, p_e_d):
+    #     new_ped = torch.zeros(p_e_d.size(0), len(alignments[0])+1, device=p_e_d.device)
+    #     for b, alignment in enumerate(alignments):
+    #         for j, src_indices in enumerate(alignment):
+    #             # Filter out zeros (when alignment is padded with zero, here the src_idx is zero and durations[0] is always 0) 
+    #             non_zero_p_e_d = [p_e_d[b][i] for i in src_indices if p_e_d[b][i] != 0]
+    #             if non_zero_p_e_d:  # Check if the list is not empty
+    #                 average_p_e_d = sum(non_zero_p_e_d) / len(non_zero_p_e_d)
+    #             else:
+    #                 average_p_e_d = 0  # Avoid division by zero if all durations are zero
+    #             print("average_p_e_d: ", average_p_e_d)
+    #             new_ped[b][j] = average_p_e_d
+    #     return new_ped
+    
+    def realign_p_e_d(alignments, p_e_d):
+        # Initialize new_ped with zeros_like to ensure it's on the same device and has the same dtype
+        new_ped = torch.zeros(p_e_d.size(0), len(alignments[0])+1, device=p_e_d.device)
+        for b, alignment in enumerate(alignments):
+            for j, src_indices in enumerate(alignment):
+                # Use torch operations to maintain the computation graph
+                non_zero_p_e_d = p_e_d[b, src_indices][p_e_d[b, src_indices] != 0]
+                if non_zero_p_e_d.nelement() > 0:  # Check if there are non-zero elements
+                    average_p_e_d = non_zero_p_e_d.float().mean()
+                else:
+                    average_p_e_d = torch.tensor(0, device=p_e_d.device, dtype=p_e_d.dtype)
+                # Use indexing to assign values to maintain the computation graph
+                new_ped[b, j] = average_p_e_d
+        return new_ped
+
+    def realign_d(alignments, durations):
+        new_d = torch.zeros(durations.size(0), len(alignments[0])+1, device=durations.device)
+        for b, alignment in enumerate(alignments):
+            for j, src_indices in enumerate(alignment):
+
+                # Filter out zeros (when alignment is padded with zero, here the src_idx is zero and durations[0] is always 0) 
+                non_zero_durations = [durations[b][i] for i in src_indices if durations[b][i] != 0]
+                if non_zero_durations:  # Check if the list is not empty
+                    average_duration = sum(non_zero_durations) / len(non_zero_durations)
+                else:
+                    average_duration = 0  # Avoid division by zero if all durations are zero
+                new_d[b][j] = average_duration
+        return new_d
+    
+    def custom_round(x):
+        # Round x in (0, .5] up to 1, keep 0 as is
+        mask = (x <= 0.5) & (x > 0)
+        x[mask] = torch.ceil(x[mask])
+        # Add pos/neg eps randomely so half the .5's round up and half down
+        eps = (torch.rand_like(x) - .5)/100
+        return torch.round(x + eps).int()
+    
+    realigned_d = realign_p_e_d(alignments, durations)
+    # realigned_d = realign_d(alignments, durations)
+
+    print("duration sum: ", torch.sum(durations))
+    print("realigned_d: ", torch.sum(realigned_d), realigned_d)
+    print("rounded realigened_d: ", torch.sum(custom_round(realigned_d)), custom_round(realigned_d))
+    
+
 
 if __name__ == "__main__":
-    test_google_translate()
+    test_realign_ped()
     pass

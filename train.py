@@ -105,9 +105,23 @@ def main(args, configs):
                 #           max_mel_lens, translation_langs, translations, translation_lens, max_translation_len, speaker_embeddings, 
                 #           alignments, pitches, energies, durations, realigned_p, realigned_e, realigned_d)
 
-                if step == 5:
-                    raise NotImplementedError
+                # if step == 5:
+                #     raise NotImplementedError
 
+                if 'LJ013-0144' in batch[0]:
+                    idx = batch[0].index('LJ013-0144')
+                    print("\nStep: ", step)
+                    print("Ids: ", batch[0])
+                    print("Durations: ", batch[19][idx])
+                    # print("Alignments: ", batch[16][idx])
+                    print("Realigned Durations: ", batch[22][idx])  # Why are these all negative decimal values?
+                    print("Mel shape: ", batch[8][idx].shape)
+                    print("mel lens: ", batch[9][idx].item())
+
+                else:
+                    step += 1
+                    continue
+                    
                 # Forward
                 (
                     losses_src_to_tgt, 
@@ -117,6 +131,14 @@ def main(args, configs):
                     d_loss 
                 ) = loop(preprocess_config, model_config, batch, model, Loss, discriminator, criterion_d, 
                          vocoder, step, word_step, device, True, d_optimizer, discriminator_step, warm_up_step)
+
+
+                if 'LJ013-0144' in batch[0]:
+                    print("Output src mel shape: ", output_src[1].shape)
+                    print("Output src mel lens: ", output_src[9][idx].item())
+                    print("Output tgt mel shape: ", output_tgt[1].shape)
+                    print("Output tgt mel lens: ", output_tgt[9][idx].item())
+                    
 
                 # Combine the losses
                 total_loss = (losses_src_to_tgt[0] + losses_tgt_to_src[0]) / 2
@@ -240,7 +262,8 @@ def main(args, configs):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--restore_step", type=int, default=0)
+    parser.add_argument("--restore_step", type=int)
+    parser.add_argument("--from_pretrained_ckpt", type=int)
     parser.add_argument(
         "-p",
         "--preprocess_config",
@@ -259,6 +282,8 @@ if __name__ == "__main__":
     parser.add_argument("-w", "--num_workers", type=int, default=0, help="number of cpu workers for dataloader")
     args = parser.parse_args()
 
+    assert not (args.restore_step and args.from_pretrained_ckpt), "Either restore_step or from_pretrained_ckpt should have a value, but not both. It's allowed that neither has a value."
+    args.restore_step = 0 if args.restore_step is None else args.restore_step
     # Read Config
     preprocess_config = yaml.load(
         open(args.preprocess_config, "r"), Loader=yaml.FullLoader

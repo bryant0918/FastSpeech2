@@ -105,21 +105,21 @@ def evaluate(model, discriminator, step, configs, logger=None, vocoder=None):
             train_step,
             audio=tgt_wav_prediction,
             sampling_rate=sampling_rate,
-            tag="Training/step_{}_{}_tgt_synthesized".format(train_step, tag),
+            tag="Validation/step_{}_{}_tgt_synthesized".format(train_step, tag),
         )
         log(
             logger,
             train_step,
             audio=src_wav_prediction,
             sampling_rate=sampling_rate,
-            tag="Training/step_{}_{}_src_synthesized".format(train_step, tag),
+            tag="Validation/step_{}_{}_src_synthesized".format(train_step, tag),
         )
         log(
             logger,
             train_step,
             audio=wav_reconstruction,
             sampling_rate=sampling_rate,
-            tag="Training/step_{}_{}_reconstructed".format(train_step, tag),
+            tag="Validation/step_{}_{}_reconstructed".format(train_step, tag),
         )
 
     return message

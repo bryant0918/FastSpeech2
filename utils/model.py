@@ -24,6 +24,15 @@ def get_model(args, configs, device, train=False):
     else:
         raise ValueError("Model type not supported. Check model config.")
 
+    if not pretrain:
+        if args.from_pretrained_ckpt:
+            pretrain_dir = train_config["path"]["ckpt_path"].replace("train", "pretrain")
+            ckpt_path = os.path.join(pretrain_dir,
+                                     "{}.pth.tar".format(args.from_pretrained_ckpt))
+            
+            ckpt = torch.load(ckpt_path, map_location=device)
+            model.load_state_dict(ckpt["model"])
+        
     if args.restore_step:
         ckpt_path = os.path.join(
             train_config["path"]["ckpt_path"],
@@ -36,6 +45,9 @@ def get_model(args, configs, device, train=False):
         scheduled_optim = ScheduledOptim(
             model, train_config, model_config, args.restore_step
         )
+        if not pretrain:
+            if args.from_pretrained_ckpt:
+                scheduled_optim.load_state_dict(ckpt["optimizer"])
         if args.restore_step:
             scheduled_optim.load_state_dict(ckpt["optimizer"])
         model.train()
@@ -49,7 +61,18 @@ def get_model(args, configs, device, train=False):
 def get_discriminator(args, configs, device, train=False):
     (preprocess_config, model_config, train_config) = configs
 
+    pretrain = train_config['pretrain']
+
     model = Discriminator(preprocess_config).to(device)
+
+    if not pretrain:
+        if args.from_pretrained_ckpt:
+            pretrain_dir = train_config["path"]["ckpt_path"].replace("train", "pretrain")
+            ckpt_path = os.path.join(pretrain_dir,
+                                     "disc_{}.pth.tar".format(args.from_pretrained_ckpt))
+            if os.path.exists(ckpt_path):
+                ckpt = torch.load(ckpt_path, map_location=device)
+                model.load_state_dict(ckpt["discriminator"])
 
     if args.restore_step:
         ckpt_path = os.path.join(
@@ -68,6 +91,9 @@ def get_discriminator(args, configs, device, train=False):
             lr=d_initial_lr,
             betas=betas,
         )
+        if not pretrain:
+            if args.from_pretrained_ckpt and os.path.exists(ckpt_path):
+                optimizer.load_state_dict(ckpt["optimizer"])
         if args.restore_step:
             optimizer.load_state_dict(ckpt["optimizer"])
 

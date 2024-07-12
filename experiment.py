@@ -406,7 +406,7 @@ if phone_realignment:
     print()
 
 """Test TextGrid"""
-test_textgrid = True
+test_textgrid = False
 if test_textgrid:
     import tgt
     from itertools import chain
@@ -736,7 +736,6 @@ if test_extractor:
     total_len = sum([phone_emb_chunk.size()[2] for phone_emb_chunk in phone_emb_chunks])
     print(total_len)
 
-
 """Test Prosody Predictor"""
 test_predictor = False
 if test_predictor:
@@ -808,7 +807,7 @@ if test_predictor:
     # print("Sample shape: ", sample.size())
 
 """Test phone alignment"""
-test_phone_alignment = True
+test_phone_alignment = False
 if test_phone_alignment:
     from itertools import chain
 
@@ -1027,7 +1026,7 @@ if test_phone_alignment:
     # src_pitch = np.load(f"preprocessed_data/LJSpeech/pitch/LJSpeech-pitch-{basename}.npy")
 
 """Test realign p_e_d"""
-test_realign_p_e_d = False
+test_realign_p_e_d = True
 if test_realign_p_e_d:
     from utils.tools import pad_inhomogeneous_2D, pad_1D
     from text import text_to_sequence

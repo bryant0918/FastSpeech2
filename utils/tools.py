@@ -163,8 +163,7 @@ def synth_one_sample(src_gt, tgt_targets, predicted_tgt, predicted_src, vocoder,
         src_gt_duration,
     ) = src_gt
     
-    (   
-        tgt_mel_target, 
+    (   tgt_mel_target, 
         tgt_len,
         tgt_pitch_target, 
         tgt_energy_target, 

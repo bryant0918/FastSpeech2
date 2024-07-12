@@ -18,10 +18,10 @@ d_optimizer:
   betas: [0.6, 0.998]
 step:
   total_step: 900000
-  log_step: 2     # 100
-  synth_step: 3  # 1000
-  val_step: 4    # 1000
-  save_step: 3  # 100000
-  word_step: 4  # 10
+  log_step: 200     # 100
+  synth_step: 2000  # 1000
+  val_step: 2000    # 1000
+  save_step: 5000  # 100000
+  word_step: 10  # 10
   discriminator_step: 10
 pretrain: False

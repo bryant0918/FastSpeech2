@@ -63,13 +63,8 @@ def loop(preprocess_config, model_config, batch, model, Loss, discriminator, cri
     # realign p,e,d targets back to src space
     re_realigned_p = realign_p_e_d(alignments, output_tgt[2])
     re_realigned_e = realign_p_e_d(alignments, output_tgt[3])
-    
-    # TODO: Set back to True
-    output_tgt[4].requires_grad = False
-    # TODO: ^^^
 
     realigned_log_d = realign_p_e_d(alignments, output_tgt[4])
-    print("Realigned log_d: ", realigned_log_d)
     re_realigned_d = torch.clamp(torch.exp(realigned_log_d) - 1, min=0)
     re_realigned_d = custom_round(re_realigned_d)
 

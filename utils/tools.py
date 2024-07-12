@@ -538,12 +538,25 @@ def flip_mapping(tgt_to_src_mappings, src_seq_len):
         return src_to_tgt_mappings_padded
 
 
+# def realign_p_e_d(alignments, p_e_d):
+#         new_ped = torch.zeros(p_e_d.size(0), len(alignments[0])+1, device=p_e_d.device)
+#         for b, alignment in enumerate(alignments):
+#             for j, src_indices in enumerate(alignment):
+#                 new_ped[b][j+1] = torch.mean(torch.tensor([p_e_d[b][i] for i in src_indices], dtype=torch.float32))
+#         return new_ped
+
 def realign_p_e_d(alignments, p_e_d):
-        new_ped = torch.zeros(p_e_d.size(0), len(alignments[0])+1, device=p_e_d.device)
-        for b, alignment in enumerate(alignments):
-            for j, src_indices in enumerate(alignment):
-                new_ped[b][j+1] = torch.mean(torch.tensor([p_e_d[b][i] for i in src_indices], dtype=torch.float32))
-        return new_ped
+    new_ped = torch.zeros(p_e_d.size(0), len(alignments[0])+1, device=p_e_d.device)
+    for b, alignment in enumerate(alignments):
+        for j, src_indices in enumerate(alignment):
+            # Use torch operations to maintain the computation graph
+            non_zero_p_e_d = p_e_d[b, src_indices][p_e_d[b, src_indices] != 0]
+            if non_zero_p_e_d.nelement() > 0:
+                average_p_e_d = non_zero_p_e_d.float().mean()
+            else:
+                average_p_e_d = torch.tensor(0, device=p_e_d.device, dtype=p_e_d.dtype)
+            new_ped[b, j] = average_p_e_d
+    return new_ped
 
 
 def custom_round(x):

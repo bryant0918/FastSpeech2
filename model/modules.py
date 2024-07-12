@@ -176,7 +176,7 @@ class LengthRegulator(nn.Module):
         output = list()
         mel_len = list()
         print("Max len in length regulator: ", max_len)
-        print("Duration in length regulator: ", duration)  # Should be realigned_d first
+        # print("Duration in length regulator: ", duration)  # Should be realigned_d first
         for batch, expand_target in zip(x, duration):
             expanded = self.expand(batch, expand_target)
             output.append(expanded)

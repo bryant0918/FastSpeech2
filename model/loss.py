@@ -58,13 +58,12 @@ class FastSpeech2Loss(nn.Module):
         
         mel_masks = mel_masks[:, :mel_masks.shape[1]]
 
-        log_duration_targets.requires_grad = False
-        pitch_targets.requires_grad = False
-        energy_targets.requires_grad = False
         mel_lens_targets.requires_grad = False
-        
-        # Stop Gradient
+        # Stop Gradient for targets
         extracted_e = extracted_e.detach()
+        log_duration_targets = log_duration_targets.detach()
+        pitch_targets = pitch_targets.detach()
+        energy_targets = energy_targets.detach()
 
         if self.pitch_feature_level == "phoneme_level":
             pitch_predictions = pitch_predictions.masked_select(src_masks)

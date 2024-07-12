@@ -134,11 +134,11 @@ def main(args, configs):
 
 
                 if 'LJ013-0144' in batch[0]:
-                    print("Output src mel shape: ", output_src[1].shape)
-                    print("Output src mel lens: ", output_src[9][idx].item())
                     print("Output tgt mel shape: ", output_tgt[1].shape)
                     print("Output tgt mel lens: ", output_tgt[9][idx].item())
-                    
+                    print("Output src mel shape: ", output_src[1].shape)
+                    print("Output src mel lens: ", output_src[9][idx].item())
+
 
                 # Combine the losses
                 total_loss = (losses_src_to_tgt[0] + losses_tgt_to_src[0]) / 2

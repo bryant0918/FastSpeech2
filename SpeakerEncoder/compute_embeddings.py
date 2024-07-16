@@ -64,6 +64,8 @@ def main(args):
             os.makedirs(os.path.join(args.output_path, spk_name), exist_ok=True)
             if args.input_type == "single_speaker":
                 wav_files = glob.glob(os.path.join(args.input_path, "*.wav"))
+                if not wav_files:
+                    wav_files = glob.glob(os.path.join(args.input_path, spk_name, "*.wav"))
             elif args.input_type == "multi_speaker":
                 wav_files = glob.glob(os.path.join(args.input_path, spk_name, "*.wav"))
             

@@ -132,6 +132,7 @@ speaker_emb/
 miipher/
 
 **/train.txt
+val.txt
 
 # logs
 nohup.out

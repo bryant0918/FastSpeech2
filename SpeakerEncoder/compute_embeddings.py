@@ -55,7 +55,7 @@ def main(args):
             spk_list = [args.speaker_name]
         elif args.input_type == "multi_speaker":
             spk_list = os.listdir(args.input_path)
-            print("spk_list: ", spk_list)
+            print("spk_list length: ", len(spk_list))
 
         multiprocessing.set_start_method('spawn', True)
         executor = ProcessPoolExecutor(max_workers=args.num_workers)

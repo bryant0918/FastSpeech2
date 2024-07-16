@@ -175,14 +175,11 @@ class LengthRegulator(nn.Module):
     def LR(self, x, duration, max_len):
         output = list()
         mel_len = list()
-        print("Max len in length regulator: ", max_len)
-        # print("Duration in length regulator: ", duration)  # Should be realigned_d first
         for batch, expand_target in zip(x, duration):
             expanded = self.expand(batch, expand_target)
             output.append(expanded)
+            print("Expanded shape: ", expanded.shape)
             mel_len.append(expanded.shape[0])
-
-        print("Mel len in length regulator: ", mel_len)    # Should be output mel lengths.
 
         if max_len is not None:
             output = pad(output, max_len)

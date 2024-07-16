@@ -64,7 +64,7 @@ class Preprocessor:
         elif self.target_lang == "es":
             self.epi = epitran.Epitran('spa-Latn')
 
-    def build_from_path(self):
+    def build_from_path(self, speakers_list):
         os.makedirs((os.path.join(self.out_dir, "mel")), exist_ok=True)
         os.makedirs((os.path.join(self.out_dir, "pitch")), exist_ok=True)
         os.makedirs((os.path.join(self.out_dir, "energy")), exist_ok=True)
@@ -80,10 +80,14 @@ class Preprocessor:
         # Compute pitch, energy, duration, and mel-spectrogram
         speakers = {}
         for i, speaker in enumerate(tqdm(os.listdir(self.in_dir))):
+            if speakers_list is not None and speaker not in speakers_list:
+                continue
             speakers[speaker] = i
             for j, wav_name in enumerate(tqdm(os.listdir(os.path.join(self.in_dir, speaker)))):
                 if ".wav" not in wav_name:
                     continue
+
+
                 
                 basename = wav_name.split(".")[0]
                 tg_path = os.path.join(self.out_dir, "TextGrid", speaker, "{}.TextGrid".format(basename))
@@ -179,8 +183,10 @@ class Preprocessor:
         text_path = os.path.join(self.in_dir, speaker, "{}.lab".format(basename))
         translation_path = os.path.join(self.in_dir, speaker, "{}_tgt.lab".format(basename))
         word_alignment_path = os.path.join(self.out_dir, "alignments", "word", "{}-word_alignment-{}.npy".format(speaker, basename))
-
         tg_path = os.path.join(self.out_dir, "TextGrid", speaker, "{}.TextGrid".format(basename))
+        dur_filename = "{}-duration-{}.npy".format(speaker, basename)
+        if os.path.exists(dur_filename):
+            return None     # duration file already exists so skip.
 
         # Get src time alignments
         textgrid = tgt.io.read_textgrid(tg_path)
@@ -235,7 +241,11 @@ class Preprocessor:
         translation = "{" + " ".join(flat_phones) + "}"
 
         # Open word alignment file
-        word_alignments = np.load(word_alignment_path)
+        try:
+            word_alignments = np.load(word_alignment_path)
+        except:
+            print("Unable to load word_alignment: ", word_alignment_path)
+            return
 
         # Get src tgt phone alignments
         # Read raw text
@@ -317,7 +327,7 @@ class Preprocessor:
             energy = energy[: len(duration)]
 
         # Save files
-        dur_filename = "{}-duration-{}.npy".format(speaker, basename)
+        
         np.save(os.path.join(self.out_dir, "duration", dur_filename), duration)
 
         pitch_filename = "{}-pitch-{}.npy".format(speaker, basename)

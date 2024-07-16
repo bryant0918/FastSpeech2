@@ -46,7 +46,7 @@ def evaluate(model, discriminator, step, configs, logger=None, vocoder=None):
     discriminator_step = train_config["step"]["discriminator_step"]
     
     # Evaluation
-    loss_sums = [0 for _ in range(10)]
+    loss_sums = [0 for _ in range(11)]
     for batches in loader:
         for batch in batches:
             batch = to_device(batch, device)
@@ -72,7 +72,7 @@ def evaluate(model, discriminator, step, configs, logger=None, vocoder=None):
     loss_means = [loss_sum / len(dataset) for loss_sum in loss_sums]
     loss_means[7] = loss_means[7] * word_step
 
-    message = "Validation Step {}, Total Loss: {:.4f}, Mel Loss: {:.4f}, Mel PostNet Loss: {:.4f}, Pitch Loss: {:.4f}, Energy Loss: {:.4f}, Duration Loss: {:.4f}, Prosody Loss: {:.4f}, Word Loss: {:.4f}, Full Duration Loss: {:.4f}, G Loss: {:.4f}, D Loss: {:.4f}".format(
+    message = "Validation Step {}, Total Loss: {:.4f}, Mel Loss: {:.4f}, Mel PostNet Loss: {:.4f}, Pitch Loss: {:.4f}, Energy Loss: {:.4f}, Duration Loss: {:.4f}, Prosody Loss: {:.4f}, Word Loss: {:.4f}, Full Duration Loss: {:.4f}, G Loss: {:.4f}, D Loss: {:.4f}, Prosody Reg: {:.4f}".format(
                 *([train_step] + [l for l in loss_means])
     )
 
@@ -150,7 +150,7 @@ def evaluate_pretrain(model, discriminator, step, configs, logger=None, vocoder=
     discriminator_step = train_config["step"]["discriminator_step"]
 
     # Evaluation
-    loss_sums = [0 for _ in range(10)]
+    loss_sums = [0 for _ in range(11)]
     for batches in loader:
         for batch in batches:
             batch = to_device(batch, device)
@@ -168,7 +168,7 @@ def evaluate_pretrain(model, discriminator, step, configs, logger=None, vocoder=
     loss_means = [loss_sum / len(dataset) for loss_sum in loss_sums]
     loss_means[7] = loss_means[7] * word_step
 
-    message = "Validation Step {}, Total Loss: {:.4f}, Mel Loss: {:.4f}, Mel PostNet Loss: {:.4f}, Pitch Loss: {:.4f}, Energy Loss: {:.4f}, Duration Loss: {:.4f}, Prosody Loss: {:.4f}, Word Loss: {:.4f}, Full Duration Loss: {:.4f}, G Loss: {:.4f}, D Loss: {:.4f}".format(
+    message = "Validation Step {}, Total Loss: {:.4f}, Mel Loss: {:.4f}, Mel PostNet Loss: {:.4f}, Pitch Loss: {:.4f}, Energy Loss: {:.4f}, Duration Loss: {:.4f}, Prosody Loss: {:.4f}, Word Loss: {:.4f}, Full Duration Loss: {:.4f}, G Loss: {:.4f}, D Loss: {:.4f}, Prosody Reg: {:.4f}".format(
                 *([train_step] + [l for l in loss_means])
     )
 

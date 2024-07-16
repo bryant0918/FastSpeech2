@@ -42,7 +42,7 @@ def text_to_sequence(text, cleaner_names, language):
             sequence += _symbols_to_sequence(_clean_text(text, cleaner_names))
             break
 
-        # print("In text_to_sequence: ", text, len(text), "group1", m.group(1), "group2", m.group(2), "group3", m.group(3))
+        # TODO: Allow english to also be ipa. (maybe prepend 'ipa' or 'arp' inside {})
         sequence += _symbols_to_sequence(_clean_text(m.group(1), cleaner_names))
         if language == 'en':
             sequence += _arpabet_to_sequence(m.group(2), language)

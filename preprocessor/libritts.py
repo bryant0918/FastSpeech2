@@ -36,6 +36,13 @@ def prepare_align(config):
                 if file_name[-4:] != ".wav":
                     continue
                 base_name = file_name[:-4]
+
+                alignments_path = os.path.join(preprocessed_dir, "alignments", "word", "{}-word_alignment-{}.npy".format(speaker, base_name))
+                if os.path.exists(alignments_path):
+                        continue
+                else:
+                    print(f"Processing {base_name}")
+
                 text_path = os.path.join(in_dir, speaker, chapter, "{}.normalized.txt".format(base_name))
                 if not os.path.exists(text_path):
                     text_path = os.path.join(in_dir, speaker, chapter, "{}.original.txt".format(base_name))
@@ -43,9 +50,6 @@ def prepare_align(config):
                         text_path = os.path.join(os.path.dirname(dataset_path), "LibriTTS", sub_dataset_name, speaker, chapter, "{}.normalized.txt".format(base_name))
 
                 out_translation_path = os.path.join(out_dir, speaker, "{}_tgt.lab".format(base_name))
-
-                if os.path.exists(out_translation_path):
-                        continue
 
                 # Get good wav path from right place
                 check_path = os.path.join('./', sub_dataset_name, speaker, chapter, file_name)
@@ -81,5 +85,5 @@ def prepare_align(config):
                 alignments = word_aligner.get_word_aligns(text.split(), translation.split())
                 alignment = alignments["mwmf"]
 
-                with open(os.path.join(preprocessed_dir, "alignments", "word", "{}-word_alignment-{}.npy".format(speaker, base_name)), "wb") as f1:
+                with open(alignments_path, "wb") as f1:
                     np.save(f1, np.array(alignment))

@@ -27,8 +27,7 @@ class FastSpeech2Loss(nn.Module):
         When going to_tgt everything should be in tgt space.
         When going to_src everything should be in src space.
         """
-        (
-            text,
+        (   text,
             mel_targets, 
             mel_lens_targets,
             pitch_targets, 
@@ -36,8 +35,7 @@ class FastSpeech2Loss(nn.Module):
             log_duration_targets,
         ) = inputs
 
-        (
-            mel_predictions,
+        (   mel_predictions,
             postnet_mel_predictions,
             pitch_predictions,
             energy_predictions,
@@ -49,8 +47,9 @@ class FastSpeech2Loss(nn.Module):
             mel_lens_predictions,
             extracted_e,
             predicted_e,
+            prosody_reg_term,
             audio,
-            pred_generated
+            pred_generated,
         ) = predictions
         device = mel_masks.device
         src_masks = ~src_masks
@@ -60,7 +59,6 @@ class FastSpeech2Loss(nn.Module):
 
         mel_lens_targets.requires_grad = False
         # Stop Gradient for targets
-        extracted_e = extracted_e.detach()
         log_duration_targets = log_duration_targets.detach()
         pitch_targets = pitch_targets.detach()
         energy_targets = energy_targets.detach()
@@ -105,9 +103,11 @@ class FastSpeech2Loss(nn.Module):
             # mel_loss = torch.sum(mel_loss * position_weights)
             # postnet_mel_loss = torch.sum(postnet_mel_loss * position_weights)
 
-            # TODO: Figure out best beta value
-            beta = .3
-            pros_loss = self.pros_loss(predicted_e, extracted_e, src_masks)*beta
+            if extracted_e is not None:
+                extracted_e = extracted_e.detach()
+                # TODO: Figure out best beta value
+                beta = .3
+                pros_loss = self.pros_loss(predicted_e, extracted_e, src_masks)*beta
 
         alpha = .5
         pitch_loss = self.mse_loss(pitch_predictions, pitch_targets)
@@ -131,7 +131,7 @@ class FastSpeech2Loss(nn.Module):
 
         total_loss = (
             mel_loss + postnet_mel_loss + duration_loss + pitch_loss + energy_loss 
-            + pros_loss + word_loss + full_duration_loss + g_loss
+            + pros_loss + word_loss + full_duration_loss + g_loss + prosody_reg_term
         )
 
         return (
@@ -145,6 +145,7 @@ class FastSpeech2Loss(nn.Module):
             word_loss,
             full_duration_loss,
             g_loss,
+            prosody_reg_term,
         )
 
 

@@ -9,7 +9,11 @@ def loop(preprocess_config, model_config, batch, model, Loss, discriminator, cri
          vocoder, step, word_step, device, training=False, d_optimizer=None, discriminator_step=1, warm_up_step=4000):
     batch_size = len(batch[0])
     # Forward pass: Src to Tgt
-    input = (batch[4],) + batch[12:15] + batch[8:11] + batch[15:17] + batch[20:] + (batch[19],)
+    include_mel = torch.bernoulli(torch.tensor(0.5))
+    if include_mel:
+        input = (training, batch[4]) + batch[12:15] + batch[8:11] + batch[15:17] + batch[20:] + (batch[19],)
+    else: 
+        input = (training, batch[4]) + batch[12:15] + (None,) + batch[9:11] + batch[15:17] + batch[20:] + batch[19:]
     output_tgt = model(*(input))
 
     # Train Discriminator on only 1 of the two fakes
@@ -40,6 +44,7 @@ def loop(preprocess_config, model_config, batch, model, Loss, discriminator, cri
         pred_generated = discriminator(output_tgt[1])
 
     log_duration_targets = torch.log(batch[-1].float() + 1)
+    
     # For calculating Word Loss
     if step % word_step == 0:
         mels = [output_tgt[1][i, :output_tgt[9][i]].transpose(0,1) for i in range(batch_size)]
@@ -61,16 +66,35 @@ def loop(preprocess_config, model_config, batch, model, Loss, discriminator, cri
     alignments = flip_mapping(batch[16], batch[5].shape[1])
 
     # realign p,e,d targets back to src space
-    re_realigned_p = realign_p_e_d(alignments, output_tgt[2])
-    re_realigned_e = realign_p_e_d(alignments, output_tgt[3])
-
+    # re_realigned_p = realign_p_e_d(alignments, output_tgt[2])
+    # re_realigned_e = realign_p_e_d(alignments, output_tgt[3])
     realigned_log_d = realign_p_e_d(alignments, output_tgt[4])
-    re_realigned_d = torch.clamp(torch.exp(realigned_log_d) - 1, min=0)
-    re_realigned_d = custom_round(re_realigned_d)
+    # re_realigned_d = torch.clamp(torch.exp(realigned_log_d) - 1, min=0)
+    # re_realigned_d = custom_round(re_realigned_d)
+
+    # Changed to using rounded_d instead of log_d (when d_targets=True then this will just be realigned_d)
+    re_realigned_d = custom_round(realign_p_e_d(alignments, output_tgt[5]))
+    re_realigned_p = realign_p_e_d(alignments, batch[-3])
+    re_realigned_e = realign_p_e_d(alignments, batch[-2])
+
+    print("source duration", len(batch[-4][0]), batch[-4][0][:15], sum(batch[-4][0]).item())
+    # print("source log_duration", len(torch.log(batch[-4].float() + 1)[0]), torch.log(batch[-4].float() + 1)[0][:20])
+    # print("source realigned_log_d", len(realigned_log_d[0]), realigned_log_d[0][:20])
+    print("source re_realigned_d: ", len(re_realigned_d[0]), re_realigned_d[0][:15], sum(re_realigned_d[0]).item())
+    # realigned_rounded_d = custom_round(realign_p_e_d(alignments, output_tgt[5]))
+    # print("source re_realigned_d_rounded: ", len(realigned_rounded_d[0]), realigned_rounded_d[0][:20], sum(realigned_rounded_d[0]).item())
+
+    re_realigned_d_no_round = realign_p_e_d(alignments, realign_p_e_d(batch[16], batch[19]))
+    print("source re_realigned_d_no_round: ", len(re_realigned_d_no_round[0]), re_realigned_d_no_round[0][:15], sum(re_realigned_d_no_round[0]).item())
 
     # Forward pass: Tgt to Src (so tgt is now src and src is now tgt)
-    output_src = model(langs=batch[11], texts=batch[5], text_lens=batch[6], max_text_len=batch[7],
-                        mels=output_tgt[1], mel_lens=output_tgt[9], max_mel_len=batch[10],
+    include_mel = torch.bernoulli(torch.tensor(0.5))
+    if include_mel:
+        mels = output_tgt[1]
+    else: 
+        mels = None
+    output_src = model(training=training, langs=batch[11], texts=batch[5], text_lens=batch[6], max_text_len=batch[7],
+                        mels=mels, mel_lens=output_tgt[9], max_mel_len=batch[10],
                         speaker_embs=batch[15], alignments=alignments, p_targets=re_realigned_p, 
                         e_targets=re_realigned_e, d_targets=re_realigned_d, d_src=batch[-1])
 
@@ -108,10 +132,10 @@ def loop(preprocess_config, model_config, batch, model, Loss, discriminator, cri
             preprocess_config,
         )
         loss_input = (batch[1],) + batch[8:10] + (re_realigned_p, re_realigned_e, realigned_log_d)
-        loss_predictions = output_src[:10] + (output_tgt[10],) + (output_src[11],) + (wav_predictions,pred_generated)
+        loss_predictions = output_src[:10] + (output_tgt[10],) + output_src[11:] + (wav_predictions, pred_generated)
     else:
         loss_input = (None,) + batch[8:10]+ (re_realigned_p, re_realigned_e, realigned_log_d)
-        loss_predictions = output_src[:10] + (output_tgt[10],) + (output_src[11],) + (None,pred_generated)
+        loss_predictions = output_src[:10] + (output_tgt[10],) + output_src[11:] + (None, pred_generated)
 
     # Calculate loss for Tgt to Src
     losses_tgt_to_src = Loss(loss_input, loss_predictions, "to_src", word_step)
@@ -122,10 +146,22 @@ def pretrain_loop(preprocess_config, model_config, batch, model, Loss, discrimin
                     vocoder, step, word_step, device, training=False,
                     d_optimizer=None, discriminator_step=1, warm_up_step=4000):
     batch_size = len(batch[0])
-    input = batch[3:11] + (None,) + batch[11:]
+
+    include_mel = torch.bernoulli(torch.tensor(0.5))
+    if include_mel:
+        input = (training,) + batch[3:11] + (None,) + batch[11:]
+    else:
+        input = (training,) + batch[3:7] + (None,) + batch[8:11] + (None,) + batch[11:]
 
     # Generator Forward pass: Src to Src
     output = model(*(input))
+
+    print(" duration", len(batch[-1][0]), batch[-1][0])
+    print(" log_duration", len(torch.log(batch[-1].float() + 1)[0]), torch.log(batch[-1].float() + 1)[0])
+    print(" predicted log_duration", len(output[4][0]), output[4][0])
+    print(" predicted d_rounded", len(output[5][0]), output[5][0], sum(output[5][0]))
+    exp_pred_log_d = custom_round(torch.clamp(torch.exp(output[4]) - 1, min=0))
+    print(" exponentiated predicted log_d", len(exp_pred_log_d[0]), exp_pred_log_d[0], sum(exp_pred_log_d[0]))
 
     d_loss = torch.tensor(0.0, device=device)
     if step % discriminator_step == 0 or step >= warm_up_step:

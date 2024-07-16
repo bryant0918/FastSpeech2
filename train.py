@@ -105,22 +105,8 @@ def main(args, configs):
                 #           max_mel_lens, translation_langs, translations, translation_lens, max_translation_len, speaker_embeddings, 
                 #           alignments, pitches, energies, durations, realigned_p, realigned_e, realigned_d)
 
-                # if step == 5:
-                #     raise NotImplementedError
-
-                if 'LJ013-0144' in batch[0]:
-                    idx = batch[0].index('LJ013-0144')
-                    print("\nStep: ", step)
-                    print("Ids: ", batch[0])
-                    print("Durations: ", batch[19][idx])
-                    # print("Alignments: ", batch[16][idx])
-                    print("Realigned Durations: ", batch[22][idx])  # Why are these all negative decimal values?
-                    print("Mel shape: ", batch[8][idx].shape)
-                    print("mel lens: ", batch[9][idx].item())
-
-                else:
-                    step += 1
-                    continue
+                if step == 30005:
+                    raise NotImplementedError
                     
                 # Forward
                 (
@@ -131,14 +117,6 @@ def main(args, configs):
                     d_loss 
                 ) = loop(preprocess_config, model_config, batch, model, Loss, discriminator, criterion_d, 
                          vocoder, step, word_step, device, True, d_optimizer, discriminator_step, warm_up_step)
-
-
-                if 'LJ013-0144' in batch[0]:
-                    print("Output tgt mel shape: ", output_tgt[1].shape)
-                    print("Output tgt mel lens: ", output_tgt[9][idx].item())
-                    print("Output src mel shape: ", output_src[1].shape)
-                    print("Output src mel lens: ", output_src[9][idx].item())
-
 
                 # Combine the losses
                 total_loss = (losses_src_to_tgt[0] + losses_tgt_to_src[0]) / 2
@@ -161,7 +139,7 @@ def main(args, configs):
                     losses = [(l1.item() + l2.item())/2 for l1, l2 in zip(losses_src_to_tgt, losses_tgt_to_src)]
                     losses.append(d_loss)
                     message1 = "Step {}/{}, ".format(step, total_step)
-                    message2 = "Total Loss: {:.4f}, Mel Loss: {:.4f}, Mel PostNet Loss: {:.4f}, Pitch Loss: {:.4f}, Energy Loss: {:.4f}, Duration Loss: {:.4f}, Prosody Loss: {:.4f}, Word Loss: {:.4f}, Full Duration Loss: {:.4f}, G Loss: {:.4f}, D Loss: {:.4f}".format(
+                    message2 = "Total Loss: {:.4f}, Mel Loss: {:.4f}, Mel PostNet Loss: {:.4f}, Pitch Loss: {:.4f}, Energy Loss: {:.4f}, Duration Loss: {:.4f}, Prosody Loss: {:.4f}, Word Loss: {:.4f}, Full Duration Loss: {:.4f}, G Loss: {:.4f}, D Loss: {:.4f}, Prosody Reg: {:.4f}".format(
                         *losses
                     )
 

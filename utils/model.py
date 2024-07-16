@@ -79,8 +79,14 @@ def get_discriminator(args, configs, device, train=False):
             train_config["path"]["ckpt_path"],
             "disc_{}.pth.tar".format(args.restore_step),
         )
-        ckpt = torch.load(ckpt_path, map_location=device)
-        model.load_state_dict(ckpt["discriminator"])
+        if os.path.exists(ckpt_path):
+            ckpt = torch.load(ckpt_path, map_location=device)
+            # Add 'module.' prefix to each key
+            modified_ckpt = {key.replace('module.', ''): value for key, value in ckpt['discriminator'].items()}
+            try:
+                model.load_state_dict(ckpt["discriminator"])
+            except:
+                model.load_state_dict(modified_ckpt)
 
     if train:
         warm_up_step = train_config['optimizer']['warm_up_step']
@@ -94,7 +100,7 @@ def get_discriminator(args, configs, device, train=False):
         if not pretrain:
             if args.from_pretrained_ckpt and os.path.exists(ckpt_path):
                 optimizer.load_state_dict(ckpt["optimizer"])
-        if args.restore_step:
+        if args.restore_step and os.path.exists(ckpt_path):
             optimizer.load_state_dict(ckpt["optimizer"])
 
         # Define a lambda function to increase the learning rate up to 10,000 steps and then decrease

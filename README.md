@@ -276,9 +276,9 @@ python3 preprocess.py config/LJSpeech/preprocess.yaml
 
 ```
 nohup python3 preprocess.py config/LJSpeech/preprocess.yaml &
-ps -ef | grep 961918
+
 nohup python3 preprocess.py config/LJSpeech/preprocess_es.yaml > preprocess.log 2>&1 &
-457999
+3154154
 ```
 
 ### Get Speaker Embeddings
@@ -312,7 +312,7 @@ nohup python3 pretrain.py -p config/LJSpeech/preprocess.yaml -p2 config/LJSpeech
 ```
 
 ```
-nohup python3 pretrain.py --restore_step 160000 -p config/LJSpeech/preprocess.yaml -p2 config/LJSpeech/preprocess_es.yaml -m config/LJSpeech/model.yaml -t config/LJSpeech/pretrain.yaml -w 16 &
+nohup python3 pretrain.py --restore_step 175000 -p config/LJSpeech/preprocess.yaml -p2 config/LJSpeech/preprocess_es.yaml -m config/LJSpeech/model.yaml -t config/LJSpeech/pretrain.yaml -w 16 &
 
 6493
 ```
@@ -329,6 +329,10 @@ nohup python3 pretrain.py -p config/LJSpeech/LL_preprocess.yaml -p2 config/LJSpe
 Train your model with
 ```
 nohup python3 train.py --from_pretrained_ckpt 175000 -p config/LJSpeech/preprocess.yaml -p2 config/LJSpeech/preprocess_es.yaml -m config/LJSpeech/model.yaml -t config/LJSpeech/train.yaml &
+
+nohup python3 train.py --restore_step 30000 -p config/LJSpeech/preprocess.yaml -p2 config/LJSpeech/preprocess_es.yaml -m config/LJSpeech/model.yaml -t config/LJSpeech/train.yaml &
+
+1562882
 ```
 ```
 python3 train.py --from_pretrained_ckpt 175000 -p config/LJSpeech/preprocess.yaml -p2 config/LJSpeech/preprocess_es.yaml -m config/LJSpeech/model.yaml -t config/LJSpeech/train.yaml

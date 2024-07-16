@@ -78,9 +78,10 @@ class MiipherInference:
         torchaudio.save(wav_path, cleaned_wav.view(1,-1).cpu(), sample_rate=self.sr, format='wav')
 
     # TODO: Change so that we process through miipher before prepare_align.py
-    def process_directory(self):
+    def process_directory(self, speakers):
         for i, speaker in enumerate(tqdm(os.listdir(self.input_dir))):
-            
+            if speakers is not None and speaker not in speakers:
+                continue
             for file_name in os.listdir(os.path.join(self.input_dir, speaker)):
                 if file_name.endswith('.wav'):
                     input_path = os.path.join(self.input_dir, speaker, file_name)

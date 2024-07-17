@@ -361,7 +361,7 @@ class ProsodyPredictor(nn.Module):
         mu = self.linear2(torch.tanh(torch.multiply(a, mu) + b))
         v = self.linear3(torch.tanh(torch.multiply(c, v) + d))
 
-        
+        # print("v", torch.min(v).item(), torch.max(v).item()) # Range [0, 1]
         sigma = torch.exp(v)
 
         log_pi = torch.log_softmax(alphas, dim=-1) # [batch_size, text_sequence_length, n_components]

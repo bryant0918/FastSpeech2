@@ -8,7 +8,7 @@ import whisper
 class FastSpeech2Loss(nn.Module):
     """ FastSpeech2 Loss """
 
-    def __init__(self, preprocess_config, model_config):
+    def __init__(self, preprocess_config, model_config, train_config):
         super(FastSpeech2Loss, self).__init__()
         self.pitch_feature_level = preprocess_config["preprocessing"]["pitch"][
             "feature"
@@ -21,6 +21,11 @@ class FastSpeech2Loss(nn.Module):
         self.pros_loss = ProsLoss()
         self.word_loss = WordLoss(model_config)
         self.bce_loss = nn.BCELoss()
+
+        self.pros_weight = train_config['loss']['pros_weight']
+        self.pitch_energy_weight = train_config['loss']['pitch_energy_weight']
+        self.full_duration_weight = train_config['loss']['full_duration_weight']
+        self.label_smoothing = train_config['loss']['label_smoothing']
 
     def forward(self, inputs, predictions, direction="to_tgt", word_step=10):
         """
@@ -106,15 +111,13 @@ class FastSpeech2Loss(nn.Module):
             if extracted_e is not None:
                 extracted_e = extracted_e.detach()
                 # TODO: Figure out best beta value
-                beta = .3
-                pros_loss = self.pros_loss(predicted_e, extracted_e, src_masks)*beta
+                pros_loss = self.pros_loss(predicted_e, extracted_e, src_masks) * self.pros_weight
 
-        alpha = .5
         pitch_loss = self.mse_loss(pitch_predictions, pitch_targets)
         energy_loss = self.mse_loss(energy_predictions, energy_targets)
         duration_loss = self.mse_loss(log_duration_predictions, log_duration_targets)
-        pitch_loss = pitch_loss * alpha
-        energy_loss = energy_loss * alpha
+        pitch_loss = pitch_loss * self.pitch_energy_weight
+        energy_loss = energy_loss * self.pitch_energy_weight
         
         # word_loss  (Requires extracting predicted phonemes from mel Spectrogram) whisper
         if audio is not None:
@@ -123,11 +126,10 @@ class FastSpeech2Loss(nn.Module):
             word_loss = torch.tensor([0]).to(device)
 
         # Full Duration Loss
-        delta = .01
-        full_duration_loss = self.mae_loss(mel_lens_predictions, mel_lens_targets.float()) * delta
+        full_duration_loss = self.mae_loss(mel_lens_predictions, mel_lens_targets.float()) * self.full_duration_weight
 
         # Calculate discriminator loss for generator with label smoothing
-        g_loss = self.bce_loss(pred_generated, torch.ones_like(pred_generated) * .95)
+        g_loss = self.bce_loss(pred_generated, torch.ones_like(pred_generated) * self.label_smoothing)
 
         total_loss = (
             mel_loss + postnet_mel_loss + duration_loss + pitch_loss + energy_loss 
@@ -163,13 +165,14 @@ class ProsLoss(nn.Module):
             Negative log-likelihood of the phone sequence given the prosody features
         """
         log_pi, mu, sigma = x
+        # print()
         # sigma = torch.sqrt(sigma)
 
         # print("sum log_pi", torch.sum(torch.exp(log_pi)).item(), log_pi.shape) # Checks out (sums to 1)
 
         # print("Log_pi", torch.min(log_pi).item(), torch.max(log_pi).item())  # Range: (-inf, 0)
         # print("Mu", torch.min(mu).item(), torch.max(mu).item())              # Range: (-inf, inf)
-        # print("Sigma", torch.min(sigma).item(), torch.max(sigma).item())     # Range: (0, 1)
+        # print("Sigma", torch.min(sigma).item(), torch.max(sigma).item())     # Range: (0, inf)
 
         batch_size, max_seq_len = mu.shape[0], mu.shape[1]
 
@@ -189,8 +192,18 @@ class ProsLoss(nn.Module):
         # print("normal_loglik", torch.min(normal_loglik).item(), torch.max(normal_loglik).item()) # Range: (-inf, 0)
         # loglik = torch.logsumexp(log_pi + normal_loglik, dim=-1) # torch.Size([2, seq] # Should be negative
         # print("Loglik", torch.min(loglik).item(), torch.max(loglik).item()) # Range: (-inf, 0)
-
         
+        # q = torch.einsum("bkih,bkih->bki", z_score, z_score) # q is too small at 1.2.
+        # print("q", torch.min(q).item(), torch.max(q).item()) # Range: (0, inf)
+        # eq = torch.exp(-0.5 * q)  # Too big at .5 if being divided by small number
+        # print("eq", torch.min(eq).item(), torch.max(eq).item(), eq.shape) # Range: (0, 1)
+
+        # sum_sigma = torch.sum(sigma, dim=-1)
+        # print("sum_sigma", torch.min(sum_sigma).item(), torch.max(sum_sigma).item(), sum_sigma.shape) # Range: (0, inf)
+
+        # normal_loglik = eq / sum_sigma
+        # print("normal_loglik", torch.min(normal_loglik).item(), torch.max(normal_loglik).item(), normal_loglik.shape) # Range: (0, 1)
+
         normal_loglik = (torch.exp(-0.5 * torch.einsum("bkih,bkih->bki", z_score, z_score))  # Should be negative
                         / torch.sum(sigma, dim=-1))  # torch.Size([2, seq, 8])
         
@@ -210,15 +223,20 @@ class ProsLoss(nn.Module):
         # print("shape of log_pi*normal_loglike", (torch.exp(log_pi)*normal_loglik).shape) # Shape
         
         # Getting RuntimeError: Function 'MulBackward0' returned nan values in its 0th output.
+        # pi_normal_loglik = torch.exp(log_pi)*normal_loglik
+        # print("pi_normal_loglik", torch.min(pi_normal_loglik).item(), torch.max(pi_normal_loglik).item(), pi_normal_loglik.shape)
+
+        # unclamped_likelihood = torch.sum(torch.exp(log_pi)*normal_loglik, dim=-1)
+        # print("unclamped_likelihood", torch.min(unclamped_likelihood).item(), torch.max(unclamped_likelihood).item(), unclamped_likelihood.shape)
+        # likelihood = torch.clamp(unclamped_likelihood, min=1e-10)
+        # print("likelihood", torch.min(likelihood).item(), torch.max(likelihood).item(), likelihood.shape) # Range: (0, 1)
+
         loglik = torch.log(torch.clamp(torch.sum(torch.exp(log_pi)*normal_loglik, dim=-1), min=1e-10))
         # print("Loglik", torch.min(loglik).item(), torch.max(loglik).item(), loglik.shape) # Range: (-inf, 0)
-
-        # # TODO: NOT MAKING SENSE: If logsumexp is always positive no matter what then negloglik will always be negative no matter what.
 
         negloglik = -loglik.masked_select(src_masks)
 
         # print("negloglik", negloglik.shape) # Shape
-
         # print("Negloglik", torch.min(negloglik).item(), torch.max(negloglik).item()) # Range: (0, 1)
 
         nlls = torch.sum(negloglik)/max_seq_len

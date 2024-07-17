@@ -25,3 +25,8 @@ step:
   word_step: 10  # 10
   discriminator_step: 10
 pretrain: False
+loss:
+  pros_weight: 0.3
+  pitch_energy_weight: 0.5
+  full_duration_weight: 0.01
+  label_smoothing: 0.95

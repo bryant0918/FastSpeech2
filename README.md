@@ -202,7 +202,7 @@ nohup python3 prepare_align.py config/LJSpeech/preprocess_es.yaml > preprocess.l
 
 ### Get the TextGrid Files
 
-#### For Datasets with existing TextGrid files
+#### <u>For Datasets with existing TextGrid files</u>
 As described in the paper, [Montreal Forced Aligner](https://montreal-forced-aligner.readthedocs.io/en/latest/) (MFA) is used to obtain the alignments between the utterances and the phoneme sequences.
 Alignments of the supported datasets are provided [here](https://drive.google.com/drive/folders/1DBRkALpPd6FL9gjHMmMEdHODmkgNIIK4?usp=sharing).
 
@@ -218,7 +218,7 @@ You have to unzip the files in ``preprocessed_data/LJSpeech/TextGrid/``.
 
 ```unzip preprocessed_data/LJSpeech/LJSpeech.zip -d preprocessed_data/LJSpeech/```
 
-#### For New Datasets without Existing TextGrid Files
+#### <u>For New Datasets without Existing TextGrid Files</u>
 For new Datasets you will need to generate TextGrid files yourself. Instructions are [here](https://montreal-forced-aligner.readthedocs.io/en/latest/installation.html) for installation and [here](https://montreal-forced-aligner.readthedocs.io/en/latest/first_steps/index.html#first-steps-align-pretrained) for aligning.
 
 Create new conda (mamba) environment for all mfa stuff
@@ -312,9 +312,9 @@ nohup python3 pretrain.py -p config/LJSpeech/preprocess.yaml -p2 config/LJSpeech
 ```
 
 ```
-nohup python3 pretrain.py --restore_step 175000 -p config/LJSpeech/preprocess.yaml -p2 config/LJSpeech/preprocess_es.yaml -m config/LJSpeech/model.yaml -t config/LJSpeech/pretrain.yaml -w 16 &
+nohup python3 pretrain.py --restore_step 15000 -p config/LJSpeech/preprocess.yaml -p2 config/LJSpeech/preprocess_es.yaml -m config/LJSpeech/model.yaml -t config/LJSpeech/pretrain.yaml -w 16 &
 
-6493
+2926249
 ```
 
 ### On GPU

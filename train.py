@@ -51,7 +51,7 @@ def main(args, configs):
     model, optimizer = get_model(args, configs[1:], device, train=True)
     model = nn.DataParallel(model)
     num_param = get_param_num(model)
-    Loss = FastSpeech2Loss(preprocess_config, model_config).to(device)
+    Loss = FastSpeech2Loss(preprocess_config, model_config, train_config).to(device)
     print("Number of FastSpeech2 Parameters:", num_param)
 
     # Prepare discriminator

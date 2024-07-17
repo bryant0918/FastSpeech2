@@ -42,6 +42,7 @@ class FastSpeech2Pros(nn.Module):
         self.postnet = PostNet()
 
         self.beta = nn.Parameter(torch.tensor(-1.0))
+        self.lambda_reg = model_config['prosody_extractor']['prosody_reg_penalty']
 
         # Only need this if I'm getting speaker embeddings path from json
         with open(os.path.join(preprocess_config["path"]["preprocessed_path"], "speakers.json"), "r") as f:
@@ -97,8 +98,7 @@ class FastSpeech2Pros(nn.Module):
             e_src = self.prosody_extractor(enhanced_mels)   # e is [batch_size, melspec H, melspec W, 128]
 
             # Normalize prosody embeddings
-            lambda_reg = .1
-            prosody_reg_term = lambda_reg * torch.norm(e_src, p=2)
+            prosody_reg_term = self.lambda_reg * torch.norm(e_src, p=2)
                     
             # Split phone pros embeddings by phone duration
             # [batch_size (list), phoneme_sequence_length (list), melspec H (tensor), melspec W (tensor), 128 (tensor)]        

@@ -178,7 +178,6 @@ class LengthRegulator(nn.Module):
         for batch, expand_target in zip(x, duration):
             expanded = self.expand(batch, expand_target)
             output.append(expanded)
-            print("Expanded shape: ", expanded.shape)
             mel_len.append(expanded.shape[0])
 
         if max_len is not None:

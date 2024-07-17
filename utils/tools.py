@@ -118,7 +118,7 @@ def log(
         logger.add_scalar("Loss/full_duration_loss", losses[8], step)
         logger.add_scalar("Loss/g_loss", losses[9], step)
         logger.add_scalar("Loss/d_loss", losses[10], step)
-        logger.add_scaler("Loss/prosody_reg", losses[11], step)
+        logger.add_scalar("Loss/prosody_reg", losses[11], step)
 
     if lr is not None:
         logger.add_scalar("Learning_rate", lr, step)

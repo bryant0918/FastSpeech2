@@ -306,9 +306,9 @@ python3 pretrain.py -p config/LJSpeech/preprocess.yaml -m config/LJSpeech/model.
 ```
 
 ```
-nohup python3 pretrain.py -p config/LJSpeech/preprocess.yaml -p2 config/LJSpeech/preprocess_es.yaml -m config/LJSpeech/model.yaml -t config/LJSpeech/pretrain.yaml -w 4 &
+nohup python3 pretrain.py -p config/LJSpeech/preprocess.yaml -p2 config/LJSpeech/preprocess_es.yaml -m config/LJSpeech/model.yaml -t config/LJSpeech/pretrain.yaml -w 16 &
 
-8739
+4091228
 ```
 
 ```

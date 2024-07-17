@@ -156,12 +156,12 @@ def pretrain_loop(preprocess_config, model_config, batch, model, Loss, discrimin
     # Generator Forward pass: Src to Src
     output = model(*(input))
 
-    print(" duration", len(batch[-1][0]), batch[-1][0])
-    print(" log_duration", len(torch.log(batch[-1].float() + 1)[0]), torch.log(batch[-1].float() + 1)[0])
-    print(" predicted log_duration", len(output[4][0]), output[4][0])
-    print(" predicted d_rounded", len(output[5][0]), output[5][0], sum(output[5][0]))
+    # print(" duration", len(batch[-1][0]), batch[-1][0])
+    # print(" log_duration", len(torch.log(batch[-1].float() + 1)[0]), torch.log(batch[-1].float() + 1)[0])
+    # print(" predicted log_duration", len(output[4][0]), output[4][0])
+    # print(" predicted d_rounded", len(output[5][0]), output[5][0], sum(output[5][0]))
     exp_pred_log_d = custom_round(torch.clamp(torch.exp(output[4]) - 1, min=0))
-    print(" exponentiated predicted log_d", len(exp_pred_log_d[0]), exp_pred_log_d[0], sum(exp_pred_log_d[0]))
+    # print(" exponentiated predicted log_d", len(exp_pred_log_d[0]), exp_pred_log_d[0], sum(exp_pred_log_d[0]))
 
     d_loss = torch.tensor(0.0, device=device)
     if step % discriminator_step == 0 or step >= warm_up_step:

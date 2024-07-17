@@ -2,16 +2,26 @@ import os
 import shutil
 
 def create_mfa_directory(base_dir):
-
+    count = 0
     dirs = [name for name in os.listdir(base_dir) if os.path.isdir(os.path.join(base_dir, name))]
 
     for dir in dirs:
         # os.makedirs(os.path.join(new_dir, dir), exist_ok=True)
         for filename in os.listdir(os.path.join(base_dir, dir)):
-            if filename.endswith("_src.lab"):
-                new_filename = filename.replace("_src.lab", ".lab")
-                os.rename(os.path.join(base_dir, dir, filename), os.path.join(base_dir, dir, new_filename))                
+            if filename.endswith(".lab"):
+                with open(os.path.join(base_dir, dir, filename), "r") as f:
+                    lines = f.readlines()
+                if not lines:
+                    os.remove(os.path.join(base_dir, dir, filename))
+                    count += 1
 
+            if filename.endswith("_src.lab"):
+                if os.exists(os.path.join(base_dir, dir, filename)):
+                    new_filename = filename.replace("_src.lab", ".lab")
+                    os.rename(os.path.join(base_dir, dir, filename), os.path.join(base_dir, dir, new_filename))
+
+    print("Deleted ", count, " files.")
+    
 def get_oov_words(oov_log_file, dict, oov_words):
     import json
     import re
@@ -89,12 +99,12 @@ def merge_dictionaries(pretrained_dict_path, generated_dict_path):
     with open(pretrained_dict_path, 'a') as f:
         f.writelines(lines)
 
-
+# forgot to remove .wav files with it but ONLY 14 files so just do it manually
 
 
 if __name__ == "__main__":
-    dir = "raw_data/LJSpeech"
-    # create_mfa_directory(dir)
+    dir = "raw_data/LibriTTS"
+    create_mfa_directory(dir)
 
     oov_file = "/home/ditto/Documents/MFA/Spanish_mfa/Spanish_mfa/split3/log/normalize_oov.log"
     dict = "/home/ditto/Documents/MFA/pretrained_models/dictionary/spanish_mfa.dict"
@@ -106,6 +116,6 @@ if __name__ == "__main__":
 
     pretrained_dict_path = '/home/ditto/Documents/MFA/pretrained_models/dictionary/spanish_mfa.dict'
     generated_dict_path = '/home/ditto/Ditto/FastSpeech2/lexicon/librispeech-lexicon.txt'
-    merge_dictionaries(pretrained_dict_path, generated_dict_path)
+    # merge_dictionaries(pretrained_dict_path, generated_dict_path)
 
     pass

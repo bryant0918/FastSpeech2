@@ -137,7 +137,7 @@ class FastSpeech2Pros(nn.Module):
                                   e_control, d_control, )
 
         # TODO: Call NPC Module here if want to implement.
-        # output = self.npc_module(output, tgt_masks)
+        # npc_out = self.npc_module(output, tgt_masks)
 
         output, mel_masks = self.decoder(output, mel_masks)
         output = self.mel_linear(output)

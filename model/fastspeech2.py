@@ -7,7 +7,7 @@ import torch.nn.functional as F
 from simalign import SentenceAligner
 
 from transformer import Encoder, Decoder, PostNet, ProsodyExtractor, ProsodyPredictor
-from .modules import VarianceAdaptor
+from .modules import VarianceAdaptor, NPCModule
 from utils.tools import get_mask_from_lengths
 
 if torch.cuda.is_available():
@@ -34,6 +34,7 @@ class FastSpeech2Pros(nn.Module):
         self.h_sd_downsize2 = nn.Linear(model_config["prosody_predictor"]["sd_dim_in"],
                                         model_config["prosody_extractor"]["dim_out"])
         self.variance_adaptor = VarianceAdaptor(preprocess_config, model_config)
+        self.npc = NPCModule(model_config)
         self.decoder = Decoder(model_config)
         self.mel_linear = nn.Linear(
             model_config["transformer"]["decoder_hidden"],

@@ -35,13 +35,11 @@ prosody_predictor:
   gru_hidden_dim: 512
   bigru_hidden_dim: 32
 
-# gst:
-#   use_gst: False
-#   conv_filters: [32, 32, 64, 64, 128, 128]
-#   gru_hidden: 128
-#   token_size: 128
-#   n_style_token: 10
-#   attn_head: 4
+npc:
+  in_channels: 256
+  hidden_channels: 256
+  num_embeddings: 256
+  embedding_dim: 256
 
 multi_speaker: False
 

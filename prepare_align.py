@@ -2,7 +2,7 @@ import argparse
 
 import yaml
 
-from preprocessor import ljspeech, aishell3, libritts, spanish
+from preprocessor import ljspeech, aishell3, libritts, spanish_tedx, spanish
 
 
 def main(config):
@@ -14,6 +14,9 @@ def main(config):
         libritts.prepare_align(config)
     if "Spanish" in config["dataset"]:
         spanish.prepare_align(config)
+    if "Spanish_TedX" in config["dataset"]:
+        spanish_tedx.prepare_align(config)
+
 
 
 if __name__ == "__main__":

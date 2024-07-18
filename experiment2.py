@@ -528,8 +528,21 @@ def test_realign_ped():
     print("realigned_d: ", torch.sum(realigned_d), realigned_d)
     print("rounded realigened_d: ", torch.sum(custom_round(realigned_d)), custom_round(realigned_d))
     
+def test_npc():
+    from model.modules import NPCModule
+    
+    # Test NPC Module
+    npc = NPCModule(256, 128, 512, 128)
 
+    x = torch.randn(4, 87, 256)
+
+    mask = torch.ones(4, 87)
+    mask[:, 50:] = 0
+
+    y = npc(x, mask.unsqueeze(-1))
+
+    print(y.shape)
 
 if __name__ == "__main__":
-    test_realign_ped()
+    test_npc()
     pass

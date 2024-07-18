@@ -38,7 +38,7 @@ def evaluate(model, discriminator, step, configs, logger=None, vocoder=None):
     )
 
     # Get loss function
-    Loss = FastSpeech2Loss(preprocess_config, model_config).to(device)
+    Loss = FastSpeech2Loss(preprocess_config, model_config, train_config).to(device)
     criterion_d = nn.BCELoss()
 
     word_step = train_config["step"]["word_step"]
@@ -142,7 +142,7 @@ def evaluate_pretrain(model, discriminator, step, configs, logger=None, vocoder=
     )
 
     # Get loss function
-    Loss = FastSpeech2Loss(preprocess_config, model_config).to(device)
+    Loss = FastSpeech2Loss(preprocess_config, model_config, train_config).to(device)
     criterion_d = nn.BCELoss()
 
     word_step = train_config["step"]["word_step"]

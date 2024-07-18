@@ -136,6 +136,9 @@ class FastSpeech2Pros(nn.Module):
             self.variance_adaptor(h_sd, tgt_masks, mel_masks, max_mel_len, p_targets, e_targets, d_targets, p_control,
                                   e_control, d_control, )
 
+        # TODO: Call NPC Module here if want to implement.
+        # output = self.npc_module(output, tgt_masks)
+
         output, mel_masks = self.decoder(output, mel_masks)
         output = self.mel_linear(output)
         postnet_output = self.postnet(output) + output

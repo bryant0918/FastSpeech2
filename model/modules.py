@@ -302,3 +302,54 @@ class Conv(nn.Module):
         x = x.contiguous().transpose(1, 2)
 
         return x
+
+class ConvBlock(nn.Module):
+    def __init__(self, in_channels, out_channels, kernel_size=3, stride=1, padding=1):
+        super(ConvBlock, self).__init__()
+        self.conv = nn.Conv1d(in_channels, out_channels, kernel_size, stride, padding)
+        self.relu = nn.ReLU()
+
+    def forward(self, x):
+        return self.relu(self.conv(x))
+    
+class MaskedConvBlock(ConvBlock):
+    def forward(self, x, mask):
+        x = x * mask
+        return super().forward(x)
+
+class VectorQuantization(nn.Module):
+    def __init__(self, num_embeddings, embedding_dim):
+        super(VectorQuantization, self).__init__()
+        self.embedding = nn.Embedding(num_embeddings, embedding_dim)
+        self.embedding.weight.data.uniform_(-1.0 / num_embeddings, 1.0 / num_embeddings)
+
+    def forward(self, x):
+        # Flatten x to (batch_size*sequence_length, embedding_dim)
+        flat_x = x.view(-1, x.size(2))
+        # Compute L2 distance between x and each embedding
+        distances = (torch.sum(flat_x**2, dim=1, keepdim=True) 
+                     + torch.sum(self.embedding.weight**2, dim=1)
+                     - 2 * torch.matmul(flat_x, self.embedding.weight.t()))
+        # Choose the closest embedding
+        indices = torch.argmin(distances, dim=1).unsqueeze(1)
+        return self.embedding(indices).view_as(x)
+
+class NPCModule(nn.Module):
+    def __init__(self, in_channels, hidden_channels, num_embeddings, embedding_dim):
+        super(NPCModule, self).__init__()
+        self.conv1 = ConvBlock(in_channels, hidden_channels)
+        self.masked_conv1 = MaskedConvBlock(hidden_channels, hidden_channels)
+        self.conv2 = ConvBlock(hidden_channels, hidden_channels)
+        self.masked_conv2 = MaskedConvBlock(hidden_channels, hidden_channels)
+        self.vq = VectorQuantization(num_embeddings, embedding_dim)
+        self.projection = nn.Linear(embedding_dim, in_channels)
+
+    def forward(self, x, mask):
+        x1 = self.conv1(x)
+        x1_masked = self.masked_conv1(x1, mask)
+        x2 = self.conv2(x1_masked)
+        x2_masked = self.masked_conv2(x2, mask)
+        ht = x1_masked + x2_masked
+        vq_ht = self.vq(ht)
+        yt = self.projection(vq_ht.transpose(1, 2)).transpose(1, 2)
+        return yt

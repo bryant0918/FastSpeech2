@@ -27,9 +27,10 @@ def prepare_align(config):
 
     with open(os.path.join(in_dir, "metadata.csv"), encoding="utf-8") as f:
         for line in tqdm(f):
-            audio_path, speaker, text = line.strip().split("|")
-            base_name, ext = os.path.splitext(os.path.basename(audio_path))
+            base_name, text = line.strip().split("|")
             
+            parts = base_name.split("_")
+            speaker = parts[1] + parts[2]
             out_translation_path = os.path.join(out_dir, speaker, "{}_tgt.lab".format(base_name))
 
             text = _clean_text(text, cleaners)
@@ -38,14 +39,14 @@ def prepare_align(config):
             preprocessed_path = os.path.join(preprocessed_dir, "mel", "{}-mel-{}.npy".format(speaker, base_name))
             if os.path.exists(preprocessed_path):
                 continue
+            else:
+                print("Processing: ", base_name)
 
             # TODO: handle api connection errors
             translation = GoogleTranslator(source='es', target='en').translate(text)
             translation = english_cleaners(translation)
-            
-            if not ext:
-                audio_path += ".wav"
-            wav_path = os.path.join(in_dir, audio_path)
+
+            wav_path = os.path.join(in_dir, "speech", "{}.wav".format(base_name))
             if os.path.exists(wav_path):
                 os.makedirs(os.path.join(out_dir, speaker), exist_ok=True)
                 try:

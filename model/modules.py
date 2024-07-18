@@ -307,15 +307,17 @@ class ConvBlock(nn.Module):
     def __init__(self, in_channels, out_channels, kernel_size=3, stride=1, padding=1):
         super(ConvBlock, self).__init__()
         self.conv = nn.Conv1d(in_channels, out_channels, kernel_size, stride, padding)
+        self.bn = nn.BatchNorm1d(out_channels)
         self.relu = nn.ReLU()
 
     def forward(self, x):
-        return self.relu(self.conv(x))
+        return self.relu(self.bn(self.conv(x)))
     
 class MaskedConvBlock(ConvBlock):
     def forward(self, x, mask):
-        x = x * mask
-        return super().forward(x)
+        print("x shape: ", x.shape)
+        x = x.transpose(1, 2) * mask
+        return super().forward(x.transpose(1, 2))
 
 class VectorQuantization(nn.Module):
     def __init__(self, num_embeddings, embedding_dim):
@@ -325,7 +327,7 @@ class VectorQuantization(nn.Module):
 
     def forward(self, x):
         # Flatten x to (batch_size*sequence_length, embedding_dim)
-        flat_x = x.view(-1, x.size(2))
+        flat_x = x.reshape(-1, x.size(2))
         # Compute L2 distance between x and each embedding
         distances = (torch.sum(flat_x**2, dim=1, keepdim=True) 
                      + torch.sum(self.embedding.weight**2, dim=1)
@@ -337,6 +339,7 @@ class VectorQuantization(nn.Module):
 class NPCModule(nn.Module):
     def __init__(self, in_channels, hidden_channels, num_embeddings, embedding_dim):
         super(NPCModule, self).__init__()
+
         self.conv1 = ConvBlock(in_channels, hidden_channels)
         self.masked_conv1 = MaskedConvBlock(hidden_channels, hidden_channels)
         self.conv2 = ConvBlock(hidden_channels, hidden_channels)
@@ -345,11 +348,13 @@ class NPCModule(nn.Module):
         self.projection = nn.Linear(embedding_dim, in_channels)
 
     def forward(self, x, mask):
+        x = x.transpose(1, 2)
         x1 = self.conv1(x)
         x1_masked = self.masked_conv1(x1, mask)
         x2 = self.conv2(x1_masked)
         x2_masked = self.masked_conv2(x2, mask)
         ht = x1_masked + x2_masked
-        vq_ht = self.vq(ht)
-        yt = self.projection(vq_ht.transpose(1, 2)).transpose(1, 2)
+        vq_ht = self.vq(ht.transpose(1, 2))
+        yt = self.projection(vq_ht)
         return yt
+

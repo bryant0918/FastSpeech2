@@ -159,8 +159,9 @@ class ProsLoss(nn.Module):
         """
         Calculate the negative log-likelihood of the phone sequence given the prosody features
         Input:
-            x: (h_sd, h_si, prev_e)
+            x: (log_pi, mu, sigma) from prosody predictor
             y: prosody embeddings e_k from prosody extractor
+            src_masks: Source masks
         Output:
             Negative log-likelihood of the phone sequence given the prosody features
         """
@@ -199,12 +200,12 @@ class ProsLoss(nn.Module):
         # print("eq", torch.min(eq).item(), torch.max(eq).item(), eq.shape) # Range: (0, 1)
 
         # sum_sigma = torch.sum(sigma, dim=-1)
-        # print("sum_sigma", torch.min(sum_sigma).item(), torch.max(sum_sigma).item(), sum_sigma.shape) # Range: (0, inf)
+        # print("sum_sigma", torch.min(sum_sigma).item(), torch.max(sum_sigma).item()) # Range: (0, inf)
 
         # normal_loglik = eq / sum_sigma
-        # print("normal_loglik", torch.min(normal_loglik).item(), torch.max(normal_loglik).item(), normal_loglik.shape) # Range: (0, 1)
+        # print("normal_loglik", torch.min(normal_loglik).item(), torch.max(normal_loglik).item()) # Range: (0, 1) but more realistically between (0.1, 0.3)
 
-        normal_loglik = (torch.exp(-0.5 * torch.einsum("bkih,bkih->bki", z_score, z_score))  # Should be negative
+        normal_loglik = (torch.exp(-0.5 * torch.einsum("bkih,bkih->bki", z_score, z_score))
                         / torch.sum(sigma, dim=-1))  # torch.Size([2, seq, 8])
         
         if torch.isnan(normal_loglik).any() or torch.isinf(normal_loglik).any():
@@ -223,23 +224,26 @@ class ProsLoss(nn.Module):
         # print("shape of log_pi*normal_loglike", (torch.exp(log_pi)*normal_loglik).shape) # Shape
         
         # Getting RuntimeError: Function 'MulBackward0' returned nan values in its 0th output.
-        # pi_normal_loglik = torch.exp(log_pi)*normal_loglik
-        # print("pi_normal_loglik", torch.min(pi_normal_loglik).item(), torch.max(pi_normal_loglik).item(), pi_normal_loglik.shape)
+        # pi_normal_loglik = torch.exp(log_pi)*normal_loglik  # Range (0, 1)
+        # print("pi_normal_loglik", torch.min(pi_normal_loglik).item(), torch.max(pi_normal_loglik).item())
 
         # unclamped_likelihood = torch.sum(torch.exp(log_pi)*normal_loglik, dim=-1)
         # print("unclamped_likelihood", torch.min(unclamped_likelihood).item(), torch.max(unclamped_likelihood).item(), unclamped_likelihood.shape)
-        # likelihood = torch.clamp(unclamped_likelihood, min=1e-10)
+        # likelihood = torch.clamp(unclamped_likelihood, min=1e-10, max=1-1e-10) # Range (1e-10, 1)
         # print("likelihood", torch.min(likelihood).item(), torch.max(likelihood).item(), likelihood.shape) # Range: (0, 1)
 
-        loglik = torch.log(torch.clamp(torch.sum(torch.exp(log_pi)*normal_loglik, dim=-1), min=1e-10))
-        # print("Loglik", torch.min(loglik).item(), torch.max(loglik).item(), loglik.shape) # Range: (-inf, 0)
+        # Leads to negative loss when not clamping at max value of 1.
+        loglik = torch.log(torch.clamp(torch.sum(torch.exp(log_pi)*normal_loglik, dim=-1), min=1e-10, max=1-1e-15)) # Range: (-1, 0)
+
+        # loglik = torch.logsumexp(log_pi + torch.log(normal_loglik), dim=-1)
+        # print("Loglik", torch.min(loglik).item(), torch.max(loglik).item(), loglik.shape) # Range: (-1, 0)
 
         negloglik = -loglik.masked_select(src_masks)
 
         # print("negloglik", negloglik.shape) # Shape
         # print("Negloglik", torch.min(negloglik).item(), torch.max(negloglik).item()) # Range: (0, 1)
 
-        nlls = torch.sum(negloglik)/max_seq_len
+        nlls = torch.sum(negloglik)/max_seq_len 
 
         return nlls / batch_size
 

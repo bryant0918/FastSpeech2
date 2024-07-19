@@ -218,7 +218,8 @@ class ProsodyExtractor(nn.Module):
         """"
         Input:
             x: mels
-        Returns
+        Returns:
+            x: e [batch_size, melspec H, melspec W, 256]
         -------
         prosody_embedding e
         """

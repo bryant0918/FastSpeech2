@@ -19,6 +19,7 @@ elif torch.backends.mps.is_available():
     device = torch.device("mps")
 else:
     device = torch.device("cpu")
+device = 'cpu'
 print("Device:", device)
 
 preprocess_config = "config/LJSpeech/preprocess.yaml"
@@ -254,7 +255,6 @@ if test_whisper:
 
         print("options: ", options)
 
-
 """Debug segmentatin fault"""  # Fixed by export LD_LIBRARY_PATH=""
 seg_fault = False
 if seg_fault:
@@ -484,7 +484,6 @@ if test_textgrid:
 
     phones, durations, start, end = get_alignment(textgrid)
 
-
 """Test Epitran"""
 test_epitran = False
 if test_epitran:
@@ -531,7 +530,6 @@ if test_epitran:
     phones_by_word = [split_with_tie_bar(word) for word in phones_by_word]
     print("EPITRAN:", phones_by_word)
     print("EPITRAN: ", list(chain.from_iterable(phones_by_word)))
-
 
 """Go through word_alignment"""
 test_word_alignment = False
@@ -739,72 +737,47 @@ if test_extractor:
 """Test Prosody Predictor"""
 test_predictor = False
 if test_predictor:
-    model = FastSpeech2Pros(preprocess_config, model_config).to(device)
-
-    text = "Hello, how are you doing today?"
-    texts = np.array([preprocess_english(text, preprocess_config)])
-
-    print("Texts shape: ", texts.shape)
-
-    ids = raw_texts = [text[:100]]
-    speakers = np.array([0])
-    text_lens = np.array([len(texts[0])])
-
-    speakers = torch.from_numpy(speakers).long().to(device)
-    texts = torch.from_numpy(texts).long().to(device)
-    src_lens = torch.from_numpy(text_lens).to(device)
-
-    max_src_lens = max(text_lens)
-    print(max_src_lens)
-
-    batch = (speakers, texts, src_lens, max_src_lens)
-
-    with torch.no_grad():
-        # Forward
-        output = model(*batch)[0]
-        print("Output shape: ", output.size())
-
-    # h_si = torch.rand([1, 19, 256], device=device)
-    # print("h_si shape: ", h_si.size())
-    #
-    # # Get Speaker Embedding created by speaker embedding repo
-    # # style_wav = "/Users/bryantmcarthur/Documents/Ditto/experiment/tony.flac"
-    # embedding_path = "/Users/bryantmcarthur/Documents/Ditto/SpeakerEncoder/outputs/tony.pkl_emb.pkl"
-    #
-    # with open(embedding_path, 'rb') as f:
-    #     emb_dict = pickle.load(f)
-    #
-    # embedding = torch.from_numpy(emb_dict["default"]).to(device)
-    # print("Embedding shape: ", embedding.size())
-    #
-    # # embedding = torch.cat((embedding, embedding))
-    # # print("Embedding shape: ", embedding.size())
-    #
-    # # Adding new dimensions to tensor_2
+    h_si = torch.rand([1, 19, 256], device=device)
+    print("h_si shape: ", h_si.size())
     
-    # embedding = embedding.unsqueeze(0).unsqueeze(0).expand(-1, 19, -1)
-    #
-    # h_sd = h_si + embedding
-    #
-    # print("h_sd shape: ", h_sd.size())
-    #
-    # # Create the model
-    # model = ProsodyPredictor(256, 128, 4, 8).to(device)
-    # # Print the model summary
-    # print(model)
-    #
-    # e = model(h_sd, h_si)
-    #
-    # pi, mu, sigma = e
-    # print("pi shape: ", pi.size())
-    # print("mu shape: ", mu.size())
-    # print("sigma shape: ", sigma.size())
-    #
-    # sample = model.sample2(h_sd, h_si)
-    # print("Sample shape: ", sample.size())
+    # Get Speaker Embedding created by speaker embedding repo
+    # style_wav = "/Users/bryantmcarthur/Documents/Ditto/experiment/tony.flac"
+    embedding_path = "/Users/bryantmcarthur/Documents/Ditto/SpeakerEncoder/outputs/tony.pkl_emb.pkl"
+    
+    with open(embedding_path, 'rb') as f:
+        emb_dict = pickle.load(f)
+    
+    embedding = torch.from_numpy(emb_dict["default"]).to(device)
+    print("Embedding shape: ", embedding.size())
+    
+    # embedding = torch.cat((embedding, embedding))
+    # print("Embedding shape: ", embedding.size())
+    
+    # Adding new dimensions to tensor_2
+    
+    embedding = embedding.unsqueeze(0).unsqueeze(0).expand(-1, 19, -1)
+    
+    h_sd = h_si + embedding
+    
+    print("h_sd shape: ", h_sd.size())
+    
+    # Create the model
+    model = ProsodyPredictor(256, 128, 4, 8).to(device)
+    # Print the model summary
+    print(model)
+    
+    e = model(h_sd, h_si)
+    
+    pi, mu, sigma = e
+    print("pi shape: ", pi.size())
+    print("mu shape: ", mu.size())
+    print("sigma shape: ", sigma.size())
+    
+    sample = model.sample2(h_sd, h_si)
+    print("Sample shape: ", sample.size())
 
-    # sample = model.sample(h_sd, h_si)
-    # print("Sample shape: ", sample.size())
+    sample = model.sample(h_sd, h_si)
+    print("Sample shape: ", sample.size())
 
 """Test phone alignment"""
 test_phone_alignment = False
@@ -1026,7 +999,7 @@ if test_phone_alignment:
     # src_pitch = np.load(f"preprocessed_data/LJSpeech/pitch/LJSpeech-pitch-{basename}.npy")
 
 """Test realign p_e_d"""
-test_realign_p_e_d = True
+test_realign_p_e_d = False
 if test_realign_p_e_d:
     from utils.tools import pad_inhomogeneous_2D, pad_1D
     from text import text_to_sequence

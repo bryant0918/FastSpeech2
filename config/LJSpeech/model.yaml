@@ -24,7 +24,7 @@ prosody_extractor:
   dim_in: 2        # Second channel is language embedding
   dim_out: 256
   hidden_dim: 8
-  prosody_reg_penalty: 0.01  # Can't be too large, otherwise embedding norms too small and get floating point errors
+  prosody_reg_penalty: 0.001  # Can't be too large, otherwise embedding norms too small and get floating point errors
 
 prosody_predictor:
   sd_dim_in: 512

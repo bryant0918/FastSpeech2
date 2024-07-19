@@ -543,6 +543,30 @@ def test_npc():
 
     print(y.shape)
 
+def test_pros_loss():
+    from model.loss import ProsLoss
+
+    prosody_loss = ProsLoss()
+
+    log_pi = -torch.abs(torch.randn(2,83,8)).to(torch.float64) 
+    mu = torch.randn(2,83,8,256).to(torch.float64) * .0000001
+    sigma = torch.abs(torch.randn(2,83,8,256)).to(torch.float64) * .01
+    
+    x = (log_pi, mu, sigma)
+    y = torch.randn(2, 83, 256).to(torch.float64) * .0000001
+
+    print("log_pi", torch.min(log_pi).item(), torch.max(log_pi).item())
+    print("mu", torch.min(mu).item(), torch.max(mu).item())
+    print("sigma", torch.min(sigma).item(), torch.max(sigma).item())
+    print("y", torch.min(y).item(), torch.max(y).item())
+
+    mask = torch.ones(2, 83).to(torch.bool)
+    mask[:, 80:] = 0
+
+    loss = prosody_loss(x, y, mask)
+
+    print("\nloss", loss.item())
+
 if __name__ == "__main__":
-    test_npc()
+    test_pros_loss()
     pass

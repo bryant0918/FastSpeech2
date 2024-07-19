@@ -25,6 +25,8 @@ def prepare_align(config):
 
     word_aligner = SentenceAligner(model="bert", token_type="bpe", matching_methods="m")
 
+    print("Preparing alignments...")
+
     with open(os.path.join(in_dir, "metadata.csv"), encoding="utf-8") as f:
         for line in tqdm(f):
             audio_path, speaker, text = line.strip().split("|")
@@ -35,9 +37,10 @@ def prepare_align(config):
             text = _clean_text(text, cleaners)
 
             # Skip if file exists (pick up where you left off)
-            preprocessed_path = os.path.join(preprocessed_dir, "mel", "{}-mel-{}.npy".format(speaker, base_name))
-            if os.path.exists(preprocessed_path):
-                continue
+            # preprocessed_path = os.path.join(preprocessed_dir, "mel", "{}-mel-{}.npy".format(speaker, base_name))
+            # if os.path.exists(preprocessed_path):
+            #     print("Skipping")
+            #     continue
 
             # TODO: handle api connection errors
             translation = GoogleTranslator(source='es', target='en').translate(text)
@@ -46,6 +49,7 @@ def prepare_align(config):
             if not ext:
                 audio_path += ".wav"
             wav_path = os.path.join(in_dir, audio_path)
+            # print("Wav path: ", wav_path)
             if os.path.exists(wav_path):
                 os.makedirs(os.path.join(out_dir, speaker), exist_ok=True)
                 try:

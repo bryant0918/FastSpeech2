@@ -197,7 +197,7 @@ python3 prepare_align.py config/LJSpeech/preprocess.yaml
 nohup python3 prepare_align.py config/LJSpeech/preprocess.yaml &
 ps -ef | grep 2014664
 nohup python3 prepare_align.py config/LJSpeech/preprocess_es.yaml > preprocess.log 2>&1 &
-452521
+2653448
 ```
 
 ### Get the TextGrid Files

@@ -17,7 +17,6 @@ def test_google_translate():
     from deep_translator import GoogleTranslator
 
     text = "printing in the only sense with which we are at present concerned differs from most if not from all the arts and crafts represented in the exhibition"
-    
     text = "and the aggregate amount of debts sued for was eightyone thousand seven hundred ninetyone pounds"
 
     # TODO: Get cleaners for translation language also (and handle api connection errors)
@@ -37,6 +36,166 @@ def test_google_translate():
 
 
     return translation
+
+def test_translators():
+    from text.cleaners import remove_punctuation, english_cleaners
+    import time
+    from api_keys import chatgpt, deepl, qcri
+    from deep_translator import (GoogleTranslator,
+                                ChatGptTranslator,
+                                MicrosoftTranslator,
+                                PonsTranslator,
+                                LingueeTranslator,
+                                MyMemoryTranslator,
+                                YandexTranslator,
+                                PapagoTranslator,
+                                DeeplTranslator,
+                                QcriTranslator,
+                                LibreTranslator,
+                                single_detection,
+                                batch_detection)
+    
+
+    """
+    What we've learned:
+    - translate_batch is NOT faster than translate sequentially
+    - GoogleTranslator is baseline
+    - ChatGptTranslator requires api key and funds
+    - MicrosoftTranslator requires api key, can get free trial but requires credit card
+    - PonsTranslator only allows up to 50 characters
+    - LingueeTranslator only allows up to 50 characters
+    - MyMemoryTranslator is slower
+    - YandexTranslator requires api key, supposedly can get free trial but couldn't find, just ask for card
+    - PapagoTranslator requires api key and funds
+    - DeeplTranslator requires api key, has free tier but is slower
+    - QcriTranslator requires api key, free, slow, en-es server not always up
+    - LibreTranslator requires api key and funds
+
+    Google translate remains to be the best option.
+    Use DeepL after maximum requests to google api.
+    use MyMemory as last resort.
+    """
+
+    google2es = GoogleTranslator(source='en', target='es')
+    google2en = GoogleTranslator(source='es', target='en')
+
+    chatgpt2es = ChatGptTranslator(api_key=chatgpt, source='en', target='es')
+
+    # micro2es = MicrosoftTranslator(source='en', target='es')
+
+    pons2es = PonsTranslator(source='english', target='spanish')
+
+    linguee2es = LingueeTranslator(source='english', target='spanish')
+
+    mmt2es = MyMemoryTranslator(source='en-US', target='es-ES')
+    mmt2en = MyMemoryTranslator(source='es-ES', target='en-US')
+
+    # yandex2es = YandexTranslator(source='en', target='es')
+
+    # papago2es = PapagoTranslator(source='en', target='es')
+
+    deepl2es = DeeplTranslator(api_key = deepl, source='en', target='es')
+
+    qcri2en = QcriTranslator(api_key = qcri, source='Spanish', target='English')
+
+    # libre2es = LibreTranslator(source='en', target='es')
+
+    translators2es = [google2es]
+    translators2en = []
+
+    en_text = "printing in the only sense with which we are at present concerned differs from most if not from all the arts and crafts represented in the exhibition"
+    en_text2 = "and the aggregate amount of debts sued for was eightyone thousand seven hundred ninetyone pounds"
+    es_text = "En Inglaterra, por esta época, Caslon hizo un intento en particular, quien comenzó su negocio en Londres como fundidor tipográfico en mil setecientos veinte y tenía cuarenta y cinco manzanas."
+
+    for translator in translators2es:
+        print()
+        print("Testing: ", translator.__class__.__name__)
+        start = time.time()
+        # translation = translator.translate(en_text)
+        translation = translator.translate(source="Spanish", target='English', text=en_text, domain='general')
+        time1 = time.time() - start
+        print("Time taken: ", time1)
+        print(translation)
+        translation = remove_punctuation(translation)
+        print(translation)
+
+        start = time.time()
+        # translation = translator.translate(en_text)
+        translation = translator.translate(source='en', target='es', text=en_text, domain='general')
+        time2 = time.time() - start
+        print("Time taken: ", time2)
+        print(translation)
+        translation = remove_punctuation(translation)
+        print(translation)
+
+        print("Total time: ", time1 + time2)
+
+        batch_text = [en_text, en_text2]
+        start = time.time()
+        # translations = translator.translate_batch(batch_text)
+        translations = translator.translate_batch(batch_text, domain='general-fast')
+        time3 = time.time() - start
+        print("Batch Time taken: ", time3)
+        print(translations)
+
+    for translator in translators2en:
+        print()
+        print("Testing: ", translator.__class__.__name__)
+        start = time.time()
+        # translation = translator.translate(en_text)
+        translation = translator.translate(source='es', target='en', domain='general', text=es_text)
+        time1 = time.time() - start
+        print("Time taken: ", time1)
+        print(translation)
+        translation = remove_punctuation(translation)
+        print(translation)
+
+        start = time.time()
+        # translation = translator.translate(en_text)
+        translation = translator.translate(source='es', target='en', domain='general', text=es_text)
+        time2 = time.time() - start
+        print("Time taken: ", time2)
+        print(translation)
+        translation = remove_punctuation(translation)
+        print(translation)
+
+        print("Total time: ", time1 + time2)
+
+        batch_text = [en_text, en_text2]
+        start = time.time()
+        # translations = translator.translate_batch(batch_text)
+        translations = translator.translate_batch(batch_text, domain='general')
+        time3 = time.time() - start
+        print("Batch Time taken: ", time3)
+        print(translations)
+
+    import subprocess
+    import json
+    # command = ["echo", "Hello, World!"]
+    # process = subprocess.run(command, capture_output=True, text=True)
+
+    # Define the curl command
+    curl_command = """
+    curl -X POST http://localhost:11434/api/generate -d '{{
+    "model": "mistral",
+    "prompt":"Translate this sentence into spanish without adding any extra context in your response: {}"
+    }}'
+    """.format(en_text)
+
+    # Execute the curl command
+    start = time.time()
+    result = subprocess.run(curl_command, shell=True, capture_output=True, text=True)
+    full_response = ""
+
+    for line in result.stdout.strip().split('\n'):
+        data = json.loads(line)
+        full_response += data["response"]
+        if data.get("done", True):  # Using .get() to avoid KeyError if 'done' is missing
+            break
+    
+    print("Time taken: ", time.time() - start)
+
+    print(full_response)
 
 def test_inv_melspec():
     import librosa
@@ -529,19 +688,45 @@ def test_realign_ped():
     print("rounded realigened_d: ", torch.sum(custom_round(realigned_d)), custom_round(realigned_d))
     
 def test_npc():
-    from model.modules import NPCModule
+    from model.modules import NPC
     
-    # Test NPC Module
-    npc = NPCModule(256, 128, 512, 128)
+    # Test My NPC Module
+    # npc = NPCModule(256, 128, 512, 128)
+    # x = torch.randn(4, 87, 256)
+    # mask = torch.ones(4, 87)
+    # mask[:, 50:] = 0
+    # y = npc(x, mask.unsqueeze(-1))
+    # print(y.shape)
 
-    x = torch.randn(4, 87, 256)
+    # Test Alexander-H-Liu's NPC Module
+    x = torch.randn(4, 87, 256).transpose(1, 2)
 
-    mask = torch.ones(4, 87)
-    mask[:, 50:] = 0
+    kernel_size = 15     # Receptive field size (R) = kernel_size + 2*(n_blocks)
+    mask_size = 5     # Desired input mask size (M_in) as described in NPC paper
+    n_blocks = 4                     # Number of ConvBlocks stacked in NPC model
+    hidden_size = 512                       # Dimension of feature of all layers
+    dropout = 0.1                                         # Dropout in ConvBlock
+    residual = True                           # Residual connection in ConvBlock
+    batch_norm = True                             # Apply BatchNorm in ConvBlock
+    activate = 'relu'                         # Activation function of ConvBlock
+    disable_cross_layer = False      # Apply Masked ConvBlock at last layer only
+    vq = {
+      'codebook_size': [64,64,64,64],    # Codebook size of each group in VQ-layer
+      'code_dim': [128,128,128,128], # Dim of each group summing up to hidden_size
+      'gumbel_temperature': 1.0        # Temperature of Gumbel Softmax in VQ-layer
+    }
+    
+    npc = NPC(87, hidden_size, n_blocks, dropout, residual,
+              kernel_size, mask_size, vq=vq, batch_norm=batch_norm, 
+              activate=activate, disable_cross_layer=disable_cross_layer, dim_bottleneck=None)
 
-    y = npc(x, mask.unsqueeze(-1))
+    print(sum(param.numel() for param in npc.parameters()))
 
-    print(y.shape)
+    pred, _ = npc(x, testing=True)
+
+    print(pred.shape)
+    loss = torch.nn.functional.l1_loss(pred, x)
+    print(loss)
 
 def test_pros_loss():
     from model.loss import ProsLoss
@@ -549,11 +734,13 @@ def test_pros_loss():
     prosody_loss = ProsLoss()
 
     log_pi = -torch.abs(torch.randn(2,83,8)).to(torch.float64) 
-    mu = torch.randn(2,83,8,256).to(torch.float64) * .0000001
-    sigma = torch.abs(torch.randn(2,83,8,256)).to(torch.float64) * .01
+    mu = torch.randn(2,83,8,256).to(torch.float64) * .0001
+    sigma = torch.abs(torch.randn(2,83,8,256)).to(torch.float64) * .0001
     
     x = (log_pi, mu, sigma)
-    y = torch.randn(2, 83, 256).to(torch.float64) * .0000001
+    y = torch.randn(2, 83, 256).to(torch.float64) * .0001
+
+    print(torch.norm(y, p=2))
 
     print("log_pi", torch.min(log_pi).item(), torch.max(log_pi).item())
     print("mu", torch.min(mu).item(), torch.max(mu).item())
@@ -568,5 +755,6 @@ def test_pros_loss():
     print("\nloss", loss.item())
 
 if __name__ == "__main__":
-    test_pros_loss()
+    # test_npc()
+    test_translators()
     pass

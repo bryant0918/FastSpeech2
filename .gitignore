@@ -136,3 +136,6 @@ val.txt
 
 # logs
 nohup.out
+
+# private info
+api_keys.py

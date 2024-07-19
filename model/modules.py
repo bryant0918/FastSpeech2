@@ -303,38 +303,314 @@ class Conv(nn.Module):
 
         return x
 
+
+EPS = 1e-10
+
+class VQLayer(nn.Module):
+    '''
+        VQ-layer modified from
+            https://github.com/iamyuanchung/VQ-APC/blob/283d338/vqapc_model.py
+    '''
+    def __init__(self, input_size, codebook_size, code_dim, gumbel_temperature):
+        '''
+            Defines a VQ layer that follows an RNN layer.
+            input_size: an int indicating the pre-quantized input feature size,
+                usually the hidden size of RNN.
+            codebook_size: an int indicating the number of codes.
+            code_dim: an int indicating the size of each code. If not the last layer,
+                then must equal to the RNN hidden size.
+            gumbel_temperature: a float indicating the temperature for gumbel-softmax.
+        '''
+        super(VQLayer, self).__init__()
+        # Directly map to logits without any transformation.
+        self.codebook_size = codebook_size
+        self.vq_logits = nn.Linear(input_size, codebook_size)
+        self.gumbel_temperature = gumbel_temperature
+        self.codebook_CxE = nn.Linear(codebook_size, code_dim, bias=False)
+        self.token_usg = np.zeros(codebook_size)
+
+    def forward(self, inputs_BxLxI, testing, lens=None):
+        logits_BxLxC = self.vq_logits(inputs_BxLxI)
+        if testing:
+            # During inference, just take the max index.
+            shape = logits_BxLxC.size()
+            _, ind = logits_BxLxC.max(dim=-1)
+            onehot_BxLxC = torch.zeros_like(logits_BxLxC).view(-1, shape[-1])
+            onehot_BxLxC.scatter_(1, ind.view(-1, 1), 1)
+            onehot_BxLxC = onehot_BxLxC.view(*shape)
+        else:
+            onehot_BxLxC = gumbel_softmax(logits_BxLxC, tau=self.gumbel_temperature, 
+                                          hard=True, eps=EPS, dim=-1)
+            self.token_usg += onehot_BxLxC.detach().cpu()\
+                        .reshape(-1,self.codebook_size).sum(dim=0).numpy()
+        codes_BxLxE = self.codebook_CxE(onehot_BxLxC)
+
+        return logits_BxLxC, codes_BxLxE
+
+    def report_ppx(self):
+        ''' Computes perplexity of distribution over codebook '''
+        acc_usg = self.token_usg/sum(self.token_usg)
+        return 2**sum(-acc_usg * np.log2(acc_usg+EPS))
+
+    def report_usg(self):
+        ''' Computes usage each entry in codebook '''
+        acc_usg = self.token_usg/sum(self.token_usg)
+        # Reset
+        self.token_usg = np.zeros(self.codebook_size)
+        return acc_usg
+
+class MaskConvBlock(nn.Module):
+    """ Masked Convolution Blocks as described in NPC paper """
+    def __init__(self, input_size, hidden_size, kernel_size, mask_size):
+        super(MaskConvBlock, self).__init__()
+        assert kernel_size-mask_size>0,"Mask > kernel somewhere in the model"
+        # CNN for computing feature (ToDo: other activation?)
+        self.act = nn.Tanh()
+        self.pad_size = (kernel_size-1)//2
+        self.conv = nn.Conv1d(in_channels=input_size,
+                               out_channels=hidden_size,
+                               kernel_size=kernel_size,
+                               padding=self.pad_size 
+                               )
+        # Fixed mask for NPC
+        mask_head = (kernel_size-mask_size)//2
+        mask_tail = mask_head + mask_size
+        conv_mask = torch.ones_like(self.conv.weight)
+        conv_mask[:,:,mask_head:mask_tail] = 0
+        self.register_buffer('conv_mask', conv_mask)
+
+    def forward(self, feat):
+        feat = nn.functional.conv1d(feat, 
+                                    self.conv_mask*self.conv.weight,
+                                    bias=self.conv.bias,
+                                    padding=self.pad_size
+                                   )
+        feat = feat.permute(0,2,1) # BxCxT -> BxTxC
+        feat = self.act(feat)
+        return feat
+
 class ConvBlock(nn.Module):
-    def __init__(self, in_channels, out_channels, kernel_size=3, stride=1, padding=1):
+    """ Convolution Blocks as described in NPC paper """
+    def __init__(self, input_size, hidden_size, residual, dropout, 
+                 batch_norm, activate):
         super(ConvBlock, self).__init__()
-        self.conv = nn.Conv1d(in_channels, out_channels, kernel_size, stride, padding)
-        self.bn = nn.BatchNorm1d(out_channels)
-        self.relu = nn.ReLU()
+        self.residual = residual
+        if activate == 'relu':
+            self.act = nn.ReLU()
+        elif activate == 'tanh':
+            self.act = nn.Tanh()
+        else:
+            raise NotImplementedError
+        self.conv = nn.Conv1d(input_size,
+                              hidden_size,
+                              kernel_size=3,
+                              stride=1,
+                              padding=1
+                             )
+        self.linear = nn.Conv1d(hidden_size,
+                              hidden_size,
+                              kernel_size=1,
+                              stride=1,
+                              padding=0
+                             )
+        self.batch_norm = batch_norm
+        if batch_norm:
+            self.bn1 = nn.BatchNorm1d(hidden_size)
+            self.bn2 = nn.BatchNorm1d(hidden_size)
+        self.dropout = nn.Dropout(dropout)
 
-    def forward(self, x):
-        return self.relu(self.bn(self.conv(x)))
+    def forward(self, feat):
+        res = feat
+        out = self.conv(feat)
+        if self.batch_norm:
+            out = self.bn1(out)
+        out = self.act(out)
+        out = self.linear(out)
+        if self.batch_norm:
+            out = self.bn2(out)
+        out = self.dropout(out)
+        if self.residual:
+            out = out + res
+        return self.act(out)
+
+class NPC(nn.Module):
+    """ NPC model with stacked ConvBlocks & Masked ConvBlocks """
+    def __init__(self, input_size, hidden_size, n_blocks, dropout, residual,
+                 kernel_size, mask_size, vq=None, batch_norm=True, 
+                 activate='relu', disable_cross_layer=False,
+                 dim_bottleneck=None):
+        super(NPC, self).__init__()
+
+        # Setup
+        assert kernel_size%2==1,'Kernel size can only be odd numbers'
+        assert mask_size%2==1,'Mask size can only be odd numbers'
+        assert n_blocks>=1,'At least 1 block needed'
+        self.code_dim = hidden_size
+        self.n_blocks = n_blocks
+        self.input_mask_size = mask_size
+        self.kernel_size = kernel_size
+        self.disable_cross_layer = disable_cross_layer
+        self.apply_vq = vq is not None
+        self.apply_ae = dim_bottleneck is not None
+        if self.apply_ae:
+            assert not self.apply_vq
+            self.dim_bottleneck = dim_bottleneck
+
+        # Build blocks
+        self.blocks, self.masked_convs = [], []
+        cur_mask_size = mask_size
+        for i in range(n_blocks):
+            h_dim = input_size if i==0 else hidden_size
+            res = False if i==0 else residual
+            # ConvBlock
+            self.blocks.append(ConvBlock(h_dim, hidden_size, res,
+                                         dropout, batch_norm, activate))
+            # Masked ConvBlock on each or last layer
+            cur_mask_size = cur_mask_size + 2 
+            if self.disable_cross_layer and (i!=(n_blocks-1)):
+                self.masked_convs.append(None)
+            else:
+                self.masked_convs.append(MaskConvBlock(hidden_size, 
+                                                       hidden_size, 
+                                                       kernel_size, 
+                                                       cur_mask_size))
+        self.blocks = nn.ModuleList(self.blocks)
+        self.masked_convs = nn.ModuleList(self.masked_convs)
+
+        # Creates N-group VQ
+        if self.apply_vq:
+            self.vq_layers = []
+            vq_config = copy.deepcopy(vq)
+            codebook_size = vq_config.pop('codebook_size')
+            self.vq_code_dims = vq_config.pop('code_dim')
+            assert len(self.vq_code_dims)==len(codebook_size)
+            assert sum(self.vq_code_dims)==hidden_size
+            for cs,cd in zip(codebook_size,self.vq_code_dims):
+                self.vq_layers.append(VQLayer(input_size=cd,
+                                              code_dim=cd,
+                                              codebook_size=cs,
+                                              **vq_config))
+            self.vq_layers = nn.ModuleList(self.vq_layers)
+
+        # Back to spectrogram
+        if self.apply_ae:
+            self.ae_bottleneck = nn.Linear(hidden_size, 
+                                           self.dim_bottleneck,bias=False)
+            self.postnet = nn.Linear(self.dim_bottleneck, input_size)
+        else:
+            self.postnet = nn.Linear(hidden_size, input_size)
     
-class MaskedConvBlock(ConvBlock):
-    def forward(self, x, mask):
-        print("x shape: ", x.shape)
-        x = x.transpose(1, 2) * mask
-        return super().forward(x.transpose(1, 2))
+    def create_msg(self):
+        msg_list = []
+        msg_list.append('Model spec.| Method = NPC\t| # of Blocks = {}\t'\
+                        .format(self.n_blocks))
+        msg_list.append('           | Desired input mask size = {}'\
+                        .format(self.input_mask_size))
+        msg_list.append('           | Receptive field size = {}'\
+                        .format(self.kernel_size+2*self.n_blocks))
+        return msg_list
 
-class VectorQuantization(nn.Module):
-    def __init__(self, num_embeddings, embedding_dim):
-        super(VectorQuantization, self).__init__()
-        self.embedding = nn.Embedding(num_embeddings, embedding_dim)
-        self.embedding.weight.data.uniform_(-1.0 / num_embeddings, 1.0 / num_embeddings)
 
-    def forward(self, x):
-        # Flatten x to (batch_size*sequence_length, embedding_dim)
-        flat_x = x.reshape(-1, x.size(2))
-        # Compute L2 distance between x and each embedding
-        distances = (torch.sum(flat_x**2, dim=1, keepdim=True) 
-                     + torch.sum(self.embedding.weight**2, dim=1)
-                     - 2 * torch.matmul(flat_x, self.embedding.weight.t()))
-        # Choose the closest embedding
-        indices = torch.argmin(distances, dim=1).unsqueeze(1)
-        return self.embedding(indices).view_as(x)
+    def report_ppx(self):
+        ''' Returns perplexity of VQ distribution '''
+        if self.apply_vq:
+            # ToDo: support more than 2 groups
+            rt = [vq_layer.report_ppx() for vq_layer in self.vq_layers]+[None]
+            return rt[0],rt[1]
+        else:
+            return None, None
+
+    def report_usg(self):
+        ''' Returns usage of VQ codebook '''
+        if self.apply_vq:
+            # ToDo: support more than 2 groups
+            rt = [vq_layer.report_usg() for vq_layer in self.vq_layers]+[None]
+            return rt[0],rt[1]
+        else:
+            return None, None
+
+    def get_unmasked_feat(self, sp_seq, n_layer):
+        ''' Returns unmasked features from n-th layer ConvBlock '''
+        unmasked_feat = sp_seq.permute(0,2,1) # BxTxC -> BxCxT
+        for i in range(self.n_blocks):
+            unmasked_feat = self.blocks[i](unmasked_feat)
+            if i == n_layer:
+                unmasked_feat = unmasked_feat.permute(0,2,1)
+                break
+        return unmasked_feat
+
+    def forward(self, sp_seq, testing=False):
+        # BxTxC -> BxCxT (reversed in Masked ConvBlock)
+        unmasked_feat = sp_seq.permute(0,2,1)
+        # Forward through each layer
+        for i in range(self.n_blocks):
+            unmasked_feat = self.blocks[i](unmasked_feat)
+            if self.disable_cross_layer:
+                # Last layer masked feature only
+                if i==(self.n_blocks-1):
+                    feat = self.masked_convs[i](unmasked_feat)
+            else:
+                # Masked feature aggregation
+                masked_feat = self.masked_convs[i](unmasked_feat)
+                if i == 0:
+                    feat = masked_feat
+                else:
+                    feat = feat + masked_feat
+        # Apply bottleneck and predict spectrogram
+        if self.apply_vq:
+            q_feat = []
+            offet = 0
+            for vq_layer,cd in zip(self.vq_layers,self.vq_code_dims):
+                _, q_f = vq_layer(feat[:,:,offet:offet+cd], testing)
+                q_feat.append(q_f)
+                offet += cd
+            q_feat = torch.cat(q_feat,dim=-1)
+            pred = self.postnet(q_feat)
+        elif self.apply_ae:
+            feat = self.ae_bottleneck(feat)
+            pred  = self.postnet(feat) 
+        else:
+            pred = self.postnet(feat)
+        return pred, feat
+
+
+
+
+
+
+
+# class ConvBlock(nn.Module):
+#     def __init__(self, in_channels, out_channels, kernel_size=3, stride=1, padding=1):
+#         super(ConvBlock, self).__init__()
+#         self.conv = nn.Conv1d(in_channels, out_channels, kernel_size, stride, padding)
+#         self.bn = nn.BatchNorm1d(out_channels)
+#         self.relu = nn.ReLU()
+
+#     def forward(self, x):
+#         return self.relu(self.bn(self.conv(x)))
+    
+# class MaskedConvBlock(ConvBlock):
+#     def forward(self, x, mask):
+#         print("x shape: ", x.shape)
+#         x = x.transpose(1, 2) * mask
+#         return super().forward(x.transpose(1, 2))
+
+# class VectorQuantization(nn.Module):
+#     def __init__(self, num_embeddings, embedding_dim):
+#         super(VectorQuantization, self).__init__()
+#         self.embedding = nn.Embedding(num_embeddings, embedding_dim)
+#         self.embedding.weight.data.uniform_(-1.0 / num_embeddings, 1.0 / num_embeddings)
+
+#     def forward(self, x):
+#         # Flatten x to (batch_size*sequence_length, embedding_dim)
+#         flat_x = x.reshape(-1, x.size(2))
+#         # Compute L2 distance between x and each embedding
+#         distances = (torch.sum(flat_x**2, dim=1, keepdim=True) 
+#                      + torch.sum(self.embedding.weight**2, dim=1)
+#                      - 2 * torch.matmul(flat_x, self.embedding.weight.t()))
+#         # Choose the closest embedding
+#         indices = torch.argmin(distances, dim=1).unsqueeze(1)
+#         return self.embedding(indices).view_as(x)
 
 class NPCModule(nn.Module):
     def __init__(self, in_channels, hidden_channels, num_embeddings, embedding_dim):

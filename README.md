@@ -197,7 +197,7 @@ python3 prepare_align.py config/LJSpeech/preprocess.yaml
 nohup python3 prepare_align.py config/LJSpeech/preprocess.yaml &
 ps -ef | grep 2014664
 nohup python3 prepare_align.py config/LJSpeech/preprocess_es.yaml > preprocess.log 2>&1 &
-2653448
+2886708
 ```
 
 ### Get the TextGrid Files
@@ -312,7 +312,7 @@ nohup python3 pretrain.py -p config/LJSpeech/preprocess.yaml -p2 config/LJSpeech
 ```
 
 ```
-nohup python3 pretrain.py --restore_step 15000 -p config/LJSpeech/preprocess.yaml -p2 config/LJSpeech/preprocess_es.yaml -m config/LJSpeech/model.yaml -t config/LJSpeech/pretrain.yaml -w 16 &
+nohup python3 pretrain.py --restore_step 90030 -p config/LJSpeech/preprocess.yaml -p2 config/LJSpeech/preprocess_es.yaml -m config/LJSpeech/model.yaml -t config/LJSpeech/pretrain.yaml -w 16 &
 
 861748
 ```

@@ -40,8 +40,7 @@ def loop(preprocess_config, model_config, batch, model, Loss, discriminator, cri
                 d_loss.backward()
                 d_optimizer.step()
     
-    with torch.no_grad():
-        pred_generated = discriminator(output_tgt[1])
+    pred_generated = discriminator(output_tgt[1])
 
     log_duration_targets = torch.log(batch[-1].float() + 1)
     
@@ -119,8 +118,7 @@ def loop(preprocess_config, model_config, batch, model, Loss, discriminator, cri
                 d_loss.backward()
                 d_optimizer.step()
 
-    with torch.no_grad():
-        pred_generated = discriminator(output_src[1])
+    pred_generated = discriminator(output_src[1])
 
     # For calculating Word Loss
     if step % word_step == 0:
@@ -160,7 +158,7 @@ def pretrain_loop(preprocess_config, model_config, batch, model, Loss, discrimin
     # print(" log_duration", len(torch.log(batch[-1].float() + 1)[0]), torch.log(batch[-1].float() + 1)[0])
     # print(" predicted log_duration", len(output[4][0]), output[4][0])
     # print(" predicted d_rounded", len(output[5][0]), output[5][0], sum(output[5][0]))
-    exp_pred_log_d = custom_round(torch.clamp(torch.exp(output[4]) - 1, min=0))
+    # exp_pred_log_d = custom_round(torch.clamp(torch.exp(output[4]) - 1, min=0))
     # print(" exponentiated predicted log_d", len(exp_pred_log_d[0]), exp_pred_log_d[0], sum(exp_pred_log_d[0]))
 
     d_loss = torch.tensor(0.0, device=device)
@@ -184,8 +182,7 @@ def pretrain_loop(preprocess_config, model_config, batch, model, Loss, discrimin
             d_loss.backward()
             d_optimizer.step()
     
-    with torch.no_grad():
-        pred_generated = discriminator(output[1])
+    pred_generated = discriminator(output[1])
 
     log_duration_targets = torch.log(batch[-1] + 1)
     # For calculating Word Loss

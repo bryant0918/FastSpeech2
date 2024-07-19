@@ -99,120 +99,149 @@ def main(args, configs):
         inner_bar = tqdm(total=len(loader), desc="Epoch {}".format(epoch), position=1)
 
         for batches in loader:
-            for batch in batches:
-                batch = to_device(batch, device)
-                # batch = (ids, raw_texts, speakers, langs, texts, src_lens, max_src_len, mels, mel_lens, max_mel_len, 
-                #           speaker_embeddings, pitches, energies, durations)
-                
-                # if step == 15010:
-                #     raise Exception("Stop")
+            try:
+                for batch in batches:
+                    batch = to_device(batch, device)
+                    # batch = (ids, raw_texts, speakers, langs, texts, src_lens, max_src_len, mels, mel_lens, max_mel_len, 
+                    #           speaker_embeddings, pitches, energies, durations)
+                    
+                    # if step == 15010:
+                    #     raise Exception("Stop")
 
-                # Forward
-                losses, output, d_loss = pretrain_loop(preprocess_config, model_config, batch, model, Loss, discriminator, criterion_d,
-                                                        vocoder, step, word_step, device, True, d_optimizer, discriminator_step, warm_up_step)
+                    # Forward
+                    losses, output, d_loss = pretrain_loop(preprocess_config, model_config, batch, model, Loss, discriminator, criterion_d,
+                                                            vocoder, step, word_step, device, True, d_optimizer, discriminator_step, warm_up_step)
 
-                # Backward
-                total_loss = losses[0] / grad_acc_step
-                total_loss.backward()
+                    # Backward
+                    total_loss = losses[0] / grad_acc_step
+                    total_loss.backward()
 
-                d_scheduler.step()
+                    d_scheduler.step()
 
-                if step % grad_acc_step == 0:
-                    # Clipping gradients to avoid gradient explosion
-                    nn.utils.clip_grad_norm_(model.parameters(), grad_clip_thresh)
+                    if step % grad_acc_step == 0:
+                        # Clipping gradients to avoid gradient explosion
+                        nn.utils.clip_grad_norm_(model.parameters(), grad_clip_thresh)
 
-                    # Update weights
-                    optimizer.step_and_update_lr()
-                    optimizer.zero_grad()
+                        # Update weights
+                        optimizer.step_and_update_lr()
+                        optimizer.zero_grad()
 
-                if step % log_step == 0:
-                    losses = [l.item() for l in losses]
-                    losses.append(d_loss)
-                    message1 = "Step {}/{}, ".format(step, total_step)
-                    message2 = "Total Loss: {:.4f}, Mel Loss: {:.4f}, Mel PostNet Loss: {:.4f}, Pitch Loss: {:.4f}, Energy Loss: {:.4f}, Duration Loss: {:.4f}, Prosody Loss: {:.4f}, Word Loss: {:.4f}, Full Duration Loss: {:.4f}, G Loss: {:.4f}, Prosody Reg: {:.4f}, D Loss: {:.4f}".format(
-                        *losses
-                    )
+                    if step % log_step == 0:
+                        losses = [l.item() for l in losses]
+                        losses.append(d_loss)
+                        message1 = "Step {}/{}, ".format(step, total_step)
+                        message2 = "Total Loss: {:.4f}, Mel Loss: {:.4f}, Mel PostNet Loss: {:.4f}, Pitch Loss: {:.4f}, Energy Loss: {:.4f}, Duration Loss: {:.4f}, Prosody Loss: {:.4f}, Word Loss: {:.4f}, Full Duration Loss: {:.4f}, G Loss: {:.4f}, Prosody Reg: {:.4f}, D Loss: {:.4f}".format(
+                            *losses
+                        )
 
-                    with open(os.path.join(train_log_path, "log.txt"), "a") as f:
-                        f.write(message1 + message2 + "\n")
+                        with open(os.path.join(train_log_path, "log.txt"), "a") as f:
+                            f.write(message1 + message2 + "\n")
 
-                    outer_bar.write(message1 + message2)
+                        outer_bar.write(message1 + message2)
 
-                    log(train_logger, step, losses=losses, lr=optimizer.get_lr())
+                        log(train_logger, step, losses=losses, lr=optimizer.get_lr())
 
-                if step % synth_step == 0:
-                    targets = (batch[0],) +(batch[7],) + batch[11:]
-                    predictions = (output[1],) + output[8:10]
-                    fig, wav_reconstruction, wav_prediction, tag = synth_one_sample_pretrain(
-                        targets,
-                        predictions,
-                        vocoder,
-                        model_config,
-                        preprocess_config,
-                    )
-                    log(
-                        train_logger,
-                        step,
-                        fig=fig,
-                        tag="Training/step_{}_{}".format(step, tag),
-                    )
-                    sampling_rate = preprocess_config["preprocessing"]["audio"][
-                        "sampling_rate"
-                    ]
-                    log(
-                        train_logger,
-                        step,
-                        audio=wav_reconstruction,
-                        sampling_rate=sampling_rate,
-                        tag="Training/step_{}_{}_reconstructed".format(step, tag),
-                    )
-                    log(
-                        train_logger,
-                        step,
-                        audio=wav_prediction,
-                        sampling_rate=sampling_rate,
-                        tag="Training/step_{}_{}_synthesized".format(step, tag),
-                    )
+                    if step % synth_step == 0:
+                        targets = (batch[0],) +(batch[7],) + batch[11:]
+                        predictions = (output[1],) + output[8:10]
+                        fig, wav_reconstruction, wav_prediction, tag = synth_one_sample_pretrain(
+                            targets,
+                            predictions,
+                            vocoder,
+                            model_config,
+                            preprocess_config,
+                        )
+                        log(
+                            train_logger,
+                            step,
+                            fig=fig,
+                            tag="Training/step_{}_{}".format(step, tag),
+                        )
+                        sampling_rate = preprocess_config["preprocessing"]["audio"][
+                            "sampling_rate"
+                        ]
+                        log(
+                            train_logger,
+                            step,
+                            audio=wav_reconstruction,
+                            sampling_rate=sampling_rate,
+                            tag="Training/step_{}_{}_reconstructed".format(step, tag),
+                        )
+                        log(
+                            train_logger,
+                            step,
+                            audio=wav_prediction,
+                            sampling_rate=sampling_rate,
+                            tag="Training/step_{}_{}_synthesized".format(step, tag),
+                        )
 
-                if step % val_step == 0:
-                    model.eval()
-                    discriminator.eval()
-                    message = evaluate_pretrain(model, discriminator, step, configs, val_logger, vocoder)
-                    with open(os.path.join(val_log_path, "log.txt"), "a") as f:
-                        f.write(message + "\n")
-                    outer_bar.write(message)
+                    if step % val_step == 0:
+                        model.eval()
+                        discriminator.eval()
+                        message = evaluate_pretrain(model, discriminator, step, configs, val_logger, vocoder)
+                        with open(os.path.join(val_log_path, "log.txt"), "a") as f:
+                            f.write(message + "\n")
+                        outer_bar.write(message)
 
-                    model.train()
-                    discriminator.train()
+                        model.train()
+                        discriminator.train()
 
-                if step % save_step == 0:
-                    print("Saving checkpoints")
-                    torch.save(
-                        {
-                            "model": model.module.state_dict(),
-                            "optimizer": optimizer._optimizer.state_dict(),
-                        },
-                        os.path.join(
-                            train_config["path"]["ckpt_path"],
-                            "{}.pth.tar".format(step),
-                        ),
-                    )
+                    if step % save_step == 0:
+                        print("Saving checkpoints")
+                        torch.save(
+                            {
+                                "model": model.module.state_dict(),
+                                "optimizer": optimizer._optimizer.state_dict(),
+                            },
+                            os.path.join(
+                                train_config["path"]["ckpt_path"],
+                                "{}.pth.tar".format(step),
+                            ),
+                        )
 
-                    torch.save(
-                        {
-                            "discriminator": discriminator.state_dict(),
-                            "optimizer": d_optimizer.state_dict(),
-                        },
-                        os.path.join(
-                            train_config["path"]["ckpt_path"],
-                            "disc_{}.pth.tar".format(step),
-                        ),
-                    )
+                        torch.save(
+                            {
+                                "discriminator": discriminator.state_dict(),
+                                "optimizer": d_optimizer.state_dict(),
+                            },
+                            os.path.join(
+                                train_config["path"]["ckpt_path"],
+                                "disc_{}.pth.tar".format(step),
+                            ),
+                        )
 
-                if step == total_step:
-                    quit()
-                step += 1
-                outer_bar.update(1)
+                    if step == total_step:
+                        quit()
+                    step += 1
+                    outer_bar.update(1)
+            except KeyboardInterrupt:
+                print("Training interrupted -- Saving checkpoints")
+                torch.save(
+                    {
+                        "model": model.module.state_dict(),
+                        "optimizer": optimizer._optimizer.state_dict(),
+                    },
+                    os.path.join(
+                        train_config["path"]["ckpt_path"],
+                        "{}.pth.tar".format(step),
+                    ),
+                )
+
+                torch.save(
+                    {
+                        "discriminator": discriminator.state_dict(),
+                        "optimizer": d_optimizer.state_dict(),
+                    },
+                    os.path.join(
+                        train_config["path"]["ckpt_path"],
+                        "disc_{}.pth.tar".format(step),
+                    ),
+                )
+                raise
+            except Exception as e:
+                print("Training interrupted by other exception.")
+                print(e)
+                raise e
 
             inner_bar.update(1)
         epoch += 1

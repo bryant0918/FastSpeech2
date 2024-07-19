@@ -34,7 +34,7 @@ class FastSpeech2Pros(nn.Module):
         self.h_sd_downsize2 = nn.Linear(model_config["prosody_predictor"]["sd_dim_in"],
                                         model_config["prosody_extractor"]["dim_out"])
         self.variance_adaptor = VarianceAdaptor(preprocess_config, model_config)
-        self.npc = NPCModule(model_config)
+        # self.npc = NPCModule(model_config)
         self.decoder = Decoder(model_config)
         self.mel_linear = nn.Linear(
             model_config["transformer"]["decoder_hidden"],
@@ -178,6 +178,9 @@ class Discriminator(nn.Module):
             nn.LeakyReLU(0.2, inplace=True),
             nn.Dropout(0.3),
             nn.Linear(1024, 1),
+            # nn.LeakyReLU(0.2, inplace=True), # Next time I restart training go to 64 first.
+            # nn.Dropout(0.3),
+            # nn.Linear(1024, 1),
             nn.Sigmoid()  # Output will be between 0 and 1
         )
 

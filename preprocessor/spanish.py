@@ -24,6 +24,7 @@ def prepare_align(config):
     os.makedirs((os.path.join(preprocessed_dir, "speaker_emb")), exist_ok=True)
 
     word_aligner = SentenceAligner(model="bert", token_type="bpe", matching_methods="m")
+    translator = GoogleTranslator(source='es', target='en')
 
     print("Preparing alignments...")
 
@@ -31,19 +32,18 @@ def prepare_align(config):
         for line in tqdm(f):
             audio_path, speaker, text = line.strip().split("|")
             base_name, ext = os.path.splitext(os.path.basename(audio_path))
-            
             out_translation_path = os.path.join(out_dir, speaker, "{}_tgt.lab".format(base_name))
-
+            
+            # Skip if file exists (pick up where you left off)
+            if os.path.exists(out_translation_path):
+                continue
+            
+            if not text:
+                continue
             text = _clean_text(text, cleaners)
 
-            # Skip if file exists (pick up where you left off)
-            # preprocessed_path = os.path.join(preprocessed_dir, "mel", "{}-mel-{}.npy".format(speaker, base_name))
-            # if os.path.exists(preprocessed_path):
-            #     print("Skipping")
-            #     continue
-
             # TODO: handle api connection errors
-            translation = GoogleTranslator(source='es', target='en').translate(text)
+            translation = translator.translate(text)
             translation = english_cleaners(translation)
             
             if not ext:

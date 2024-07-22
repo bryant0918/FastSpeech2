@@ -95,13 +95,14 @@ def test_translators():
     # papago2es = PapagoTranslator(source='en', target='es')
 
     deepl2es = DeeplTranslator(api_key = deepl, source='en', target='es')
+    deepl2en = DeeplTranslator(api_key = deepl, source='es', target='en')
 
     qcri2en = QcriTranslator(api_key = qcri, source='Spanish', target='English')
 
     # libre2es = LibreTranslator(source='en', target='es')
 
     translators2es = [google2es]
-    translators2en = []
+    translators2en = [deepl2en]
 
     en_text = "printing in the only sense with which we are at present concerned differs from most if not from all the arts and crafts represented in the exhibition"
     en_text2 = "and the aggregate amount of debts sued for was eightyone thousand seven hundred ninetyone pounds"
@@ -146,8 +147,8 @@ def test_translators():
         translation = translator.translate(source='es', target='en', domain='general', text=es_text)
         time1 = time.time() - start
         print("Time taken: ", time1)
-        print(translation)
-        translation = remove_punctuation(translation)
+        print(translation, type(translation))
+        translation = english_cleaners(translation)
         print(translation)
 
         start = time.time()

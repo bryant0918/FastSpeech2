@@ -164,8 +164,8 @@ def pretrain_loop(preprocess_config, model_config, batch, model, Loss, discrimin
     d_loss = torch.tensor(0.0, device=device)
     if step % discriminator_step == 0 or step >= warm_up_step:
         # Experiment Label Smoothing
-        real_labels = torch.ones(batch_size, 1, device=device) * .95
-        fake_labels = torch.zeros(batch_size, 1, device=device) + .05 * torch.ones(batch_size, 1, device=device)
+        real_labels = .95 * torch.ones(batch_size, 1, device=device) 
+        fake_labels = .05 * torch.ones(batch_size, 1, device=device)
 
         # Train Discriminator with real data
         # real_data_noisy = batch[7] + 0.1 * torch.randn_like(batch[7])

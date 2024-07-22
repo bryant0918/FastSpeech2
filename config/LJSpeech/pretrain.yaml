@@ -29,4 +29,4 @@ loss:
   pros_weight: 0.5
   pitch_energy_weight: 0.5
   full_duration_weight: 0.01
-  label_smoothing: 0.95
+  label_smoothing: 0.05

@@ -312,7 +312,7 @@ nohup python3 pretrain.py -p config/LJSpeech/preprocess.yaml -p2 config/LJSpeech
 ```
 
 ```
-nohup python3 pretrain.py --restore_step 90030 -p config/LJSpeech/preprocess.yaml -p2 config/LJSpeech/preprocess_es.yaml -m config/LJSpeech/model.yaml -t config/LJSpeech/pretrain.yaml -w 16 &
+nohup python3 pretrain.py --restore_step 269296 -p config/LJSpeech/preprocess.yaml -p2 config/LJSpeech/preprocess_es.yaml -m config/LJSpeech/model.yaml -t config/LJSpeech/pretrain.yaml -w 16 &
 
 861748
 ```

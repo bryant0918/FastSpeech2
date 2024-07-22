@@ -8,8 +8,9 @@ from tqdm import tqdm
 from text import _clean_text
 from text.cleaners import english_cleaners
 
-from deep_translator import GoogleTranslator
+from deep_translator import GoogleTranslator, DeeplTranslator
 from simalign import SentenceAligner
+from api_keys import deepl
 
 
 def prepare_align(config):
@@ -42,8 +43,11 @@ def prepare_align(config):
                 continue
             text = _clean_text(text, cleaners)
 
-            # TODO: handle api connection errors
-            translation = translator.translate(text)
+            try: 
+                translation = translator.translate(text)
+            except:
+                translation = DeeplTranslator(api_key = deepl, source='es', target='en')
+
             translation = english_cleaners(translation)
             
             if not ext:

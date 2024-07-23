@@ -2,7 +2,7 @@ import argparse
 
 import yaml
 
-from preprocessor import ljspeech, aishell3, libritts, spanish_tedx, spanish
+from preprocessor import ljspeech, aishell3, libritts, spanish_tedx, spanish, spanish_copy
 
 
 def main(config):

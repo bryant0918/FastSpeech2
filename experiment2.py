@@ -13,6 +13,34 @@ def test_translation():
 
     return raw_translation
 
+def test_marian_translte():
+    from transformers import MarianMTModel, MarianTokenizer
+    import time
+
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    device = 'cpu'    
+
+    # Load the tokenizer and model
+    model_name = 'Helsinki-NLP/opus-mt-es-en'
+    tokenizer = MarianTokenizer.from_pretrained(model_name)
+    model = MarianMTModel.from_pretrained(model_name).to(device)
+
+    def translate(text, tokenizer, model):
+        # Tokenize the input text
+        inputs = tokenizer(text, return_tensors="pt", padding=True, truncation=True).to(device)
+        # Generate translation using the model
+        translated = model.generate(**inputs)
+        # Decode the translated text
+        translated_text = tokenizer.decode(translated[0], skip_special_tokens=True)
+        return translated_text
+
+    # Example usage
+    spanish_text = "Hola, ¿cómo estás?"
+    start = time.time()
+    translated_text = translate(spanish_text, tokenizer, model)
+    print("Time taken: ", time.time() - start)
+    print(f"Translated text: {translated_text}")
+
 def test_google_translate():
     from deep_translator import GoogleTranslator
 
@@ -39,7 +67,7 @@ def test_google_translate():
 
 def test_translators():
     from text.cleaners import remove_punctuation, english_cleaners
-    import time
+    import time, os
     from api_keys import chatgpt, deepl, qcri
     from deep_translator import (GoogleTranslator,
                                 ChatGptTranslator,
@@ -75,8 +103,21 @@ def test_translators():
     Use DeepL after maximum requests to google api.
     use MyMemory as last resort.
     """
-
-    google2es = GoogleTranslator(source='en', target='es')
+    
+    proxies_example = {
+    'http': '82.136.72.102:80',
+    'http':'200.108.190.38:999',
+    'http':'113.160.155.121:19132',
+    'http':'116.63.129.202:6000',
+    'http':'191.37.208.1:8081',
+    'http':'103.158.27.94:8090',
+    'http':'113.161.187.190:8080',
+    }
+    proxies_example = {
+    'socks4':'103.88.169.6:3629',
+    'socks4':'138.201.21.228:48164',
+    }
+    google2es = GoogleTranslator(source='en', target='es', proxies=proxies_example)
     google2en = GoogleTranslator(source='es', target='en')
 
     chatgpt2es = ChatGptTranslator(api_key=chatgpt, source='en', target='es')
@@ -102,11 +143,18 @@ def test_translators():
     # libre2es = LibreTranslator(source='en', target='es')
 
     translators2es = [google2es]
-    translators2en = [deepl2en]
+    translators2en = [mmt2en, deepl2en]
 
     en_text = "printing in the only sense with which we are at present concerned differs from most if not from all the arts and crafts represented in the exhibition"
     en_text2 = "and the aggregate amount of debts sued for was eightyone thousand seven hundred ninetyone pounds"
     es_text = "En Inglaterra, por esta época, Caslon hizo un intento en particular, quien comenzó su negocio en Londres como fundidor tipográfico en mil setecientos veinte y tenía cuarenta y cinco manzanas."
+
+    in_dir = "/home/ditto/Datasets/Speech/es"
+    with open(os.path.join(in_dir, "metadata.csv"), encoding="utf-8") as f:
+        lines = f.readlines()
+
+    # audio_path, speaker, text = line.strip().split("|")
+    batch_text = [line.strip().split("|")[2] for line in lines][:4]
 
     for translator in translators2es:
         print()
@@ -131,7 +179,7 @@ def test_translators():
 
         print("Total time: ", time1 + time2)
 
-        batch_text = [en_text, en_text2]
+        # batch_text = [en_text, en_text2]
         start = time.time()
         # translations = translator.translate_batch(batch_text)
         translations = translator.translate_batch(batch_text, domain='general-fast')
@@ -162,7 +210,7 @@ def test_translators():
 
         print("Total time: ", time1 + time2)
 
-        batch_text = [en_text, en_text2]
+        # batch_text = [en_text, en_text2]
         start = time.time()
         # translations = translator.translate_batch(batch_text)
         translations = translator.translate_batch(batch_text, domain='general')
@@ -755,7 +803,19 @@ def test_pros_loss():
 
     print("\nloss", loss.item())
 
+def anaylze_p_e_d():
+    import numpy as np
+
+    aug_pitch = "preprocessed_data/LJSpeech/pitch/augmented-pitch-LJ031-0020_a.npy"
+    og_pitch = "preprocessed_data/LJSpeech/pitch/LJSpeech-pitch-LJ031-0020.npy"
+
+    og_pitch = np.load(og_pitch)
+    aug_pitch = np.load(aug_pitch)
+
+    print(np.min(og_pitch), np.max(og_pitch), np.shape(og_pitch))
+    print(np.min(aug_pitch), np.max(aug_pitch), np.shape(aug_pitch))
+
 if __name__ == "__main__":
     # test_npc()
-    test_translators()
+    anaylze_p_e_d()
     pass

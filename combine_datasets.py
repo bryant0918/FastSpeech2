@@ -1,5 +1,6 @@
 import os
 import random
+import argparse
 
 def combine_datasets(dir1, dir2):
 
@@ -25,8 +26,11 @@ def combine_datasets(dir1, dir2):
     print("Done.")
 
 if __name__ == "__main__":
-    preprocessed_dir1 = "preprocessed_data/LJSpeech"
-    preprocessed_dir2 = "preprocessed_data/old"
-    combine_datasets(preprocessed_dir1, preprocessed_dir2)
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--dir1", type=str, default="preprocessed_data/LJSpeech")
+    parser.add_argument("--dir2", type=str, default="preprocessed_data/old")
+    args = parser.parse_args()
+
+    combine_datasets(args.dir1, args.dir2)
 
     pass

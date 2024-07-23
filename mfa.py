@@ -1,5 +1,5 @@
 import os
-import shutil
+import argparse
 
 def create_mfa_directory(base_dir):
     count = 0
@@ -99,23 +99,33 @@ def merge_dictionaries(pretrained_dict_path, generated_dict_path):
     with open(pretrained_dict_path, 'a') as f:
         f.writelines(lines)
 
-# forgot to remove .wav files with it but ONLY 14 files so just do it manually
-
 
 if __name__ == "__main__":
-    dir = "raw_data/LibriTTS"
-    create_mfa_directory(dir)
+    parser = argparse.ArgumentParser()
+    parser.add_argument("oov_file", type=str)
+    parser.add_argument("dict_file", type=str)
+    parser.add_argument("out_file", type=str)
+    parser.add_argument("--get_oov_words", action="store_true")
+    parser.add_argument("--pretrained_dict_path", type=str)
+    parser.add_argument("--generated_dict_path", type=str)
+    parser.add_argument("--merge_dictionaries", action="store_true")
+    args = parser.parse_args()
 
-    oov_file = "/home/ditto/Documents/MFA/Spanish_mfa/Spanish_mfa/split3/log/normalize_oov.log"
-    dict = "/home/ditto/Documents/MFA/pretrained_models/dictionary/spanish_mfa.dict"
-    oov_words = "/home/ditto/Documents/MFA/Spanish_mfa/oov_words.txt"
-    # get_oov_words(oov_file, dict, out_file)
 
-    pretrained_dict_path = '/home/ditto/Documents/MFA/pretrained_models/dictionary/spanish_mfa.dict'
-    generated_dict_path = '/home/ditto/Documents/MFA/Spanish_mfa/dictionary/generated_dictionary.txt'
+    # dir = "raw_data/LibriTTS"
+    # create_mfa_directory(dir)
 
-    pretrained_dict_path = '/home/ditto/Documents/MFA/pretrained_models/dictionary/spanish_mfa.dict'
-    generated_dict_path = '/home/ditto/Ditto/FastSpeech2/lexicon/librispeech-lexicon.txt'
-    # merge_dictionaries(pretrained_dict_path, generated_dict_path)
+    # oov_file = "/home/ditto/Documents/MFA/Spanish_mfa/Spanish_mfa/split3/log/normalize_oov.log"
+    # dict = "/home/ditto/Documents/MFA/pretrained_models/dictionary/spanish_mfa.dict"
+    # oov_words = "/home/ditto/Documents/MFA/Spanish_mfa/oov_words.txt"
+    if args.get_oov_words:
+        get_oov_words(args.oov_file, args.dict_file, args.out_file)
+
+    # pretrained_dict_path = '/home/ditto/Documents/MFA/pretrained_models/dictionary/spanish_mfa.dict'
+    # generated_dict_path = '/home/ditto/Documents/MFA/Spanish_mfa/dictionary/generated_dictionary.txt'
+    # pretrained_dict_path = '/home/ditto/Documents/MFA/pretrained_models/dictionary/spanish_mfa.dict'
+    # generated_dict_path = '/home/ditto/Ditto/FastSpeech2/lexicon/librispeech-lexicon.txt'
+    if args.merge_dictionaries:
+        merge_dictionaries(args.pretrained_dict_path, args.generated_dict_path)
 
     pass

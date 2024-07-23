@@ -196,7 +196,7 @@ python3 prepare_align.py config/LJSpeech/preprocess.yaml
 ```
 nohup python3 prepare_align.py config/LJSpeech/preprocess.yaml &
 ps -ef | grep 2014664
-nohup python3 prepare_align.py config/LJSpeech/preprocess_es.yaml > preprocess.log 2>&1 &
+nohup python3 prepare_align.py config/LibriTTS/preprocess_es.yaml > align.log 2>&1 &
 2886708
 ```
 
@@ -234,7 +234,7 @@ pip install speechbrain
 Next download the models you will need.
 I will use english_us_arpa in the ReadMe but find whichever language models you need on the website.
 ```
-mfa model download acoustic <english_us_arpa>
+mfa model download acoustic <spanish_mfa>
 mfa model download dictionary <english_us_arpa>
 mfa model download g2p <english_us_arpa>
 ```
@@ -312,7 +312,7 @@ nohup python3 pretrain.py -p config/LJSpeech/preprocess.yaml -p2 config/LJSpeech
 ```
 
 ```
-nohup python3 pretrain.py --restore_step 269296 -p config/LJSpeech/preprocess.yaml -p2 config/LJSpeech/preprocess_es.yaml -m config/LJSpeech/model.yaml -t config/LJSpeech/pretrain.yaml -w 16 &
+nohup python3 pretrain.py --restore_step 281751 -p config/LJSpeech/preprocess.yaml -p2 config/LJSpeech/preprocess_es.yaml -m config/LJSpeech/model.yaml -t config/LJSpeech/pretrain.yaml -w 16 &
 
 861748
 ```

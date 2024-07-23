@@ -87,7 +87,7 @@ class Preprocessor:
                 if ".wav" not in wav_name:
                     continue
 
-                print(wav_name)
+                # print(wav_name)
 
                 basename = wav_name.split(".")[0]
                 tg_path = os.path.join(self.out_dir, "TextGrid", speaker, "{}.TextGrid".format(basename))

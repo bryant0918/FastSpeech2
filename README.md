@@ -275,7 +275,7 @@ python3 preprocess.py config/LJSpeech/preprocess.yaml
 ```
 
 ```
-nohup python3 preprocess.py config/LJSpeech/preprocess.yaml &
+nohup python3 preprocess.py config/LJSpeech/preprocess.yaml --speakers LJSpeech &
 
 nohup python3 preprocess.py config/LJSpeech/preprocess_es.yaml > preprocess.log 2>&1 &
 3154154

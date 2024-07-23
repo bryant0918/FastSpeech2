@@ -806,16 +806,87 @@ def test_pros_loss():
 def anaylze_p_e_d():
     import numpy as np
 
+    og_pitch = "preprocessed_data/LJSpeech/pitch/LJSpeech-pitch-LJ019-0137.npy"
     aug_pitch = "preprocessed_data/LJSpeech/pitch/augmented-pitch-LJ031-0020_a.npy"
-    og_pitch = "preprocessed_data/LJSpeech/pitch/LJSpeech-pitch-LJ031-0020.npy"
+    aug_pitch = "preprocessed_data/LJSpeech/pitch/augmented-pitch-LJ032-0001_a.npy"
+
+    og_energy = "preprocessed_data/LJSpeech/energy/LJSpeech-energy-LJ032-0001.npy"
+    aug_energy = "preprocessed_data/LJSpeech/energy/augmented-energy-LJ032-0001_a.npy"
 
     og_pitch = np.load(og_pitch)
     aug_pitch = np.load(aug_pitch)
 
+    og_energy = np.load(og_energy)
+    aug_energy = np.load(aug_energy)
+
     print(np.min(og_pitch), np.max(og_pitch), np.shape(og_pitch))
     print(np.min(aug_pitch), np.max(aug_pitch), np.shape(aug_pitch))
 
+    print(np.min(og_energy), np.max(og_energy), np.shape(og_energy))
+    print(np.min(aug_energy), np.max(aug_energy), np.shape(aug_energy))
+
+    # 138.92622993901406 296.77412518844494 (15,)
+    # -1.2443200884455081 5.16465252707064 (15,)
+
+def test_plot():
+    from utils.tools import plot_mel, expand
+    from matplotlib import pyplot as plt
+    import numpy as np
+    import os
+    import json
+
+    basename = "LJ040-0143"
+
+    og_pitch = f"preprocessed_data/LJSpeech/pitch/LJSpeech-pitch-{basename}.npy"
+    aug_pitch = f"preprocessed_data/LJSpeech/pitch/augmented-pitch-{basename}_a.npy"
+
+    og_energy = f"preprocessed_data/LJSpeech/energy/LJSpeech-energy-{basename}.npy"
+    aug_energy = f"preprocessed_data/LJSpeech/energy/augmented-energy-{basename}_a.npy"
+
+    og_duration = f"preprocessed_data/LJSpeech/duration/LJSpeech-duration-{basename}.npy"
+    aug_duration = f"preprocessed_data/LJSpeech/duration/augmented-duration-{basename}_a.npy"
+
+    og_pitch = np.load(og_pitch)
+    aug_pitch = np.load(aug_pitch)
+
+    og_energy = np.load(og_energy)
+    aug_energy = np.load(aug_energy)
+
+    og_duration = np.load(og_duration)
+    aug_duration = np.load(aug_duration)
+
+    og_pitch = expand(og_pitch, og_duration)
+    aug_pitch = expand(aug_pitch, aug_duration)
+
+    og_energy = expand(og_energy, og_duration)
+    aug_energy = expand(aug_energy, aug_duration)
+
+    og_mel = f"preprocessed_data/LJSpeech/mel/LJSpeech-mel-{basename}.npy"
+    aug_mel = f"preprocessed_data/LJSpeech/mel/augmented-mel-{basename}_a.npy"
+    
+    og_mel = np.load(og_mel).T
+    aug_mel = np.load(aug_mel).T
+
+    with open(
+        "preprocessed_data/LJSpeech/stats.json"
+    ) as f:
+        stats = json.load(f)
+        stats = stats["pitch"] + stats["energy"][:2]
+
+
+    fig = plot_mel(
+        [
+            (og_mel, og_pitch, og_energy),
+            (aug_mel, aug_pitch, aug_energy),
+        ],
+        stats,
+        ["Original Spectrogram", "Augmented Spectrogram"],
+    )
+
+    fig.savefig(f'output/result/LJSpeech/{basename}.png')
+
+
 if __name__ == "__main__":
     # test_npc()
-    anaylze_p_e_d()
+    test_plot()
     pass

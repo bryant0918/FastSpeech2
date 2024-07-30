@@ -885,8 +885,93 @@ def test_plot():
 
     fig.savefig(f'output/result/LJSpeech/{basename}.png')
 
+def test_dataloader():
+    import time
+    import yaml
+    import numpy as np
+    from torch.utils.data import DataLoader
+    from dataset import PreTrainDataset, TrainDataset
+
+    preprocess_config = "config/LJSpeech/preprocess.yaml"
+    preprocess_config2 = "config/LJSpeech/preprocess_es.yaml"
+    model_config = "config/LJSpeech/model.yaml"
+    train_config = "config/LJSpeech/train.yaml"
+    num_workers = 16
+
+    preprocess_config = yaml.load(open(preprocess_config, "r"), Loader=yaml.FullLoader)
+    preprocess_config2 = yaml.load(open(preprocess_config2, "r"), Loader=yaml.FullLoader)
+    model_config = yaml.load(open(model_config, "r"), Loader=yaml.FullLoader)
+    train_config = yaml.load(open(train_config, "r"), Loader=yaml.FullLoader)
+
+
+    # dataset = PreTrainDataset("train.txt", preprocess_config, preprocess_config2, train_config, sort=True, drop_last=True)
+    dataset = TrainDataset("train.txt", preprocess_config, preprocess_config2, train_config, sort=True, drop_last=True)
+
+    batch_size = train_config["optimizer"]["batch_size"]
+    group_size = 1  # Set this larger than 1 (4) to enable sorting in Dataset
+
+    loader = DataLoader(
+        dataset,
+        batch_size=batch_size * group_size,
+        shuffle=True,
+        collate_fn=dataset.collate_fn,
+        num_workers=num_workers,
+        # sampler=sampler,
+    )
+
+    print(len(loader))
+    times = []
+    start = time.time()
+    for i, batches in enumerate(loader):
+        times.append(time.time() - start)
+        start = time.time()
+        
+        if i == 100:
+            break
+
+    # len_batches = [len(batches) for batches in loader]
+    print(np.mean(times), np.std(times))                #  0.0022732298650001005 0.007514691563871479
+    # Training with reverse_alignments and num_workers=0 : 0.14733001973369333 0.1094607383560366
+                                                        #  0.01245397388344944 0.04326651956277088
+
+
+    return
+
+def test_DPP():
+    from pretrain_ddp import main
+
+    import yaml
+    import argparse
+    import torch.multiprocessing as mp
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--restore_step", type=int, default=0)
+    parser.add_argument("-p", "--preprocess_config", type=str,required=False, 
+                        help="path to preprocess.yaml")
+    parser.add_argument("-p2", "--preprocess_config2", type=str,required=False, 
+                        help="path to second preprocess.yaml for other language")
+    parser.add_argument("-m", "--model_config", type=str, required=False, help="path to model.yaml")
+    parser.add_argument("-t", "--train_config", type=str, required=False, help="path to train.yaml")
+    parser.add_argument("-w", "--num_workers", type=int, default=4, help="number of cpu workers for dataloader")
+    args = parser.parse_args()
+
+    preprocess_config = "config/LJSpeech/preprocess.yaml"
+    preprocess_config2 = "config/LJSpeech/preprocess_es.yaml"
+    model_config = "config/LJSpeech/model.yaml"
+    train_config = "config/LJSpeech/pretrain.yaml"
+
+    preprocess_config = yaml.load(open(preprocess_config, "r"), Loader=yaml.FullLoader)
+    preprocess2_config = yaml.load(open(preprocess_config2, "r"), Loader=yaml.FullLoader)
+    model_config = yaml.load(open(model_config, "r"), Loader=yaml.FullLoader)
+    train_config = yaml.load(open(train_config, "r"), Loader=yaml.FullLoader)
+
+    configs = (preprocess_config, preprocess2_config, model_config, train_config)
+
+    world_size = torch.cuda.device_count()
+    mp.spawn(main, args=(args, configs, world_size,), nprocs=world_size, join=True)
+
 
 if __name__ == "__main__":
     # test_npc()
-    test_plot()
+    test_DPP()
     pass

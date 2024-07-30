@@ -6,6 +6,7 @@ import torchaudio
 import hydra
 import os
 from tqdm import tqdm
+from concurrent.futures import ThreadPoolExecutor
 
 from text.tools import split_with_tie_bar
 from itertools import chain
@@ -58,12 +59,17 @@ class MiipherInference:
             if isinstance(batch[key], torch.Tensor): 
                 batch[key] = batch[key].to('cpu')
 
-        (
-            phone_feature,
-            speaker_feature,
-            degraded_ssl_feature,
-            _,
-        ) = self.miipher.feature_extractor(batch)
+        try:
+            (
+                phone_feature,
+                speaker_feature,
+                degraded_ssl_feature,
+                _,
+            ) = self.miipher.feature_extractor(batch)
+        except RuntimeError as e:
+            print(f"Error: {e}")
+            print("Skipping", wav_path)
+            return
 
         phone_feature = phone_feature.to(self.device)
         speaker_feature = speaker_feature.to(self.device)
@@ -77,11 +83,17 @@ class MiipherInference:
 
         torchaudio.save(wav_path, cleaned_wav.view(1,-1).cpu(), sample_rate=self.sr, format='wav')
 
+
     # TODO: Change so that we process through miipher before prepare_align.py
     def process_directory(self, speakers):
+
         for i, speaker in enumerate(tqdm(os.listdir(self.input_dir))):
             if speakers is not None and speaker not in speakers:
                 continue
+
+            if i < 10844:
+                continue
+
             for file_name in os.listdir(os.path.join(self.input_dir, speaker)):
                 if file_name.endswith('.wav'):
                     input_path = os.path.join(self.input_dir, speaker, file_name)
@@ -108,7 +120,7 @@ class MiipherInference:
                             except TypeError:
                                 print("Word", word, self.cmu.lookup(word), base_name)
                                 continue
-
+                    
                     self.process_audio(input_path, phones=' '.join(flat_phones))
 
 

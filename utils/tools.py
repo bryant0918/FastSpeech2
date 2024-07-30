@@ -150,7 +150,7 @@ def get_mask_from_lengths(lengths, max_len=None):
 def expand(values, durations):
     out = list()
     for value, d in zip(values, durations):
-        out += [value] * max(0, int(d))
+        out = out + [value] * max(0, int(d))
     return np.array(out)
 
 

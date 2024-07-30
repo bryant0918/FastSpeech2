@@ -178,10 +178,10 @@ class TrainDataset(Dataset):
         alignments = pad_inhomogeneous_2D(alignments)
 
         # Debugging but maybe add reverse_alignments to dataset
-        reverse_alignments = flip_mapping(torch.from_numpy(alignments).int(), np.shape(texts)[1])
-        if np.shape(alignments)[1] + 1 != np.shape(translations)[1] or reverse_alignments.shape[1] + 1 != np.shape(texts)[1]:
-            print(np.shape(alignments), np.shape(translations), reverse_alignments.shape, np.shape(texts))
-            raise ValueError("Alignments and Texts must have the same length")
+        # reverse_alignments = flip_mapping(torch.from_numpy(alignments).int(), np.shape(texts)[1])
+        # if np.shape(alignments)[1] + 1 != np.shape(translations)[1] or reverse_alignments.shape[1] + 1 != np.shape(texts)[1]:
+        #     print(np.shape(alignments), np.shape(translations), reverse_alignments.shape, np.shape(texts))
+        #     raise ValueError("Alignments and Texts must have the same length")
         
         alignments = torch.from_numpy(alignments).int()
         pitches = torch.from_numpy(pitches).float()
@@ -337,7 +337,6 @@ class PreTrainDataset(Dataset):
                 raw_translation.append(rtr)
 
         return src_lang, tgt_lang, name, speaker, text, raw_text, translation, raw_translation
-
 
     def reprocess(self, data, idxs):
         ids = [data[idx]["id"] for idx in idxs]

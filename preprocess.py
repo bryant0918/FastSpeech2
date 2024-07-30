@@ -10,8 +10,9 @@ if __name__ == "__main__":
     parser.add_argument("config", type=str, help="path to preprocess.yaml")
 
     # Don't use this unless you plan on ONLY using those speakers during training.
-    # parser.add_argument("--speakers", type=str, 
-    #                     help="comma separated speakers to preprocess, e.g. 'Augmented,Bryant' if none given will preprocess all speakers.")
+    parser.add_argument("--speakers", type=str, 
+                        help="comma separated speakers to preprocess, e.g. 'Augmented,Bryant' if none given will preprocess all speakers.")
+    # Otherwise it would put the speakers in a different log space and confuse the model.
     
     args = parser.parse_args()
     

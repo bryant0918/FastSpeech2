@@ -7,7 +7,7 @@ import torch.nn.functional as F
 from simalign import SentenceAligner
 
 from transformer import Encoder, Decoder, PostNet, ProsodyExtractor, ProsodyPredictor
-from .modules import VarianceAdaptor, NPCModule
+from .modules import VarianceAdaptor, NPC
 from utils.tools import get_mask_from_lengths
 
 if torch.cuda.is_available():
@@ -34,7 +34,7 @@ class FastSpeech2Pros(nn.Module):
         self.h_sd_downsize2 = nn.Linear(model_config["prosody_predictor"]["sd_dim_in"],
                                         model_config["prosody_extractor"]["dim_out"])
         self.variance_adaptor = VarianceAdaptor(preprocess_config, model_config)
-        # self.npc = NPCModule(model_config)
+        # self.npc = NPC(model_config)
         self.decoder = Decoder(model_config)
         self.mel_linear = nn.Linear(
             model_config["transformer"]["decoder_hidden"],
@@ -147,7 +147,7 @@ class FastSpeech2Pros(nn.Module):
         return (output, postnet_output, p_predictions, e_predictions, log_d_predictions, d_rounded, tgt_masks,
                 mel_masks, text_lens, mel_lens, agg_extracted_prosody, e_tgt, prosody_reg_term)
 
-
+from model.modules import BatchNorm
 class Discriminator(nn.Module):
     def __init__(self, preprocess_config):
         super(Discriminator, self).__init__()
@@ -157,16 +157,16 @@ class Discriminator(nn.Module):
             nn.Conv2d(in_channels=1, out_channels=32, kernel_size=3, stride=2, padding=1),
             nn.LeakyReLU(0.2, inplace=True),
             nn.Conv2d(32, 64, 3, 2, 1),
-            nn.BatchNorm2d(64),
+            BatchNorm(64, 4),
             nn.LeakyReLU(0.2, inplace=True),
             nn.Conv2d(64, 128, 3, 2, 1),
-            nn.BatchNorm2d(128),
+            BatchNorm(128, 4),
             nn.LeakyReLU(0.2, inplace=True),
             nn.Conv2d(128, 256, 3, 2, 1),
-            nn.BatchNorm2d(256),
+            BatchNorm(256, 4),
             nn.LeakyReLU(0.2, inplace=True),
             nn.Conv2d(256, 512, 3, 1, 1),
-            nn.BatchNorm2d(512),
+            BatchNorm(512, 4),
             nn.LeakyReLU(0.2, inplace=True),
         )
 

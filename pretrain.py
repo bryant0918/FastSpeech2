@@ -215,28 +215,29 @@ def main(args, configs):
                     step += 1
                     outer_bar.update(1)
             except KeyboardInterrupt:
-                print("Training interrupted -- Saving checkpoints")
-                torch.save(
-                    {
-                        "model": model.module.state_dict(),
-                        "optimizer": optimizer._optimizer.state_dict(),
-                    },
-                    os.path.join(
-                        train_config["path"]["ckpt_path"],
-                        "{}.pth.tar".format(step),
-                    ),
-                )
+                if step > 20:
+                    print("Training interrupted -- Saving checkpoints")
+                    torch.save(
+                        {
+                            "model": model.module.state_dict(),
+                            "optimizer": optimizer._optimizer.state_dict(),
+                        },
+                        os.path.join(
+                            train_config["path"]["ckpt_path"],
+                            "{}.pth.tar".format(step),
+                        ),
+                    )
 
-                torch.save(
-                    {
-                        "discriminator": discriminator.state_dict(),
-                        "optimizer": d_optimizer.state_dict(),
-                    },
-                    os.path.join(
-                        train_config["path"]["ckpt_path"],
-                        "disc_{}.pth.tar".format(step),
-                    ),
-                )
+                    torch.save(
+                        {
+                            "discriminator": discriminator.state_dict(),
+                            "optimizer": d_optimizer.state_dict(),
+                        },
+                        os.path.join(
+                            train_config["path"]["ckpt_path"],
+                            "disc_{}.pth.tar".format(step),
+                        ),
+                    )
                 raise
             except Exception as e:
                 print("Training interrupted by other exception.")

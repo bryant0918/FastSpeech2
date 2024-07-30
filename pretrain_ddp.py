@@ -227,28 +227,29 @@ def main(rank, args, configs, world_size):
                     step += 1
                     outer_bar.update(1)
             except KeyboardInterrupt:
-                print("Training interrupted -- Saving checkpoints")
-                torch.save(
-                    {
-                        "model": model.module.state_dict(),
-                        "optimizer": optimizer._optimizer.state_dict(),
-                    },
-                    os.path.join(
-                        train_config["path"]["ckpt_path"],
-                        "{}.pth.tar".format(step),
-                    ),
-                )
+                if step > 20:
+                    print("Training interrupted -- Saving checkpoints")
+                    torch.save(
+                        {
+                            "model": model.module.state_dict(),
+                            "optimizer": optimizer._optimizer.state_dict(),
+                        },
+                        os.path.join(
+                            train_config["path"]["ckpt_path"],
+                            "{}.pth.tar".format(step),
+                        ),
+                    )
 
-                torch.save(
-                    {
-                        "discriminator": discriminator.state_dict(),
-                        "optimizer": d_optimizer.state_dict(),
-                    },
-                    os.path.join(
-                        train_config["path"]["ckpt_path"],
-                        "disc_{}.pth.tar".format(step),
-                    ),
-                )
+                    torch.save(
+                        {
+                            "discriminator": discriminator.state_dict(),
+                            "optimizer": d_optimizer.state_dict(),
+                        },
+                        os.path.join(
+                            train_config["path"]["ckpt_path"],
+                            "disc_{}.pth.tar".format(step),
+                        ),
+                    )
                 raise
             except Exception as e:
                 print("Training interrupted by other exception.")
@@ -282,5 +283,3 @@ if __name__ == "__main__":
 
     world_size = torch.cuda.device_count()
     mp.spawn(main, args=(args, configs, world_size,), nprocs=world_size, join=True)
-
-    # main(args, configs)

@@ -954,7 +954,7 @@ def test_DPP():
                         help="path to second preprocess.yaml for other language")
     parser.add_argument("-m", "--model_config", type=str, required=False, help="path to model.yaml")
     parser.add_argument("-t", "--train_config", type=str, required=False, help="path to train.yaml")
-    parser.add_argument("-w", "--num_workers", type=int, default=4, help="number of cpu workers for dataloader")
+    parser.add_argument("-w", "--num_workers", type=int, default=12, help="number of cpu workers for dataloader")
     args = parser.parse_args()
 
     args.restore_step = 0 if args.restore_step is None else args.restore_step
@@ -973,6 +973,8 @@ def test_DPP():
     configs = (preprocess_config, preprocess2_config, model_config, train_config)
 
     world_size = torch.cuda.device_count()
+    print("World size: ", world_size)
+    print("num workers: ", args.num_workers)
     mp.spawn(main, args=(args, configs, world_size,), nprocs=world_size, join=True)
 
 

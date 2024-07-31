@@ -112,17 +112,21 @@ Once it is booted up and running you can copy your preprocessed data to the file
 ```
 tar -czvf tiny.tar.gz preprocessed_data/tiny
 
-scp -i ~/.ssh/lambda-labs.pem tiny.tar.gz ubuntu@104.171.203.36:/home/ubuntu/emotiv-data-NTX
+scp -i ~/.ssh/lambda-labs.pem tiny.tar.gz ubuntu@192.222.52.43:/home/ubuntu/emotiv-data-NTX
 
+tar -xzvf tiny.tar.gz
+```
+
+```
 scp -i path/to/key.pem -r path/to/local/folder ubuntu@hostIP:path/to/remote/folder
 
-rsync -az -e "ssh -i ~/.ssh/lambda-labs.pem" --ignore-existing preprocessed_data/ ubuntu@192.222.52.239:/home/ubuntu/emotiv-data-NTX/preprocessed_data
+rsync -az -e "ssh -i ~/.ssh/lambda-labs.pem" --ignore-existing preprocessed_data/ ubuntu@192.222.52.43:/home/ubuntu/emotiv-data-NTX/preprocessed_data
 ```
 
 also transfer the pull_docker.sh file.
 
 ```
-scp -i ~/.ssh/lambda-labs.pem pull_docker.sh ubuntu@192.222.52.239:/home/ubuntu/emotiv-data-NTX/pull_docker.sh
+scp -i ~/.ssh/lambda-labs.pem pull_docker.sh ubuntu@192.222.52.43:/home/ubuntu/emotiv-data-NTX/pull_docker.sh
 ```
 
 Next ssh into the server `ssh -i ~/.ssh/lambda-labs.pem ubuntu@IPaddress`
@@ -154,8 +158,11 @@ ssh into the server: `ssh -i ~/.ssh/lambda-labs.pem ubuntu@IPaddress`
 
 If you need to pull down a more recent docker version:
 
+Have access key and secret key ready.
 ```
 cd emotiv-data-NTX
+sudo aws configure
+sudo apt-get install jq
 sudo bash pull_docker.sh
 ```
 
@@ -366,7 +373,7 @@ nohup python3 pretrain.py --restore_step 281751 -p config/LJSpeech/preprocess.ya
 ```
 python3 pretrain.py -p config/Tiny/preprocess.yaml -p2 config/Tiny/preprocess_es.yaml -m config/Tiny/model.yaml -t config/Tiny/pretrain.yaml -w 16
 
-python3 pretrain_ddp.py -p config/Tiny/LL_preprocess.yaml -p2 config/Tiny/LL_preprocess_es.yaml -m config/Tiny/LL_model.yaml -t config/Tiny/LL_pretrain.yaml -w 16
+python3 pretrain_ddp.py -p config/Tiny/LL_preprocess.yaml -p2 config/Tiny/LL_preprocess_es.yaml -m config/Tiny/LL_model.yaml -t config/Tiny/LL_pretrain.yaml -w 128
 ```
 
 ### On GPU

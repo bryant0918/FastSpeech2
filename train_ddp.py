@@ -20,14 +20,6 @@ from dataset import TrainDataset
 
 from evaluate import evaluate
 
-if torch.cuda.is_available():
-    device = torch.device("cuda")
-elif torch.backends.mps.is_available():
-    device = torch.device("mps")
-else:
-    device = torch.device("cpu")
-
-print("Device", device)
 
 def setup(rank, world_size):
     os.environ['MASTER_ADDR'] = 'localhost'  # Multi-Node (Cluster): Use the IP address of the master node when GPUs are distributed across multiple machines.

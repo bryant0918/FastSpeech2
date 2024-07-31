@@ -11,13 +11,6 @@ from matplotlib import pyplot as plt
 
 matplotlib.use("Agg")
 
-if torch.cuda.is_available():
-    device = torch.device("cuda")
-elif torch.backends.mps.is_available():
-    device = torch.device("mps")
-else:
-    device = torch.device("cpu")
-
 
 def to_device(data, device):
     # For Pros Full training
@@ -137,6 +130,7 @@ def log(
 
 def get_mask_from_lengths(lengths, max_len=None):
     batch_size = lengths.shape[0]
+    device = lengths.device
     if max_len is None:
         max_len = torch.max(lengths).item()
 
@@ -519,6 +513,7 @@ def pad(input_ele, mel_max_length=None):
 
 
 def flip_mapping(tgt_to_src_mappings, src_seq_len):
+        device = tgt_to_src_mappings.device
 
         batch = []
         for tgt_to_src_mapping in tgt_to_src_mappings:
@@ -538,13 +533,6 @@ def flip_mapping(tgt_to_src_mappings, src_seq_len):
                 
         return src_to_tgt_mappings_padded
 
-
-# def realign_p_e_d(alignments, p_e_d):
-#         new_ped = torch.zeros(p_e_d.size(0), len(alignments[0])+1, device=p_e_d.device)
-#         for b, alignment in enumerate(alignments):
-#             for j, src_indices in enumerate(alignment):
-#                 new_ped[b][j+1] = torch.mean(torch.tensor([p_e_d[b][i] for i in src_indices], dtype=torch.float32))
-#         return new_ped
 
 def realign_p_e_d(alignments, p_e_d):
     new_ped = torch.zeros(p_e_d.size(0), len(alignments[0])+1, device=p_e_d.device)

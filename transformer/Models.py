@@ -7,13 +7,6 @@ import transformer.Constants as Constants
 from .Layers import FFTBlock
 from text.symbols import symbols, _langs
 
-if torch.cuda.is_available():
-    device = torch.device("cuda")
-elif torch.backends.mps.is_available():
-    device = torch.device("mps")
-else:
-    device = torch.device("cpu")
-
 
 def get_sinusoid_encoding_table(n_position, d_hid, padding_idx=None):
     """ Sinusoid position encoding table """
@@ -79,6 +72,7 @@ class Encoder(nn.Module):
         )
 
     def forward(self, src_seq, mask, return_attns=False):
+        device = src_seq.device
         enc_slf_attn_list = []
         batch_size, max_len = src_seq.shape[0], src_seq.shape[1]
         # -- Prepare masks
@@ -446,6 +440,7 @@ class ProsodyPredictor(nn.Module):
             phone_alignments: Maps tgt (text) to src (audio)
         """
         beta = torch.sigmoid(beta)
+        device = tgt_samp.device
         # print("phone_alignments", phone_alignments.shape)
         batch_size = len(phone_alignments)
         seq_length = tgt_samp.shape[1]

@@ -13,15 +13,6 @@ from model import FastSpeech2Loss
 from dataset import PreTrainDataset, TrainDataset
 
 
-
-if torch.cuda.is_available():
-    device = torch.device("cuda")
-elif torch.backends.mps.is_available():
-    device = torch.device("mps")
-else:
-    device = torch.device("cpu")
-
-
 def evaluate(model, discriminator, step, configs, logger=None, vocoder=None):
     preprocess_config, preprocess2_config, model_config, train_config = configs
     train_step = step
@@ -36,6 +27,8 @@ def evaluate(model, discriminator, step, configs, logger=None, vocoder=None):
         shuffle=False,
         collate_fn=dataset.collate_fn,
     )
+
+    device = model.device
 
     # Get loss function
     Loss = FastSpeech2Loss(preprocess_config, model_config, train_config).to(device)
@@ -141,6 +134,7 @@ def evaluate_pretrain(model, discriminator, step, configs, logger=None, vocoder=
         collate_fn=dataset.collate_fn,
     )
 
+    device = model.device
     # Get loss function
     Loss = FastSpeech2Loss(preprocess_config, model_config, train_config).to(device)
     criterion_d = nn.BCELoss()

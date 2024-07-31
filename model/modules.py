@@ -11,12 +11,6 @@ import torch.nn.functional as F
 
 from utils.tools import get_mask_from_lengths, pad
 
-if torch.cuda.is_available():
-    device = torch.device("cuda")
-elif torch.backends.mps.is_available():
-    device = torch.device("mps")
-else:
-    device = torch.device("cpu")
 
 class VarianceAdaptor(nn.Module):
     """Variance Adaptor"""
@@ -173,6 +167,7 @@ class LengthRegulator(nn.Module):
         super(LengthRegulator, self).__init__()
 
     def LR(self, x, duration, max_len):
+        device = x.device
         output = list()
         mel_len = list()
         for batch, expand_target in zip(x, duration):

@@ -4,18 +4,10 @@ import json
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from simalign import SentenceAligner
 
 from transformer import Encoder, Decoder, PostNet, ProsodyExtractor, ProsodyPredictor
 from .modules import VarianceAdaptor, NPC
 from utils.tools import get_mask_from_lengths
-
-if torch.cuda.is_available():
-    device = torch.device("cuda")
-elif torch.backends.mps.is_available():
-    device = torch.device("mps")
-else:
-    device = torch.device("cpu")
 
 
 class FastSpeech2Pros(nn.Module):
@@ -68,6 +60,9 @@ class FastSpeech2Pros(nn.Module):
             d_src = d_targets
             pretraining = True
         batch_size, src_seq_length = d_src.size(0), d_src.size(1)
+        device = langs.device
+
+
         tgt_masks = get_mask_from_lengths(text_lens, max_text_len)
         # print("Tgt masks shape: ", tgt_masks.shape)
         

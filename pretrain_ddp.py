@@ -1,7 +1,6 @@
 import argparse
 import os
 
-import numpy as np
 import torch
 import yaml
 import torch.nn as nn
@@ -12,22 +11,13 @@ import torch.distributed as dist
 import torch.multiprocessing as mp
 from torch.nn.parallel import DistributedDataParallel as DDP
 
-from utils.model import get_model, get_vocoder, get_param_num, vocoder_infer, get_discriminator
+from utils.model import get_model, get_vocoder, get_param_num, get_discriminator
 from utils.tools import to_device, log, synth_one_sample_pretrain
 from utils.training import pretrain_loop
-from model import FastSpeech2Loss, Discriminator
+from model import FastSpeech2Loss
 from dataset import PreTrainDataset
 
 from evaluate import evaluate_pretrain
-
-if torch.cuda.is_available():
-    device = torch.device("cuda")
-elif torch.backends.mps.is_available():
-    device = torch.device("mps")
-else:
-    device = torch.device("cpu")
-
-print("Device", device)
 
 def setup(rank, world_size):
     os.environ['MASTER_ADDR'] = 'localhost'  # Multi-Node (Cluster): Use the IP address of the master node when GPUs are distributed across multiple machines.
@@ -65,11 +55,11 @@ def main(rank, args, configs, world_size):
     Loss = FastSpeech2Loss(preprocess_config, model_config, train_config).to(rank)
     print("Number of FastSpeech2 Parameters:", num_param)
 
-    indices_to_print = [0, 92, 93, 94, 95, 96, 97, 98, 99, 100, 101, 102, 103, 104, 105, 106, 107, 108]
-    indices_to_print = [90, 91, 92, 93, 94, 95, 96, 97, 98, 99, 100, 101, 102, 103, 104, 105, 106]
-    named_parameters = list(model.named_parameters())
-    for idx in indices_to_print:
-        print(f"Name: {named_parameters[idx][0]}, Shape: {named_parameters[idx][1].shape}")
+    # indices_to_print = [0, 92, 93, 94, 95, 96, 97, 98, 99, 100, 101, 102, 103, 104, 105, 106, 107, 108]
+    # indices_to_print = [90, 91, 92, 93, 94, 95, 96, 97, 98, 99, 100, 101, 102, 103, 104, 105, 106]
+    # named_parameters = list(model.named_parameters())
+    # for idx in indices_to_print:
+    #     print(f"Name: {named_parameters[idx][0]}, Shape: {named_parameters[idx][1].shape}")
 
     # Prepare discriminator
     discriminator, d_optimizer, d_scheduler = get_discriminator(args, configs[1:], rank, train=True)

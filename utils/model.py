@@ -5,7 +5,7 @@ import torch
 import numpy as np
 
 import hifigan
-import bigvgan
+# import bigvgan
 from model import ScheduledOptim, FastSpeech2Pros, ProsLearner, Discriminator
 
 
@@ -161,17 +161,17 @@ def get_vocoder(config, device):
         vocoder.remove_weight_norm()
         vocoder.to(device)
 
-    elif name == "BigVGAN":
-        with open("bigvgan/config.json", "r") as f:
-            config = json.load(f)
-        config = bigvgan.AttrDict(config)
-        vocoder = bigvgan.Generator(config)
-        ckpt = torch.load("bigvgan/g_05000000", map_location=device)
+    # elif name == "BigVGAN":
+    #     with open("bigvgan/config.json", "r") as f:
+    #         config = json.load(f)
+    #     config = bigvgan.AttrDict(config)
+    #     vocoder = bigvgan.Generator(config)
+    #     ckpt = torch.load("bigvgan/g_05000000", map_location=device)
 
-        vocoder.load_state_dict(ckpt['generator'])
-        vocoder.eval()
-        vocoder.remove_weight_norm()
-        vocoder.to(device)
+    #     vocoder.load_state_dict(ckpt['generator'])
+    #     vocoder.eval()
+    #     vocoder.remove_weight_norm()
+    #     vocoder.to(device)
 
     return vocoder
 

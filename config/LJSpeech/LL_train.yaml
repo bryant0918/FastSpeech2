@@ -8,15 +8,25 @@ optimizer:
   eps: 0.000000001
   weight_decay: 0.0
   grad_clip_thresh: 1.0
-  grad_acc_step: 1
+  grad_acc_step: 2
   warm_up_step: 4000
   anneal_steps: [300000, 400000, 500000]
   anneal_rate: 0.3
+d_optimizer:
+  d_initial_lr: 0.000001
+  d_max_lr: 0.001
+  betas: [0.6, 0.998]
 step:
   total_step: 900000
-  log_step: 2     # 100
-  synth_step: 3  # 1000
-  val_step: 4    # 1000
-  save_step: 3  # 100000
-  word_step: 4  # 10
+  log_step: 100     # 100
+  synth_step: 1500  # 1000
+  val_step: 1500    # 1000
+  save_step: 3000  # 100000
+  word_step: 10  # 10
+  discriminator_step: 5
 pretrain: False
+loss:
+  pros_weight: 0.3
+  pitch_energy_weight: 0.5
+  full_duration_weight: 0.01
+  label_smoothing: 0.95

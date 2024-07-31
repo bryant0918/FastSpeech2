@@ -107,12 +107,14 @@ python3 synthesize.py --text "Hi my name is Ditto and this is my voice" --restor
 
 You must first create a filesystem in the region that contains the GPU instances you will use. Create the filesystem and then launch in instance.
 
-Once it is booted up and running you can copy your preprocessed data to the filesystem using scp:
+Once it is booted up and running you can copy your preprocessed data to the filesystem using tar and scp:
 
 ```
-scp -i path/to/key.pem -r path/to/local/folder ubuntu@hostIP:path/to/remote/folder
+tar -czvf tiny.tar.gz preprocessed_data/tiny
 
-scp -i ~/.ssh/lambda-labs.pem -r preprocessed_data ubuntu@104.171.203.36:/home/ubuntu/emotiv-data-NTX
+scp -i ~/.ssh/lambda-labs.pem tiny.tar.gz ubuntu@104.171.203.36:/home/ubuntu/emotiv-data-NTX
+
+scp -i path/to/key.pem -r path/to/local/folder ubuntu@hostIP:path/to/remote/folder
 
 rsync -az -e "ssh -i ~/.ssh/lambda-labs.pem" --ignore-existing preprocessed_data/ ubuntu@192.222.52.239:/home/ubuntu/emotiv-data-NTX/preprocessed_data
 ```

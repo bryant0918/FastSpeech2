@@ -5,6 +5,11 @@ output/
 # Random stuff in here
 LJSpeech-1.1.tar.bz2
 nohup.out
+*.log
+img/
+api_keys.py
+demo/
+bigvgan/
 
 # Previously Built docker image
 *_1-0-0.tar
@@ -12,3 +17,5 @@ nohup.out
 # Unneeded Models
 *.tar.zip
 miipher/
+pretrained_models/
+

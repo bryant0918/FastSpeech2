@@ -23,7 +23,7 @@ step:
   val_step: 1500    # 1000
   save_step: 3000  # 100000
   word_step: 10  # 10
-  discriminator_step: 10
+  discriminator_step: 5
 pretrain: False
 loss:
   pros_weight: 0.3

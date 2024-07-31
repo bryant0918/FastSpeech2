@@ -972,6 +972,6 @@ def test_DPP():
 
 
 if __name__ == "__main__":
-    # test_npc()
-    test_DPP()
+    test_npc()
+    # test_DPP()
     pass

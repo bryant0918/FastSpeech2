@@ -1,9 +1,9 @@
 dataset: "Spanish_TedX"
 
 path:
-  corpus_path: "/home/ditto/Datasets/Speech/es"
+  corpus_path: "/home/ditto/Datasets/Speech/esbase/tedx_spanish_corpus"
   lexicon_path: ""  # Only used in synthesize.py
-  raw_path: "raw_data/Spanish"
+  raw_path: "raw_data/Spanish_TedX"
   preprocessed_path: "/emotiv-data-NTX/preprocessed_data/Spanish_TedX"
 
 preprocessing:
@@ -29,3 +29,6 @@ preprocessing:
   energy:
     feature: "phoneme_level" # support 'phoneme_level' or 'frame_level'
     normalization: True
+  miipher:
+    miipher_path: "miipher/miipher_v2.ckpt"
+    vocoder_path: "miipher/vocoder_finetuned_v2.ckpt"

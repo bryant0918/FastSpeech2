@@ -363,6 +363,12 @@ nohup python3 pretrain.py --restore_step 281751 -p config/LJSpeech/preprocess.ya
 861748
 ```
 
+```
+python3 pretrain.py -p config/Tiny/preprocess.yaml -p2 config/Tiny/preprocess_es.yaml -m config/Tiny/model.yaml -t config/Tiny/pretrain.yaml -w 16
+
+python3 pretrain_copy.py -p config/Tiny/LL_preprocess.yaml -p2 config/Tiny/LL_preprocess_es.yaml -m config/Tiny/LL_model.yaml -t config/Tiny/LL_pretrain.yaml -w 16
+```
+
 ### On GPU
 
 ```
@@ -385,6 +391,12 @@ nohup python3 train.py --restore_step 30000 -p config/LJSpeech/preprocess.yaml -
 
 ```
 python3 train.py --from_pretrained_ckpt 175000 -p config/LJSpeech/preprocess.yaml -p2 config/LJSpeech/preprocess_es.yaml -m config/LJSpeech/model.yaml -t config/LJSpeech/train.yaml
+```
+
+```
+python3 train.py -p config/Tiny/preprocess.yaml -p2 config/Tiny/preprocess_es.yaml -m config/Tiny/model.yaml -t config/Tiny/train.yaml -w 16
+
+python3 train_copy.py -p config/Tiny/LL_preprocess.yaml -p2 config/Tiny/LL_preprocess_es.yaml -m config/Tiny/LL_model.yaml -t config/Tiny/LL_train.yaml -w 16
 ```
 
 The model takes less than 10k steps (less than 1 hour on my GTX1080Ti GPU) of training to generate audio samples with acceptable quality, which is much more efficient than the autoregressive models such as Tacotron2.

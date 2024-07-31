@@ -76,15 +76,15 @@ def loop(preprocess_config, model_config, batch, model, Loss, discriminator, cri
     re_realigned_p = realign_p_e_d(alignments, batch[-3])
     re_realigned_e = realign_p_e_d(alignments, batch[-2])
 
-    print("source duration", len(batch[-4][0]), batch[-4][0][:15], sum(batch[-4][0]).item())
+    # print("source duration", len(batch[-4][0]), batch[-4][0][:15], sum(batch[-4][0]).item())
     # print("source log_duration", len(torch.log(batch[-4].float() + 1)[0]), torch.log(batch[-4].float() + 1)[0][:20])
     # print("source realigned_log_d", len(realigned_log_d[0]), realigned_log_d[0][:20])
-    print("source re_realigned_d: ", len(re_realigned_d[0]), re_realigned_d[0][:15], sum(re_realigned_d[0]).item())
+    # print("source re_realigned_d: ", len(re_realigned_d[0]), re_realigned_d[0][:15], sum(re_realigned_d[0]).item())
     # realigned_rounded_d = custom_round(realign_p_e_d(alignments, output_tgt[5]))
     # print("source re_realigned_d_rounded: ", len(realigned_rounded_d[0]), realigned_rounded_d[0][:20], sum(realigned_rounded_d[0]).item())
 
-    re_realigned_d_no_round = realign_p_e_d(alignments, realign_p_e_d(batch[16], batch[19]))
-    print("source re_realigned_d_no_round: ", len(re_realigned_d_no_round[0]), re_realigned_d_no_round[0][:15], sum(re_realigned_d_no_round[0]).item())
+    # re_realigned_d_no_round = realign_p_e_d(alignments, realign_p_e_d(batch[16], batch[19]))
+    # print("source re_realigned_d_no_round: ", len(re_realigned_d_no_round[0]), re_realigned_d_no_round[0][:15], sum(re_realigned_d_no_round[0]).item())
 
     # Forward pass: Tgt to Src (so tgt is now src and src is now tgt)
     include_mel = torch.bernoulli(torch.tensor(0.5))

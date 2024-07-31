@@ -93,7 +93,9 @@ def main(args, configs):
     outer_bar.n = args.restore_step
     outer_bar.update()
 
-    torch.autograd.set_detect_anomaly(True)
+    # torch.autograd.set_detect_anomaly(True)
+    import time
+    start = time.time()
 
     while True:
         inner_bar = tqdm(total=len(loader), desc="Epoch {}".format(epoch), position=1)
@@ -105,8 +107,9 @@ def main(args, configs):
                     # batch = (ids, raw_texts, speakers, langs, texts, src_lens, max_src_len, mels, mel_lens, max_mel_len, 
                     #           speaker_embeddings, pitches, energies, durations)
                     
-                    # if step == 15010:
-                    #     raise Exception("Stop")
+                    if step == 200:
+                        print("Time taken for 200 steps: ", time.time() - start)
+                        raise Exception("Stop")
 
                     # Forward
                     losses, output, d_loss = pretrain_loop(preprocess_config, model_config, batch, model, Loss, discriminator, criterion_d,

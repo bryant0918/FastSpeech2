@@ -635,12 +635,20 @@ def batch_norm(X, gamma, beta, moving_mean, moving_var, eps, momentum):
         # In prediction mode, use mean and variance obtained by moving average
         X_hat = (X - moving_mean) / torch.sqrt(moving_var + eps)
     else:
-        assert len(X.shape) in (2, 4)
+        assert len(X.shape) in (2, 3, 4)
         if len(X.shape) == 2:
             # When using a fully connected layer, calculate the mean and
             # variance on the feature dimension
             mean = X.mean(dim=0)
             var = ((X - mean) ** 2).mean(dim=0)
+        elif len(X.shape) == 3:
+            # When using a one-dimensional convolutional layer over the (N,L) slice,
+            # it is commonly referred to as Temporal Batch Normalization, 
+            # calculate the mean and variance on the channel dimension (axis=1). 
+            # Here we need to maintain the shape of X, so that the broadcasting
+            # operation can be carried out later.
+            mean = X.mean(dim=(0, 2), keepdim=True)
+            var = ((X - mean) ** 2).mean(dim=(0, 2), keepdim=True)
         else:
             # When using a two-dimensional convolutional layer, calculate the
             # mean and variance on the channel dimension (axis=1). Here we
@@ -665,6 +673,8 @@ class BatchNorm(nn.Module):
         super().__init__()
         if num_dims == 2:
             shape = (1, num_features)
+        elif num_dims == 3:
+            shape = (1, num_features, 1)
         else:
             shape = (1, num_features, 1, 1)
         # The scale parameter and the shift parameter (model parameters) are

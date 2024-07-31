@@ -938,7 +938,8 @@ def test_dataloader():
     return
 
 def test_DPP():
-    from pretrain_ddp import main
+    # from pretrain_ddp import main
+    from train_ddp import main
 
     import yaml
     import argparse
@@ -946,6 +947,7 @@ def test_DPP():
 
     parser = argparse.ArgumentParser()
     parser.add_argument("--restore_step", type=int, default=0)
+    parser.add_argument("--from_pretrained_ckpt", type=int)
     parser.add_argument("-p", "--preprocess_config", type=str,required=False, 
                         help="path to preprocess.yaml")
     parser.add_argument("-p2", "--preprocess_config2", type=str,required=False, 
@@ -955,10 +957,13 @@ def test_DPP():
     parser.add_argument("-w", "--num_workers", type=int, default=4, help="number of cpu workers for dataloader")
     args = parser.parse_args()
 
+    args.restore_step = 0 if args.restore_step is None else args.restore_step
+
     preprocess_config = "config/LJSpeech/preprocess.yaml"
     preprocess_config2 = "config/LJSpeech/preprocess_es.yaml"
     model_config = "config/LJSpeech/model.yaml"
-    train_config = "config/LJSpeech/pretrain.yaml"
+    # train_config = "config/LJSpeech/pretrain.yaml"
+    train_config = "config/LJSpeech/train.yaml"
 
     preprocess_config = yaml.load(open(preprocess_config, "r"), Loader=yaml.FullLoader)
     preprocess2_config = yaml.load(open(preprocess_config2, "r"), Loader=yaml.FullLoader)
@@ -972,6 +977,6 @@ def test_DPP():
 
 
 if __name__ == "__main__":
-    test_npc()
-    # test_DPP()
+    # test_npc()
+    test_DPP()
     pass

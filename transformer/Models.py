@@ -225,19 +225,23 @@ class ProsodyExtractor(nn.Module):
         """
         # Apply language embedding
 
-
         # Apply network
         x = self.cnn(x)
 
         x = x.permute(0, 2, 1)  # Permute to [batch_size, height*width, 8] (N,L,H_in)
 
         # Apply Bi-GRU layer
-        x, _ = self.gru(x)  # [batch_size, melspec H * melspec W, 128]
+        x, h_n = self.gru(x)  # [batch_size, melspec H * melspec W, 256]
+        
+        h_n = h_n.permute(1, 0, 2)  # [batch_size, num_layers * num_directions, hidden_size]
+        h_n = h_n.contiguous().view(h_n.size()[0], -1)  # [batch_size, num_layers * num_directions * hidden_size]
 
+        # Add to output
+        x = x + h_n.unsqueeze(1) * .1  # [batch_size, melspec H * melspec W, 256]
         # x.view(x.size()[0], seq_length, num_directions, hidden_size).
 
         # TODO: Don't hardcode 80 here, use n_mel_channels from preprocess_config
-        return x.view(x.size()[0], 80, -1, x.size()[-1])  # [batch_size, melspec H, melspec W, 128]
+        return x.view(x.size()[0], 80, -1, x.size()[-1])  # [batch_size, melspec H, melspec W, 256]
 
     def split_phones(self, x, durations, device='cuda'):
         """
@@ -282,8 +286,8 @@ class ProsodyExtractor(nn.Module):
         language_embeddings = self.lang_embedding(language_codes)
         language_embeddings = language_embeddings.unsqueeze(1).unsqueeze(2)
         language_embeddings = language_embeddings.repeat(1, 1, melspec.shape[2], 1)
-        
-        return torch.cat([melspec, language_embeddings], dim=1)
+        batch_size = language_embeddings.shape[0]
+        return torch.cat([melspec, language_embeddings[:batch_size//2]], dim=1)
 
 
 class ProsodyPredictor(nn.Module):
@@ -323,6 +327,7 @@ class ProsodyPredictor(nn.Module):
 
         self.linear2 = nn.Linear(dim_out * n_components, dim_out * n_components)
         self.linear3 = nn.Linear(dim_out * n_components, dim_out * n_components)
+        self.linear3.bias.requires_grad = False
 
     def forward(self, h_sd, h_si, eps=1e-8):
         # First predict the Speaker Independent means and log-variances

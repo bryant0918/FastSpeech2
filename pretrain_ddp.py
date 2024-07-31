@@ -60,10 +60,16 @@ def main(rank, args, configs, world_size):
 
     # Prepare model
     model, optimizer = get_model(args, configs[1:], rank, train=True)
-    model = DDP(model, device_ids=[rank])
+    model = DDP(model, device_ids=[rank])  # find_unused_parameters=True
     num_param = get_param_num(model)
     Loss = FastSpeech2Loss(preprocess_config, model_config, train_config).to(rank)
     print("Number of FastSpeech2 Parameters:", num_param)
+
+    indices_to_print = [0, 92, 93, 94, 95, 96, 97, 98, 99, 100, 101, 102, 103, 104, 105, 106, 107, 108]
+    indices_to_print = [90, 91, 92, 93, 94, 95, 96, 97, 98, 99, 100, 101, 102, 103, 104, 105, 106]
+    named_parameters = list(model.named_parameters())
+    for idx in indices_to_print:
+        print(f"Name: {named_parameters[idx][0]}, Shape: {named_parameters[idx][1].shape}")
 
     # Prepare discriminator
     discriminator, d_optimizer, d_scheduler = get_discriminator(args, configs[1:], rank, train=True)
@@ -106,6 +112,8 @@ def main(rank, args, configs, world_size):
 
     # Only use while debugging
     # torch.autograd.set_detect_anomaly(True)
+    import time
+    start = time.time()
 
     while True:
         inner_bar = tqdm(total=len(loader), desc="Epoch {}".format(epoch), position=1)
@@ -117,8 +125,9 @@ def main(rank, args, configs, world_size):
                     # batch = (ids, raw_texts, speakers, langs, texts, src_lens, max_src_len, mels, mel_lens, max_mel_len, 
                     #           speaker_embeddings, pitches, energies, durations)
                     
-                    # if step == 15010:
-                    #     raise Exception("Stop")
+                    if step == 200:
+                        print("Time taken for 200 steps: ", time.time() - start)
+                        raise Exception("Stop")
 
                     # Forward
                     losses, output, d_loss = pretrain_loop(preprocess_config, model_config, batch, model, Loss, discriminator, criterion_d,
@@ -126,7 +135,13 @@ def main(rank, args, configs, world_size):
 
                     # Backward
                     total_loss = losses[0] / grad_acc_step
+
+                    # If mels is None then set requires grad for prosody extractor parameters to False
+                    
                     total_loss.backward()
+
+                    # print("linear3 weight grad", model.module.prosody_predictor.linear3.weight.grad)  # Should not be None
+                    # print("linear3 bias grad", model.module.prosody_predictor.linear3.bias.grad) 
 
                     d_scheduler.step()
 
@@ -223,6 +238,7 @@ def main(rank, args, configs, world_size):
                         )
 
                     if step == total_step:
+                        cleanup()
                         quit()
                     step += 1
                     outer_bar.update(1)
@@ -250,16 +266,16 @@ def main(rank, args, configs, world_size):
                             "disc_{}.pth.tar".format(step),
                         ),
                     )
+                cleanup()
                 raise
             except Exception as e:
                 print("Training interrupted by other exception.")
                 print(e)
+                cleanup()
                 raise e
 
             inner_bar.update(1)
         epoch += 1
-
-    cleanup()
 
 
 if __name__ == "__main__":

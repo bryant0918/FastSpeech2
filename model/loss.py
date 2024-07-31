@@ -27,6 +27,8 @@ class FastSpeech2Loss(nn.Module):
         self.full_duration_weight = train_config['loss']['full_duration_weight']
         self.label_smoothing = train_config['loss']['label_smoothing']
 
+        self.batch_size = train_config['optimizer']['batch_size']
+
     def forward(self, inputs, predictions, direction="to_tgt", word_step=10):
         """
         When going to_tgt everything should be in tgt space.
@@ -111,7 +113,7 @@ class FastSpeech2Loss(nn.Module):
             if extracted_e is not None:
                 extracted_e = extracted_e.detach()
                 # TODO: Figure out best beta value
-                pros_loss = self.pros_loss(predicted_e, extracted_e, src_masks) * self.pros_weight
+                pros_loss = self.pros_loss(predicted_e, extracted_e, src_masks[:self.batch_size//2]) * self.pros_weight
 
         pitch_loss = self.mse_loss(pitch_predictions, pitch_targets)
         energy_loss = self.mse_loss(energy_predictions, energy_targets)

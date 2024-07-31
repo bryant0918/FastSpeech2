@@ -56,7 +56,9 @@ class FastSpeech2Pros(nn.Module):
 
             for param in self.prosody_extractor.parameters():
                 param.requires_grad = False
-
+        else: # If pretraining beta is not used.
+            self.beta.requires_grad = False
+        
     def forward(self, training, langs, texts, text_lens, max_text_len, mels=None, mel_lens=None, max_mel_len=None,
                 speaker_embs=None, alignments=None, p_targets=None, e_targets=None, 
                 d_targets=None, d_src=None, p_control=1.0, e_control=1.0, d_control=1.0,):
@@ -91,45 +93,49 @@ class FastSpeech2Pros(nn.Module):
         # print("e_tgt[1] (mu) shape: ", e_tgt[1].shape)
 
         h_sd = self.h_sd_downsize(h_sd) # 512 to 256
+
+        mels = mels.unsqueeze(1) # mels shape is [batch_size, 1, melspec W, melspec H]
+        enhanced_mels = self.prosody_extractor.add_lang_emb(mels, langs)
+        
+        e_src = self.prosody_extractor(enhanced_mels)   # e is [batch_size, melspec H, melspec W, 128]
+
+        # Normalize prosody embeddings
+        prosody_reg_term = self.lambda_reg * torch.norm(e_src, p=2)
                 
-        if mels is not None:
-            mels = mels.unsqueeze(1) # mels shape is [batch_size, 1, melspec W, melspec H]
-            enhanced_mels = self.prosody_extractor.add_lang_emb(mels, langs)
+        # Split phone pros embeddings by phone duration
+        # [batch_size (list), phoneme_sequence_length (list), melspec H (tensor), melspec W (tensor), 128 (tensor)]        
+        e_k_src = self.prosody_extractor.split_phones(e_src, d_src)  
+        
+        # For calculating Lpp loss:
+        agg_extracted_prosody = torch.zeros(batch_size//2, src_seq_length, 256).to(device)
+        for b in range(batch_size//2):
+            for i in range(len(e_k_src[b])):
+                if e_k_src[b][i].shape[0] == 0 or e_k_src[b][i].shape[1] == 0:
+                    agg_extracted_prosody[b,i,:] = torch.zeros(256)
+                else:
+                    agg_extracted_prosody[b,i,:] = torch.mean(e_k_src[b][i], dim=(0, 1))
+
+        if pretraining:
+            h_sd_with_mels = torch.cat((h_sd[:batch_size//2], F.dropout(agg_extracted_prosody, p=0.2, training=training)), dim=-1) # torch.Size([Batch//2, tgt_seq_len, 512]
             
-            e_src = self.prosody_extractor(enhanced_mels)   # e is [batch_size, melspec H, melspec W, 128]
-
-            # Normalize prosody embeddings
-            prosody_reg_term = self.lambda_reg * torch.norm(e_src, p=2)
-                    
-            # Split phone pros embeddings by phone duration
-            # [batch_size (list), phoneme_sequence_length (list), melspec H (tensor), melspec W (tensor), 128 (tensor)]        
-            e_k_src = self.prosody_extractor.split_phones(e_src, d_src)  
-            
-            # For calculating Lpp loss:
-            agg_extracted_prosody = torch.zeros(batch_size, src_seq_length, 256).to(device)
-            for b in range(batch_size):
-                for i in range(len(e_k_src[b])):
-                    if e_k_src[b][i].shape[0] == 0 or e_k_src[b][i].shape[1] == 0:
-                        agg_extracted_prosody[b,i,:] = torch.zeros(256)
-                    else:
-                        agg_extracted_prosody[b,i,:] = torch.mean(e_k_src[b][i], dim=(0, 1))
-
-            if pretraining:
-                h_sd = torch.cat((h_sd, F.dropout(agg_extracted_prosody, p=0.2, training=training)), dim=-1) # torch.Size([Batch, tgt_seq_len, 512]
-            else: # Full training
-                # TODO: Allow for new predicted_prosodies_tgt shape
-                tgt_samp = self.prosody_predictor.sample2(e_tgt) # torch.Size([2, 88, 256])
-                adjusted_e_tgt = self.prosody_predictor.prosody_realigner(alignments, tgt_samp, e_k_src, self.beta)
-
-                # Concat
-                h_sd = torch.cat((h_sd, adjusted_e_tgt), dim=-1)  # torch.Size([Batch, tgt_seq_len, 512]
-                # h_sd = h_sd + adjusted_e_tgt
-
-        else: # no audio provided (use sample from prosody predictor)
-            agg_extracted_prosody = None
-            prosody_reg_term = torch.tensor(0.0).to(device)
             tgt_samp = self.prosody_predictor.sample2(e_tgt)
-            h_sd = torch.cat((h_sd, tgt_samp), dim=-1)
+            h_sd_without_mels = torch.cat((h_sd[batch_size//2:], tgt_samp[batch_size//2:]), dim=-1)
+            
+            h_sd = torch.cat((h_sd_with_mels, h_sd_without_mels), dim=0)
+
+        else: # Full training
+            # TODO: Allow for new predicted_prosodies_tgt shape
+            tgt_samp = self.prosody_predictor.sample2(e_tgt) # torch.Size([2, 88, 256])
+
+            # With mels
+            adjusted_e_tgt = self.prosody_predictor.prosody_realigner(alignments[:batch_size//2], tgt_samp[:batch_size//2], e_k_src[:batch_size//2], self.beta)
+            h_sd_with_mels = torch.cat((h_sd[:batch_size//2], adjusted_e_tgt), dim=-1)  # torch.Size([Batch, tgt_seq_len, 512]
+
+            # Without mels
+            h_sd_without_mels = torch.cat((h_sd[batch_size//2:], tgt_samp[batch_size//2:]), dim=-1)
+            
+            h_sd = torch.cat((h_sd_with_mels, h_sd_without_mels), dim=0)
+
 
         h_sd = self.h_sd_downsize2(h_sd) # 512 to 256
 
@@ -144,6 +150,7 @@ class FastSpeech2Pros(nn.Module):
         output = self.mel_linear(output)
         postnet_output = self.postnet(output) + output
 
+        e_tgt = (e_tgt[0][:batch_size//2], e_tgt[1][:batch_size//2], e_tgt[2][:batch_size//2])
         return (output, postnet_output, p_predictions, e_predictions, log_d_predictions, d_rounded, tgt_masks,
                 mel_masks, text_lens, mel_lens, agg_extracted_prosody, e_tgt, prosody_reg_term)
 

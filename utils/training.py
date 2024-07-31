@@ -8,12 +8,11 @@ from utils.model import vocoder_infer
 def loop(preprocess_config, model_config, batch, model, Loss, discriminator, criterion_d, 
          vocoder, step, word_step, device, training=False, d_optimizer=None, discriminator_step=1, warm_up_step=4000):
     batch_size = len(batch[0])
-    # Forward pass: Src to Tgt
-    include_mel = torch.bernoulli(torch.tensor(0.5))
-    if include_mel:
-        input = (training, batch[4]) + batch[12:15] + batch[8:11] + batch[15:17] + batch[20:] + (batch[19],)
-    else: 
-        input = (training, batch[4]) + batch[12:15] + (None,) + batch[9:11] + batch[15:17] + batch[20:] + batch[19:]
+
+    # Custom feature selection to not over-rely on input audio
+    mels = batch[8][:batch_size//2]
+    input = (training, batch[4]) + batch[12:15] + (mels,) + batch[9:11] + batch[15:17] + batch[20:] + batch[19:]
+
     output_tgt = model(*(input))
 
     # Train Discriminator on only 1 of the two fakes
@@ -87,11 +86,7 @@ def loop(preprocess_config, model_config, batch, model, Loss, discriminator, cri
     # print("source re_realigned_d_no_round: ", len(re_realigned_d_no_round[0]), re_realigned_d_no_round[0][:15], sum(re_realigned_d_no_round[0]).item())
 
     # Forward pass: Tgt to Src (so tgt is now src and src is now tgt)
-    include_mel = torch.bernoulli(torch.tensor(0.5))
-    if include_mel:
-        mels = output_tgt[1]
-    else: 
-        mels = None
+    mels = output_tgt[1][:batch_size//2]
     output_src = model(training=training, langs=batch[11], texts=batch[5], text_lens=batch[6], max_text_len=batch[7],
                         mels=mels, mel_lens=output_tgt[9], max_mel_len=batch[10],
                         speaker_embs=batch[15], alignments=alignments, p_targets=re_realigned_p, 
@@ -145,12 +140,10 @@ def pretrain_loop(preprocess_config, model_config, batch, model, Loss, discrimin
                     d_optimizer=None, discriminator_step=1, warm_up_step=4000):
     batch_size = len(batch[0])
 
-    include_mel = torch.bernoulli(torch.tensor(0.5))
-    if include_mel:
-        input = (training,) + batch[3:11] + (None,) + batch[11:]
-    else:
-        input = (training,) + batch[3:7] + (None,) + batch[8:11] + (None,) + batch[11:]
-
+    # Custom feature selection to not over-rely on input audio
+    mels = batch[7][:batch_size//2]
+    input = (training,) + batch[3:7] + (mels,) + batch[8:11] + (None,) + batch[11:]
+  
     # Generator Forward pass: Src to Src
     output = model(*(input))
 

@@ -4,6 +4,7 @@ import torch
 import torch.nn as nn
 import numpy as np
 from torch.nn import functional as F
+from model.modules import BatchNorm
 
 from .SubLayers import MultiHeadAttention, PositionwiseFeedForward
 
@@ -89,7 +90,7 @@ class PostNet(nn.Module):
                     dilation=1,
                     w_init_gain="tanh",
                 ),
-                nn.BatchNorm1d(postnet_embedding_dim),
+                BatchNorm(postnet_embedding_dim, 3),
             )
         )
 
@@ -105,7 +106,7 @@ class PostNet(nn.Module):
                         dilation=1,
                         w_init_gain="tanh",
                     ),
-                    nn.BatchNorm1d(postnet_embedding_dim),
+                    BatchNorm(postnet_embedding_dim, 3),
                 )
             )
 
@@ -120,7 +121,7 @@ class PostNet(nn.Module):
                     dilation=1,
                     w_init_gain="linear",
                 ),
-                nn.BatchNorm1d(n_mel_channels),
+                BatchNorm(n_mel_channels, 3),
             )
         )
 

@@ -99,7 +99,7 @@ class FastSpeech2Pros(nn.Module):
                 
         # Split phone pros embeddings by phone duration
         # [batch_size (list), phoneme_sequence_length (list), melspec H (tensor), melspec W (tensor), 128 (tensor)]        
-        e_k_src = self.prosody_extractor.split_phones(e_src, d_src)  
+        e_k_src = self.prosody_extractor.split_phones(e_src, d_src, device=device)  
         
         # For calculating Lpp loss:
         agg_extracted_prosody = torch.zeros(batch_size//2, src_seq_length, 256).to(device)

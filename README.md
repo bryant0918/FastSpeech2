@@ -373,7 +373,9 @@ nohup python3 pretrain.py --restore_step 281751 -p config/LJSpeech/preprocess.ya
 ```
 python3 pretrain.py -p config/Tiny/preprocess.yaml -p2 config/Tiny/preprocess_es.yaml -m config/Tiny/model.yaml -t config/Tiny/pretrain.yaml -w 16
 
-python3 pretrain_ddp.py -p config/Tiny/LL_preprocess.yaml -p2 config/Tiny/LL_preprocess_es.yaml -m config/Tiny/LL_model.yaml -t config/Tiny/LL_pretrain.yaml -w 128
+python3 pretrain_ddp.py -p config/Tiny/LL_preprocess.yaml -p2 config/Tiny/LL_preprocess_es.yaml -m config/Tiny/LL_model.yaml -t config/Tiny/LL_pretrain.yaml -w 16 --ip 192.222.52.202
+
+python3 pretrain.py -p config/Tiny/LL_preprocess.yaml -p2 config/Tiny/LL_preprocess_es.yaml -m config/Tiny/LL_model.yaml -t config/Tiny/LL_pretrain.yaml -w 24
 ```
 
 ### On GPU

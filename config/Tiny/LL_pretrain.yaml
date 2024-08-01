@@ -1,7 +1,10 @@
 path:
-  ckpt_path: "/emotiv-data-NTX/output/ckpt/LJSpeech/pretrain"
-  log_path: "/emotiv-data-NTX/output/log/LJSpeech/pretrain"
-  result_path: "/emotiv-data-NTX/output/result/LJSpeech/pretrain"
+  # ckpt_path: "/emotiv-data-NTX/output/ckpt/LJSpeech/pretrain"
+  # log_path: "/emotiv-data-NTX/output/log/LJSpeech/pretrain"
+  # result_path: "/emotiv-data-NTX/output/result/LJSpeech/pretrain"
+  ckpt_path: "/output/ckpt/LJSpeech/pretrain"
+  log_path: "/output/log/LJSpeech/pretrain"
+  result_path: "/output/result/LJSpeech/pretrain"
 optimizer:
   batch_size: 32
   betas: [0.9, 0.98]

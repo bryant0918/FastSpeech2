@@ -1,5 +1,8 @@
 FROM continuumio/miniconda3
 
+# Install sudo and vim
+RUN apt-get update && apt-get install -y sudo vim
+
 # Copy the environment.yml file into the container
 COPY environment.yml /tmp/environment.yml
 

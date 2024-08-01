@@ -137,7 +137,7 @@ class FastSpeech2Loss(nn.Module):
             mel_loss + postnet_mel_loss + duration_loss + pitch_loss + energy_loss 
             + pros_loss + word_loss + full_duration_loss + g_loss + prosody_reg_term
         )
-
+        
         return (
             total_loss,
             mel_loss,

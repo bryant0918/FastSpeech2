@@ -19,9 +19,9 @@ from dataset import PreTrainDataset
 
 from evaluate import evaluate_pretrain
 
-def setup(rank, world_size):
-    os.environ['MASTER_ADDR'] = 'localhost'  # Multi-Node (Cluster): Use the IP address of the master node when GPUs are distributed across multiple machines.
-    os.environ['MASTER_PORT'] = '12355'  # Ensure this port is free
+def setup(rank, world_size, ip):
+    os.environ['MASTER_ADDR'] = ip      # Multi-Node (Cluster): Use the IP address of the master node when GPUs are distributed across multiple machines.
+    os.environ['MASTER_PORT'] = '12355' # Ensure this port is free
     dist.init_process_group("nccl", rank=rank, world_size=world_size)
 
 def cleanup():
@@ -29,7 +29,7 @@ def cleanup():
 
 def main(rank, args, configs, world_size):
     print("Prepare training ...")
-    setup(rank, world_size)
+    setup(rank, world_size, args.ip)
 
     preprocess_config, preprocess_config2, model_config, train_config = configs
 
@@ -278,6 +278,7 @@ if __name__ == "__main__":
     parser.add_argument("-m", "--model_config", type=str, required=True, help="path to model.yaml")
     parser.add_argument("-t", "--train_config", type=str, required=True, help="path to train.yaml")
     parser.add_argument("-w", "--num_workers", type=int, default=4, help="number of cpu workers for dataloader")
+    parser.add_argument("--ip", type=str, default="localhost", help="IP address of master node")
     args = parser.parse_args()
 
     # Read Configs
@@ -289,3 +290,9 @@ if __name__ == "__main__":
 
     world_size = torch.cuda.device_count()
     mp.spawn(main, args=(args, configs, world_size,), nprocs=world_size, join=True)
+
+
+# sed -i "s/'localhost'/'192.222.52.202'/" pretrain_ddp.py
+
+
+# -- Process 7 terminated with the following error: Traceback (most recent call last): File "/opt/conda/envs/Emotiv/lib/python3.10/site-packages/torch/multiprocessing/spawn.py", line 75, in _wrap fn(i, *args) File "/FastSpeech2/pretrain_ddp.py", line 32, in main setup(rank, world_size) File "/FastSpeech2/pretrain_ddp.py", line 25, in setup dist.init_process_group("nccl", rank=rank, world_size=world_size) File "/opt/conda/envs/Emotiv/lib/python3.10/site-packages/torch/distributed/c10d_logger.py", line 75, in wrapper return func(*args, **kwargs) File "/opt/conda/envs/Emotiv/lib/python3.10/site-packages/torch/distributed/c10d_logger.py", line 89, in wrapper func_return = func(*args, **kwargs) File "/opt/conda/envs/Emotiv/lib/python3.10/site-packages/torch/distributed/distributed_c10d.py", line 1305, in init_process_group store, rank, world_size = next(rendezvous_iterator) File "/opt/conda/envs/Emotiv/lib/python3.10/site-packages/torch/distributed/rendezvous.py", line 246, in _env_rendezvous_handler store = _create_c10d_store(master_addr, master_port, rank, world_size, timeout, use_libuv) File "/opt/conda/envs/Emotiv/lib/python3.10/site-packages/torch/distributed/rendezvous.py", line 174, in _create_c10d_store return TCPStore( torch.distributed.DistNetworkError: Connection reset by peer

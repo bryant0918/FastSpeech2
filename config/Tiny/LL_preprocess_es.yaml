@@ -4,7 +4,9 @@ path:
   corpus_path: "/home/ditto/Datasets/Speech/es/base/tedx_spanish_corpus"
   lexicon_path: ""  # Only used in synthesize.py
   raw_path: "raw_data/Spanish_TedX"
-  preprocessed_path: "/emotiv-data-NTX/preprocessed_data/tiny/Spanish_TedX"
+  # preprocessed_path: "/emotiv-data-NTX/preprocessed_data/tiny/Spanish_TedX"
+  preprocessed_path: "/preprocessed_data/tiny/Spanish_TedX"
+
 
 preprocessing:
   val_size: 512

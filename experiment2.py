@@ -977,8 +977,57 @@ def test_DPP():
     print("num workers: ", args.num_workers)
     mp.spawn(main, args=(args, configs, world_size,), nprocs=world_size, join=True)
 
+def profile_data_loading():
+    import cProfile
+    import pstats
+    from torch.utils.data import DataLoader
+    from dataset import PreTrainDataset
+    import yaml
+    import psutil
+    import time
+
+    preprocess_config = "config/LJSpeech/preprocess.yaml"
+    preprocess_config2 = "config/LJSpeech/preprocess_es.yaml"
+    model_config = "config/LJSpeech/model.yaml"
+    train_config = "config/LJSpeech/train.yaml"
+
+    preprocess_config = yaml.load(open(preprocess_config, "r"), Loader=yaml.FullLoader)
+    preprocess_config2 = yaml.load(open(preprocess_config2, "r"), Loader=yaml.FullLoader)
+    model_config = yaml.load(open(model_config, "r"), Loader=yaml.FullLoader)
+    train_config = yaml.load(open(train_config, "r"), Loader=yaml.FullLoader)
+
+    dataset = PreTrainDataset("train.txt", preprocess_config, preprocess_config2, train_config, sort=True, drop_last=True)
+
+    train_loader = DataLoader(dataset, batch_size=4, collate_fn=dataset.collate_fn, num_workers=12)
+
+    # Capture initial disk I/O stats
+    io_before = psutil.disk_io_counters()
+
+    profiler = cProfile.Profile()
+    profiler.enable()
+    
+    for i, data in enumerate(train_loader):
+        time.sleep(.1)  # Introduce a small delay
+        if i >= 50:  # Profile more batches
+            break
+    
+  
+    profiler.disable()
+    stats = pstats.Stats(profiler).sort_stats('cumtime')
+    stats.print_stats(10)  # Print the top 10 results
+
+    # Capture final disk I/O stats
+    io_after = psutil.disk_io_counters()
+
+    # Calculate the difference
+    read_bytes = io_after.read_bytes - io_before.read_bytes
+    write_bytes = io_after.write_bytes - io_before.write_bytes
+
+    print(f"Read bytes: {read_bytes}")
+    print(f"Write bytes: {write_bytes}")
+
 
 if __name__ == "__main__":
     # test_npc()
-    test_DPP()
+    profile_data_loading()
     pass

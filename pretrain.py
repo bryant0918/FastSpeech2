@@ -117,6 +117,7 @@ def main(args, configs):
 
                     # Backward
                     total_loss = losses[0] / grad_acc_step
+                    total_loss = total_loss.mean()
                     total_loss.backward()
 
                     d_scheduler.step()

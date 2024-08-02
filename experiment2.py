@@ -998,7 +998,7 @@ def profile_data_loading():
 
     dataset = PreTrainDataset("train.txt", preprocess_config, preprocess_config2, train_config, sort=True, drop_last=True)
 
-    train_loader = DataLoader(dataset, batch_size=4, collate_fn=dataset.collate_fn, num_workers=12)
+    train_loader = DataLoader(dataset, batch_size=4, collate_fn=dataset.collate_fn, num_workers=0)
 
     # Capture initial disk I/O stats
     io_before = psutil.disk_io_counters()
@@ -1014,7 +1014,7 @@ def profile_data_loading():
   
     profiler.disable()
     stats = pstats.Stats(profiler).sort_stats('cumtime')
-    stats.print_stats(10)  # Print the top 10 results
+    stats.print_stats(20)  # Print the top 10 results
 
     # Capture final disk I/O stats
     io_after = psutil.disk_io_counters()

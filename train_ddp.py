@@ -61,7 +61,7 @@ def main(rank, args, configs, world_size):
     # Prepare discriminator
     discriminator, d_optimizer, d_scheduler = get_discriminator(args, configs[1:], rank, train=True)
     discriminator = DDP(discriminator, device_ids=[rank])
-    criterion_d = nn.BCELoss()
+    criterion_d = nn.BCEWithLogitsLoss()
     discriminator_params = get_param_num(discriminator)
     print("Number of Discriminator Parameters:", discriminator_params)
     print("Total Parameters:", num_param + discriminator_params)

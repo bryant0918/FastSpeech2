@@ -20,7 +20,7 @@ class FastSpeech2Loss(nn.Module):
         self.mae_loss = nn.L1Loss()
         self.pros_loss = ProsLoss()
         self.word_loss = WordLoss(model_config)
-        self.bce_loss = nn.BCELoss()
+        self.bce_loss = nn.BCEWithLogitsLoss()
 
         self.pros_weight = train_config['loss']['pros_weight']
         self.pitch_energy_weight = train_config['loss']['pitch_energy_weight']

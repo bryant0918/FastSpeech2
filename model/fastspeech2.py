@@ -62,7 +62,6 @@ class FastSpeech2Pros(nn.Module):
         batch_size, src_seq_length = d_src.size(0), d_src.size(1)
         device = langs.device
 
-
         tgt_masks = get_mask_from_lengths(text_lens, max_text_len)
         # print("Tgt masks shape: ", tgt_masks.shape)
         
@@ -100,7 +99,7 @@ class FastSpeech2Pros(nn.Module):
         # Split phone pros embeddings by phone duration
         # [batch_size (list), phoneme_sequence_length (list), melspec H (tensor), melspec W (tensor), 128 (tensor)]        
         e_k_src = self.prosody_extractor.split_phones(e_src, d_src, device=device)  
-        
+
         # For calculating Lpp loss:
         agg_extracted_prosody = torch.zeros(batch_size//2, src_seq_length, 256).to(device)
         for b in range(batch_size//2):
@@ -183,7 +182,7 @@ class Discriminator(nn.Module):
             # nn.LeakyReLU(0.2, inplace=True), # Next time I restart training go to 64 first.
             # nn.Dropout(0.3),
             # nn.Linear(1024, 1),
-            nn.Sigmoid()  # Output will be between 0 and 1
+            # nn.Sigmoid()  # Output will be between 0 and 1 ## Switched to BCEwithLogitsLoss for amp.
         )
 
     def forward(self, mels):

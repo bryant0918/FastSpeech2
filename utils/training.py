@@ -3,6 +3,7 @@ import torch
 from utils.tools import flip_mapping, realign_p_e_d, custom_round
 from utils.model import vocoder_infer
 
+import time
 
 
 def loop(preprocess_config, model_config, batch, model, Loss, discriminator, criterion_d, 
@@ -44,15 +45,16 @@ def loop(preprocess_config, model_config, batch, model, Loss, discriminator, cri
     log_duration_targets = torch.log(batch[-1].float() + 1)
     
     # For calculating Word Loss
+    mel_size = max(batch_size//8, 1)
     if step % word_step == 0:
-        mels = [output_tgt[1][i, :output_tgt[9][i]].transpose(0,1) for i in range(batch_size)]
+        mels = [output_tgt[1][i, :output_tgt[9][i]].transpose(0,1) for i in range(mel_size)]
         wav_predictions = vocoder_infer(
             mels,
             vocoder,
             model_config,
             preprocess_config,
         )
-        loss_input = (batch[2],) + batch[8:10] + batch[20:22] + (log_duration_targets,)
+        loss_input = (batch[2][:mel_size],) + batch[8:10] + batch[20:22] + (log_duration_targets,)
         loss_predictions = output_tgt + (wav_predictions, pred_generated)
     else:
         loss_input = (None,) + batch[8:10] + batch[20:22] + (log_duration_targets,)
@@ -117,14 +119,14 @@ def loop(preprocess_config, model_config, batch, model, Loss, discriminator, cri
 
     # For calculating Word Loss
     if step % word_step == 0:
-        mels = [output_src[1][i, :output_src[9][i]].transpose(0,1) for i in range(batch_size)]
+        mels = [output_src[1][i, :output_src[9][i]].transpose(0,1) for i in range(mel_size)]
         wav_predictions = vocoder_infer(
             mels,
             vocoder,
             model_config,
             preprocess_config,
         )
-        loss_input = (batch[1],) + batch[8:10] + (re_realigned_p, re_realigned_e, realigned_log_d)
+        loss_input = (batch[1][:mel_size],) + batch[8:10] + (re_realigned_p, re_realigned_e, realigned_log_d)
         loss_predictions = output_src[:10] + (output_tgt[10],) + output_src[11:] + (wav_predictions, pred_generated)
     else:
         loss_input = (None,) + batch[8:10]+ (re_realigned_p, re_realigned_e, realigned_log_d)
@@ -144,8 +146,10 @@ def pretrain_loop(preprocess_config, model_config, batch, model, Loss, discrimin
     mels = batch[7][:batch_size//2]
     input = (training,) + batch[3:7] + (mels,) + batch[8:11] + (None,) + batch[11:]
   
+    start0 = time.time()
     # Generator Forward pass: Src to Src
     output = model(*(input))
+    print("Time for forward function: ", time.time() - start0)
 
     d_loss = torch.tensor(0.0, device=device)
     if step % discriminator_step == 0 or step >= warm_up_step:
@@ -176,20 +180,23 @@ def pretrain_loop(preprocess_config, model_config, batch, model, Loss, discrimin
     log_duration_targets = torch.log(batch[-1] + 1)
     # For calculating Word Loss
     if step % word_step == 0:
-        mels = [output[1][i, :output[9][i]].transpose(0,1) for i in range(batch_size)]
+        mel_size = max(batch_size//8, 1)
+        mels = [output[1][i, :output[9][i]].transpose(0,1) for i in range(mel_size)]
         wav_predictions = vocoder_infer(
             mels,
             vocoder,
             model_config,
             preprocess_config,
         )
-        loss_input = (batch[1],) + batch[7:9] + batch[11:13] + (log_duration_targets,)
+        loss_input = (batch[1][:mel_size],) + batch[7:9] + batch[11:13] + (log_duration_targets,)
         loss_predictions = output + (wav_predictions, pred_generated)
     else:
         loss_input = (None,) + batch[7:9] + batch[11:13] + (log_duration_targets,)
         loss_predictions = output + (None, pred_generated)
     
+    start1 = time.time()
     # Calculate loss for Src to Src
     losses = Loss(loss_input, loss_predictions, "to_src", word_step)
+    print("Time for loss function: ", time.time() - start1)
     
     return losses, output, d_loss.item()

@@ -1,35 +1,35 @@
 import argparse
 import os
 
+import numpy as np
 import torch
 import yaml
 import torch.nn as nn
 from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
+from torch.cuda.amp import autocast, GradScaler
 from tqdm import tqdm
-import torch.distributed as dist
-import torch.multiprocessing as mp
-from torch.nn.parallel import DistributedDataParallel as DDP
+import multiprocessing as mp
 
-from utils.model import get_model, get_vocoder, get_param_num, get_discriminator
+from utils.model import get_model, get_vocoder, get_param_num, vocoder_infer, get_discriminator
 from utils.tools import to_device, log, synth_one_sample_pretrain
 from utils.training import pretrain_loop
-from model import FastSpeech2Loss
+from model import FastSpeech2Loss, Discriminator
 from dataset import PreTrainDataset
 
 from evaluate import evaluate_pretrain
 
-def setup(rank, world_size, ip):
-    os.environ['MASTER_ADDR'] = ip      # Multi-Node (Cluster): Use the IP address of the master node when GPUs are distributed across multiple machines.
-    os.environ['MASTER_PORT'] = '12355' # Ensure this port is free
-    dist.init_process_group("nccl", rank=rank, world_size=world_size)
+if torch.cuda.is_available():
+    device = torch.device("cuda")
+elif torch.backends.mps.is_available():
+    device = torch.device("mps")
+else:
+    device = torch.device("cpu")
 
-def cleanup():
-    dist.destroy_process_group()
+print("Device", device)
 
-def main(rank, args, configs, world_size):
+def main(args, configs):
     print("Prepare training ...")
-    setup(rank, world_size, args.ip)
 
     preprocess_config, preprocess_config2, model_config, train_config = configs
 
@@ -38,39 +38,34 @@ def main(rank, args, configs, world_size):
     batch_size = train_config["optimizer"]["batch_size"]
     group_size = 1  # Set this larger than 1 (4) to enable sorting in Dataset
     # assert batch_size * group_size < len(dataset)
-    sampler = torch.utils.data.distributed.DistributedSampler(dataset, num_replicas=world_size, rank=rank)
+    # sampler = torch.utils.data.distributed.DistributedSampler(dataset)
     loader = DataLoader(
         dataset,
         batch_size=batch_size * group_size,
-        # shuffle=True,
+        shuffle=True,
         collate_fn=dataset.collate_fn,
         num_workers=args.num_workers,
-        sampler=sampler,
+        pin_memory=True,
+        # sampler=sampler,
     )
 
     # Prepare model
-    model, optimizer = get_model(args, configs[1:], rank, train=True)
-    model = DDP(model, device_ids=[rank])  # find_unused_parameters=True
+    model, optimizer = get_model(args, configs[1:], device, train=True)
+    model = nn.DataParallel(model)
     num_param = get_param_num(model)
-    Loss = FastSpeech2Loss(preprocess_config, model_config, train_config).to(rank)
+    Loss = FastSpeech2Loss(preprocess_config, model_config, train_config).to(device)
     print("Number of FastSpeech2 Parameters:", num_param)
 
-    # indices_to_print = [0, 92, 93, 94, 95, 96, 97, 98, 99, 100, 101, 102, 103, 104, 105, 106, 107, 108]
-    # indices_to_print = [90, 91, 92, 93, 94, 95, 96, 97, 98, 99, 100, 101, 102, 103, 104, 105, 106]
-    # named_parameters = list(model.named_parameters())
-    # for idx in indices_to_print:
-    #     print(f"Name: {named_parameters[idx][0]}, Shape: {named_parameters[idx][1].shape}")
-
     # Prepare discriminator
-    discriminator, d_optimizer, d_scheduler = get_discriminator(args, configs[1:], rank, train=True)
-    discriminator = DDP(discriminator, device_ids=[rank])
+    discriminator, d_optimizer, d_scheduler = get_discriminator(args, configs[1:], device, train=True)
+    discriminator = nn.DataParallel(discriminator)
     criterion_d = nn.BCEWithLogitsLoss()
     discriminator_params = get_param_num(discriminator)
     print("Number of Discriminator Parameters:", discriminator_params)
     print("Total Parameters:", num_param + discriminator_params)
     
     # Load vocoder
-    vocoder = get_vocoder(model_config, f"cuda:{rank}")
+    vocoder = get_vocoder(model_config, device)
 
     # Init loggerc
     for p in train_config["path"].values():
@@ -100,38 +95,48 @@ def main(rank, args, configs, world_size):
     outer_bar.n = args.restore_step
     outer_bar.update()
 
-    # Only use while debugging
     # torch.autograd.set_detect_anomaly(True)
+
+    scaler = GradScaler()
+
     import time
     start = time.time()
-
+    start0 = time.time()
+    backward_times, forward_times = [], []
     while True:
         inner_bar = tqdm(total=len(loader), desc="Epoch {}".format(epoch), position=1)
 
         for batches in loader:
+            print("\n\nStep: ", step)
+            # print("Time to load batch: ", time.time() - start0)
             try:
                 for batch in batches:
-                    batch = to_device(batch, rank)
+                    start1 = time.time()
+                    batch = to_device(batch, device)
                     # batch = (ids, raw_texts, speakers, langs, texts, src_lens, max_src_len, mels, mel_lens, max_mel_len, 
                     #           speaker_embeddings, pitches, energies, durations)
-                    
-                    if step == 200:
+                    # print("time to send to device: ", time.time() - start1)
+
+                    if step == 50:
                         print("Time taken for 200 steps: ", time.time() - start)
+                        print("average backward time: ", np.mean(backward_times))
+                        print("average forward time: ", np.mean(forward_times))
                         raise Exception("Stop")
 
+                    start2 = time.time()
                     # Forward
-                    losses, output, d_loss = pretrain_loop(preprocess_config, model_config, batch, model, Loss, discriminator, criterion_d,
-                                                            vocoder, step, word_step, rank, True, d_optimizer, discriminator_step, warm_up_step)
+                    with autocast(dtype=torch.float32):
+                        losses, output, d_loss = pretrain_loop(preprocess_config, model_config, batch, model, Loss, discriminator, criterion_d,
+                                                                vocoder, step, word_step, device, True, d_optimizer, discriminator_step, warm_up_step)
+                    forward_times.append(time.time() - start2)
+                    print("time for forward: ", forward_times[-1])
 
+                    start2 = time.time()
                     # Backward
                     total_loss = losses[0] / grad_acc_step
+                    total_loss = total_loss.mean()
 
-                    # If mels is None then set requires grad for prosody extractor parameters to False
-                    
-                    total_loss.backward()
-
-                    # print("linear3 weight grad", model.module.prosody_predictor.linear3.weight.grad)  # Should not be None
-                    # print("linear3 bias grad", model.module.prosody_predictor.linear3.bias.grad) 
+                    scaler.scale(total_loss).backward()
 
                     d_scheduler.step()
 
@@ -139,10 +144,16 @@ def main(rank, args, configs, world_size):
                         # Clipping gradients to avoid gradient explosion
                         nn.utils.clip_grad_norm_(model.parameters(), grad_clip_thresh)
 
-                        # Update weights
+                        # Unscale the gradients manually
+                        scaler.unscale_(optimizer)
                         optimizer.step_and_update_lr()
+                        scaler.update()
                         optimizer.zero_grad()
 
+                    backward_times.append(time.time() - start2)
+                    print("time for backward: ", backward_times[-1])
+
+                    start3 = time.time()
                     if step % log_step == 0:
                         losses = [l.item() for l in losses]
                         losses.append(d_loss)
@@ -157,7 +168,9 @@ def main(rank, args, configs, world_size):
                         outer_bar.write(message1 + message2)
 
                         log(train_logger, step, losses=losses, lr=optimizer.get_lr())
+                    # print("Time to log: ", time.time() - start3)
 
+                    start4 = time.time()
                     if step % synth_step == 0:
                         targets = (batch[0],) +(batch[7],) + batch[11:]
                         predictions = (output[1],) + output[8:10]
@@ -192,10 +205,13 @@ def main(rank, args, configs, world_size):
                             tag="Training/step_{}_{}_synthesized".format(step, tag),
                         )
 
+                    # print("Time to synth: ", time.time() - start4)
+
+                    start5 = time.time()
                     if step % val_step == 0:
                         model.eval()
                         discriminator.eval()
-                        message = evaluate_pretrain(model, discriminator, step, configs, val_logger, vocoder)
+                        message = evaluate_pretrain(model, discriminator, step, configs, val_logger, vocoder, device)
                         with open(os.path.join(val_log_path, "log.txt"), "a") as f:
                             f.write(message + "\n")
                         outer_bar.write(message)
@@ -203,6 +219,9 @@ def main(rank, args, configs, world_size):
                         model.train()
                         discriminator.train()
 
+                    # print("Time to evaluate: ", time.time() - start5)
+
+                    start6 = time.time()
                     if step % save_step == 0:
                         print("Saving checkpoints")
                         torch.save(
@@ -226,12 +245,13 @@ def main(rank, args, configs, world_size):
                                 "disc_{}.pth.tar".format(step),
                             ),
                         )
+                    # print("Time to save: ", time.time() - start6)
 
                     if step == total_step:
-                        cleanup()
                         quit()
                     step += 1
                     outer_bar.update(1)
+
             except KeyboardInterrupt:
                 if step > 20:
                     print("Training interrupted -- Saving checkpoints")
@@ -256,15 +276,14 @@ def main(rank, args, configs, world_size):
                             "disc_{}.pth.tar".format(step),
                         ),
                     )
-                cleanup()
                 raise
             except Exception as e:
                 print("Training interrupted by other exception.")
                 print(e)
-                cleanup()
                 raise e
 
             inner_bar.update(1)
+            start0 = time.time()
         epoch += 1
 
 
@@ -278,7 +297,6 @@ if __name__ == "__main__":
     parser.add_argument("-m", "--model_config", type=str, required=True, help="path to model.yaml")
     parser.add_argument("-t", "--train_config", type=str, required=True, help="path to train.yaml")
     parser.add_argument("-w", "--num_workers", type=int, default=4, help="number of cpu workers for dataloader")
-    parser.add_argument("--ip", type=str, default="localhost", help="IP address of master node")
     args = parser.parse_args()
 
     # Read Configs
@@ -288,11 +306,4 @@ if __name__ == "__main__":
     train_config = yaml.load(open(args.train_config, "r"), Loader=yaml.FullLoader)
     configs = (preprocess_config, preprocess2_config, model_config, train_config)
 
-    world_size = torch.cuda.device_count()
-    mp.spawn(main, args=(args, configs, world_size,), nprocs=world_size, join=True)
-
-
-# sed -i "s/'localhost'/'192.222.52.202'/" pretrain_ddp.py
-
-
-# -- Process 7 terminated with the following error: Traceback (most recent call last): File "/opt/conda/envs/Emotiv/lib/python3.10/site-packages/torch/multiprocessing/spawn.py", line 75, in _wrap fn(i, *args) File "/FastSpeech2/pretrain_ddp.py", line 32, in main setup(rank, world_size) File "/FastSpeech2/pretrain_ddp.py", line 25, in setup dist.init_process_group("nccl", rank=rank, world_size=world_size) File "/opt/conda/envs/Emotiv/lib/python3.10/site-packages/torch/distributed/c10d_logger.py", line 75, in wrapper return func(*args, **kwargs) File "/opt/conda/envs/Emotiv/lib/python3.10/site-packages/torch/distributed/c10d_logger.py", line 89, in wrapper func_return = func(*args, **kwargs) File "/opt/conda/envs/Emotiv/lib/python3.10/site-packages/torch/distributed/distributed_c10d.py", line 1305, in init_process_group store, rank, world_size = next(rendezvous_iterator) File "/opt/conda/envs/Emotiv/lib/python3.10/site-packages/torch/distributed/rendezvous.py", line 246, in _env_rendezvous_handler store = _create_c10d_store(master_addr, master_port, rank, world_size, timeout, use_libuv) File "/opt/conda/envs/Emotiv/lib/python3.10/site-packages/torch/distributed/rendezvous.py", line 174, in _create_c10d_store return TCPStore( torch.distributed.DistNetworkError: Connection reset by peer
+    main(args, configs)

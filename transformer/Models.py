@@ -86,10 +86,20 @@ class Encoder(nn.Module):
             )
 
         else:
+            if self.src_word_emb(src_seq).isnan().any():
+                # Clamp the output of the embedding layer to prevent NaNs
+                enc_output = torch.clamp(self.src_word_emb(src_seq), min=-1e4, max=1e4)
+                print("clamped has nans: ", enc_output.isnan().any())
+                raise ValueError("nan from src_word_emb!")
+            if self.position_enc[:, :max_len, :].expand(batch_size, -1, -1).isnan().any():
+                raise ValueError("nan from position_enc!")
             enc_output = self.src_word_emb(src_seq) + self.position_enc[
                                                       :, :max_len, :
                                                       ].expand(batch_size, -1, -1)
 
+        if enc_output.isnan().any():
+            raise ValueError("nan in enc_output before self.layer_stack!")
+        
         for enc_layer in self.layer_stack:
             # enc_output, enc_slf_attn = enc_layer(enc_output, mask=mask, slf_attn_mask=slf_attn_mask)
             # if return_attns:
@@ -101,6 +111,7 @@ class Encoder(nn.Module):
             enc_output = torch.relu(enc_output)  # Apply non-linearity (ReLU) after the residual connection
             if return_attns:
                 enc_slf_attn_list += [enc_slf_attn]
+        
         return enc_output
     
 
@@ -249,29 +260,14 @@ class ProsodyExtractor(nn.Module):
         """
 
         zeros = torch.zeros((durations.shape[0], 1), dtype=torch.int).to(device)
-        # print("zeros.size:", zeros.size())
-        # print("durations.size:", durations.size())
-        # print(durations)
 
         concated = torch.cat([zeros, durations], dim=1)
         cumulative_durations = torch.cumsum(concated, dim=1)
-        # print("Cumulative durations", cumulative_durations)
 
         start_frames = cumulative_durations[:, :-1]
         end_frames = cumulative_durations[:, 1:]
 
-        batch_phone_emb_chunks = []
-        # Iterate over each sample in the batch
-        for b in range(x.shape[0]):
-            sample_phone_emb_chunks = []
-            # Iterate over each phoneme
-            for i in range(start_frames.shape[1]):
-                start = start_frames[b, i].item()
-                end = end_frames[b, i].item()
-                # Extract the chunk using slicing
-                chunk = x[b, :, start:end, :]
-                sample_phone_emb_chunks.append(chunk)
-            batch_phone_emb_chunks.append(sample_phone_emb_chunks)
+        batch_phone_emb_chunks = [[x[b, :, start_frames[b, i].item():end_frames[b, i].item(), :]   for i in range(start_frames.shape[1])] for b in range(x.shape[0])]
 
         return batch_phone_emb_chunks
 
@@ -363,6 +359,10 @@ class ProsodyPredictor(nn.Module):
 
         # print("v", torch.min(v).item(), torch.max(v).item()) # Range [0, 1]
         sigma = torch.exp(v)
+        
+        if alphas.isnan().any():
+            print("alphas: ", alphas)
+        # print("alphas: ", alphas.isnan().any(), alphas.isinf().any(), (alphas < 0).any())
 
         log_pi = torch.log_softmax(alphas, dim=-1) # [batch_size, text_sequence_length, n_components]
 
@@ -420,7 +420,12 @@ class ProsodyPredictor(nn.Module):
         # # Sample a component index for each item in the batch and sequence
         batch_size, seq_len, n_components, dim_out = mu.size()
 
-        components = torch.multinomial(pi.view(-1, n_components), 1)
+        try:
+            components = torch.multinomial(pi.view(-1, n_components), 1)
+        except RuntimeError:
+            print("pi", pi.isnan().any(), pi.isinf().any(), (pi < 0).any())
+            print("log_pi", log_pi.isnan().any(), log_pi.isinf().any(), (log_pi < 0).any())
+            raise 
         components = components.view(batch_size, seq_len)
 
         # # Gather the corresponding means and variances

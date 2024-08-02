@@ -53,3 +53,7 @@ class ScheduledOptim:
 
     def get_lr(self):
         return self._optimizer.param_groups[0]["lr"]
+
+    @property
+    def param_groups(self):
+        return self._optimizer.param_groups

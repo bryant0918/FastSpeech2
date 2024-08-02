@@ -179,7 +179,9 @@ sudo docker run -it -p 6006:6006 --gpus all --entrypoint /bin/bash -v /home/ubun
 ```
 
 ```
-sudo docker run -it --gpus all --entrypoint /bin/bash -v /home/ubuntu/emotiv-data-NTX:/emotiv-data-NTX fastspeech2
+sudo docker run -it -p 12355:12355 --gpus all --entrypoint /bin/bash -v /home/ubuntu/emotiv-data-NTX:/emotiv-data-NTX fastspeech2
+
+sudo docker run -it -p 12355:12355 --gpus all --entrypoint /bin/bash -v /home/ubuntu/preprocessed_data:/preprocessed_data fastspeech2
 ```
 
 Don't forget to `conda activate Emotiv` and you should be good to go.
@@ -239,7 +241,7 @@ nohup python3 clean_audio.py config/LibriTTS/preprocess_es.yaml > clean_audio.lo
 
 ### Get the TextGrid Files
 
-#### `<u>`For Datasets with existing TextGrid files `</u>`
+#### <u>For Datasets with existing TextGrid files </u>
 
 As described in the paper, [Montreal Forced Aligner](https://montreal-forced-aligner.readthedocs.io/en/latest/) (MFA) is used to obtain the alignments between the utterances and the phoneme sequences.
 Alignments of the supported datasets are provided [here](https://drive.google.com/drive/folders/1DBRkALpPd6FL9gjHMmMEdHODmkgNIIK4?usp=sharing).
@@ -259,7 +261,7 @@ You have to unzip the files in ``preprocessed_data/LJSpeech/TextGrid/``.
 
 ``unzip preprocessed_data/LJSpeech/LJSpeech.zip -d preprocessed_data/LJSpeech/``
 
-#### `<u>`For New Datasets without Existing TextGrid Files `</u>`
+#### <u>For New Datasets without Existing TextGrid Files </u>
 
 For new Datasets you will need to generate TextGrid files yourself. Instructions are [here](https://montreal-forced-aligner.readthedocs.io/en/latest/installation.html) for installation and [here](https://montreal-forced-aligner.readthedocs.io/en/latest/first_steps/index.html#first-steps-align-pretrained) for aligning.
 
@@ -290,11 +292,16 @@ run `create_mfa_directory(raw_dir)` in `mfa.py`
 
 Now validate your dataset by (note: <english_us_arpa> here is referring to acoustic and dictionary models):
 
+create directory name in MFA folder to ensure oov file writes. `mkdir -p /home/ditto/Documents/MFA/<dir_name>`
 ```
 mfa validate raw_dir <english_us_arpa> <english_us_arpa>
 ```
 
 Next you will want to get all the out of vocabulary words from the dataset and use the G2P model to add the pronounciation to the dictionary model.
+
+IMPORTANT: Make sure to grab the normalize_oov.log from "/home/ditto/Documents/MFA/<corpus>/split3/log/normalize_oov.log" DURING mfa validate. Generating that file during "Normalizing text..." is one of the first steps. That <corpus> directory is a temp directory and will be deleted after mfa validate is complete. So copy the file somewhere else to use for merging your dictionaries. `cp /home/ditto/Documents/MFA/<corpus>/split3/log/normalize_oov.log /home/ditto/Documents/MFA/<corpus>_normalize_oov.log`
+
+As soon as you have that file copied over you may proceed and you do not need to wait for the validate to finish.
 
 From `mfa.py` first run `get_oov_words(oov_log_file, dict, oov_words)` to get the out of vocabulary words in a list. Next use the G2P model to generate a dictionary for those words:
 
@@ -307,9 +314,9 @@ Then from `mfa.py` run `merge_dictionaries(pretrained_dict_path, generated_dict_
 Now you are ready to revalidate and align the corpus. First remove the MFA corpus directory in MFA: `rm -r '/home/ditto/Documents/MFA/<corpus>`. \<corpus\> here will be the folder name of raw_dir. Then validate and align:
 
 ```
-mfa validate raw_dir <english_us_arpa> <english_us_arpa>
+mfa validate raw_dir <english_us_arpa> <english_us_arpa> -j 21 --use_mp
 
-mfa align raw_dir <english_us_arpa> <english_us_arpa> preprocessed_data_dir/TextGrid
+mfa align raw_dir <english_us_arpa> <english_us_arpa> preprocessed_data_dir/TextGrid -j 16 --use_mp
 ```
 
 You should now see TextGrid files in preprocessed_data_dir

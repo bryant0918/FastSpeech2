@@ -63,6 +63,15 @@ def get_oov_words(oov_log_file, dict, oov_words):
 
     return
 
+def check_word_in_dict(dict, word):
+    with open(dict, "r") as f:
+        lines = f.readlines()
+    dict_words = [line.strip().split('\t')[0] for line in lines]
+
+    print(bool(word in dict_words))
+
+    return
+
 
 def merge_dictionaries(pretrained_dict_path, generated_dict_path):
     import re
@@ -101,31 +110,40 @@ def merge_dictionaries(pretrained_dict_path, generated_dict_path):
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser()
-    parser.add_argument("oov_file", type=str)
-    parser.add_argument("dict_file", type=str)
-    parser.add_argument("out_file", type=str)
-    parser.add_argument("--get_oov_words", action="store_true")
-    parser.add_argument("--pretrained_dict_path", type=str)
-    parser.add_argument("--generated_dict_path", type=str)
-    parser.add_argument("--merge_dictionaries", action="store_true")
-    args = parser.parse_args()
+    # parser = argparse.ArgumentParser()
+    # parser.add_argument("--oov_file", type=str)
+    # parser.add_argument("--dict_file", type=str)
+    # parser.add_argument("--out_file", type=str)
+    # parser.add_argument("--get_oov_words", action="store_true")
+    # parser.add_argument("--pretrained_dict_path", type=str)
+    # parser.add_argument("--generated_dict_path", type=str)
+    # parser.add_argument("--merge_dictionaries", action="store_true")
+    # args = parser.parse_args()
+
+    # if args.get_oov_words:
+    #     get_oov_words(args.oov_file, args.dict_file, args.out_file)
+
+    # if args.merge_dictionaries:
+    #     merge_dictionaries(args.pretrained_dict_path, args.generated_dict_path)
 
 
     # dir = "raw_data/LibriTTS"
     # create_mfa_directory(dir)
 
-    # oov_file = "/home/ditto/Documents/MFA/Spanish_mfa/Spanish_mfa/split3/log/normalize_oov.log"
-    # dict = "/home/ditto/Documents/MFA/pretrained_models/dictionary/spanish_mfa.dict"
-    # oov_words = "/home/ditto/Documents/MFA/Spanish_mfa/oov_words.txt"
-    if args.get_oov_words:
-        get_oov_words(args.oov_file, args.dict_file, args.out_file)
+    oov_file = "/home/ditto/Documents/MFA/Spanish_new/Spanish_new/split3/log/normalize_oov.log"
+    dict = "/home/ditto/Documents/MFA/pretrained_models/dictionary/spanish_mfa.dict"
+    oov_words = "/home/ditto/Documents/MFA/spanish_new_oov_words.txt"
+    # get_oov_words(oov_file, dict, oov_words)
 
-    # pretrained_dict_path = '/home/ditto/Documents/MFA/pretrained_models/dictionary/spanish_mfa.dict'
-    # generated_dict_path = '/home/ditto/Documents/MFA/Spanish_mfa/dictionary/generated_dictionary.txt'
-    # pretrained_dict_path = '/home/ditto/Documents/MFA/pretrained_models/dictionary/spanish_mfa.dict'
-    # generated_dict_path = '/home/ditto/Ditto/FastSpeech2/lexicon/librispeech-lexicon.txt'
-    if args.merge_dictionaries:
-        merge_dictionaries(args.pretrained_dict_path, args.generated_dict_path)
+    generated_dict_path = '/home/ditto/Documents/MFA/spanish_new_generated_dictionary.txt'
+    pretrained_dict_path0 = '/home/ditto/Documents/MFA/pretrained_models/dictionary/spanish_mfa.dict'
+    pretrained_dict_path1 = '/home/ditto/Documents/MFA/pretrained_models/dictionary/spanish_mfa.dict.bak'
+    pretrained_dict_path2 = '/home/ditto/Documents/MFA/pretrained_models/dictionary/english_us_arpa.dict'
+    merge_dictionaries(pretrained_dict_path0, generated_dict_path)
+
+    # merge_dictionaries(pretrained_dict_path, generated_dict_path)
+    pretrained_dicts = [generated_dict_path, pretrained_dict_path0, pretrained_dict_path1, pretrained_dict_path2, oov_words]
+    for dict in pretrained_dicts:
+        check_word_in_dict(dict, 'ZOSIM')
 
     pass

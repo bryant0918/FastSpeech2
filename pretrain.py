@@ -44,6 +44,7 @@ def main(args, configs):
         shuffle=True,
         collate_fn=dataset.collate_fn,
         num_workers=args.num_workers,
+        pin_memory=True,
         # sampler=sampler,
     )
 
@@ -57,7 +58,7 @@ def main(args, configs):
     # Prepare discriminator
     discriminator, d_optimizer, d_scheduler = get_discriminator(args, configs[1:], device, train=True)
     discriminator = nn.DataParallel(discriminator)
-    criterion_d = nn.BCELoss()
+    criterion_d = nn.BCEWithLogitsLoss()
     discriminator_params = get_param_num(discriminator)
     print("Number of Discriminator Parameters:", discriminator_params)
     print("Total Parameters:", num_param + discriminator_params)
@@ -96,25 +97,37 @@ def main(args, configs):
     # torch.autograd.set_detect_anomaly(True)
     import time
     start = time.time()
-
+    start0 = time.time()
+    backward_times, forward_times = [], []
     while True:
         inner_bar = tqdm(total=len(loader), desc="Epoch {}".format(epoch), position=1)
 
         for batches in loader:
+            print("\n\nStep: ", step)
+            # print("Time to load batch: ", time.time() - start0)
             try:
                 for batch in batches:
+                    start1 = time.time()
                     batch = to_device(batch, device)
                     # batch = (ids, raw_texts, speakers, langs, texts, src_lens, max_src_len, mels, mel_lens, max_mel_len, 
                     #           speaker_embeddings, pitches, energies, durations)
-                    
-                    if step == 200:
-                        print("Time taken for 200 steps: ", time.time() - start)
+                    # print("time to send to device: ", time.time() - start1)
+
+                    if step == 100:
+                        print("Time taken for 100 steps: ", time.time() - start)
+                        print("average backward time: ", np.mean(backward_times))
+                        print("average forward time: ", np.mean(forward_times))
                         raise Exception("Stop")
 
+                    start2 = time.time()
                     # Forward
                     losses, output, d_loss = pretrain_loop(preprocess_config, model_config, batch, model, Loss, discriminator, criterion_d,
                                                             vocoder, step, word_step, device, True, d_optimizer, discriminator_step, warm_up_step)
+                    forward_times.append(time.time() - start2)
+                    print("time for forward: ", forward_times[-1])
 
+
+                    start2 = time.time()
                     # Backward
                     total_loss = losses[0] / grad_acc_step
                     total_loss = total_loss.mean()
@@ -130,6 +143,10 @@ def main(args, configs):
                         optimizer.step_and_update_lr()
                         optimizer.zero_grad()
 
+                    backward_times.append(time.time() - start2)
+                    # print("time for backward: ", backward_times[-1])
+
+                    start3 = time.time()
                     if step % log_step == 0:
                         losses = [l.item() for l in losses]
                         losses.append(d_loss)
@@ -144,7 +161,9 @@ def main(args, configs):
                         outer_bar.write(message1 + message2)
 
                         log(train_logger, step, losses=losses, lr=optimizer.get_lr())
+                    # print("Time to log: ", time.time() - start3)
 
+                    start4 = time.time()
                     if step % synth_step == 0:
                         targets = (batch[0],) +(batch[7],) + batch[11:]
                         predictions = (output[1],) + output[8:10]
@@ -179,10 +198,13 @@ def main(args, configs):
                             tag="Training/step_{}_{}_synthesized".format(step, tag),
                         )
 
+                    # print("Time to synth: ", time.time() - start4)
+
+                    start5 = time.time()
                     if step % val_step == 0:
                         model.eval()
                         discriminator.eval()
-                        message = evaluate_pretrain(model, discriminator, step, configs, val_logger, vocoder)
+                        message = evaluate_pretrain(model, discriminator, step, configs, val_logger, vocoder, device)
                         with open(os.path.join(val_log_path, "log.txt"), "a") as f:
                             f.write(message + "\n")
                         outer_bar.write(message)
@@ -190,6 +212,9 @@ def main(args, configs):
                         model.train()
                         discriminator.train()
 
+                    # print("Time to evaluate: ", time.time() - start5)
+
+                    start6 = time.time()
                     if step % save_step == 0:
                         print("Saving checkpoints")
                         torch.save(
@@ -213,11 +238,13 @@ def main(args, configs):
                                 "disc_{}.pth.tar".format(step),
                             ),
                         )
+                    # print("Time to save: ", time.time() - start6)
 
                     if step == total_step:
                         quit()
                     step += 1
                     outer_bar.update(1)
+
             except KeyboardInterrupt:
                 if step > 20:
                     print("Training interrupted -- Saving checkpoints")
@@ -249,6 +276,7 @@ def main(args, configs):
                 raise e
 
             inner_bar.update(1)
+            start0 = time.time()
         epoch += 1
 
 

@@ -22,7 +22,7 @@ step:
   synth_step: 2000  # 2000
   val_step: 2000    # 1000
   save_step: 5000  # 5000
-  word_step: 10   # 10
+  word_step: 5   # 5
   discriminator_step: 2
 pretrain: True
 loss:

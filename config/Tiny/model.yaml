@@ -53,7 +53,7 @@ synthesizer:
   model: "FastSpeech2Pros" # support 'FastSpeech2', 'FastSpeech2Pros'"
 
 transcriber:  # Whisper
-  model: "base"
+  model: "base"  # support 'tiny', 'base', 'small', 'medium', 'large'
 
 sentence_embedder:  # Bert
   model: 'bert-base-uncased'

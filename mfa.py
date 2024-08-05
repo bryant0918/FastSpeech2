@@ -130,7 +130,8 @@ if __name__ == "__main__":
     # dir = "raw_data/LibriTTS"
     # create_mfa_directory(dir)
 
-    oov_file = "/home/ditto/Documents/MFA/Spanish_new/Spanish_new/split3/log/normalize_oov.log"
+    # oov_file = "/home/ditto/Documents/MFA/Spanish_new/Spanish_new/split3/log/normalize_oov.log"
+    oov_file = "/home/ditto/Documents/MFA/normalize_oov.log"
     dict = "/home/ditto/Documents/MFA/pretrained_models/dictionary/spanish_mfa.dict"
     oov_words = "/home/ditto/Documents/MFA/spanish_new_oov_words.txt"
     # get_oov_words(oov_file, dict, oov_words)

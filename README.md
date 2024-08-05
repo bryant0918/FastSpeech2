@@ -314,9 +314,9 @@ Then from `mfa.py` run `merge_dictionaries(pretrained_dict_path, generated_dict_
 Now you are ready to revalidate and align the corpus. First remove the MFA corpus directory in MFA: `rm -r '/home/ditto/Documents/MFA/<corpus>`. \<corpus\> here will be the folder name of raw_dir. Then validate and align:
 
 ```
-mfa validate raw_dir <english_us_arpa> <english_us_arpa> -j 21 --use_mp
+mfa validate raw_dir <english_us_arpa> <english_us_arpa> -j 21 --use_mp --no_final_clean --overwrite
 
-mfa align raw_dir <english_us_arpa> <english_us_arpa> preprocessed_data_dir/TextGrid -j 16 --use_mp
+mfa align raw_dir <english_us_arpa> <english_us_arpa> preprocessed_data_dir/TextGrid -j 16 --use_mp --overwrite --clean
 ```
 
 You should now see TextGrid files in preprocessed_data_dir
@@ -332,9 +332,11 @@ python3 preprocess.py config/LJSpeech/preprocess.yaml
 ```
 nohup python3 preprocess.py config/LJSpeech/preprocess.yaml &
 
-nohup python3 preprocess.py config/LJSpeech/preprocess_es.yaml > preprocess.log 2>&1 &
-3154154
+nohup python3 preprocess.py config/LibriTTS/preprocess_es.yaml > preprocess.log 2>&1 &
+14496
 ```
+
+Word quechua None raw_data/Spanish_new/22386e8db9e5ecb8f12dedf9581eec968bcc0fb0adee382a793fe37f37e05ee64109d0c4b893d18b57694301f0424161d3415ad0cbe62d7bd56ba583a8ef23c6/common_voice_es_34372698_tgt.lab
 
 ### Get Speaker Embeddings
 
@@ -345,8 +347,8 @@ python SpeakerEncoder/compute_embeddings.py --output_path preprocessed_data/LJSp
 ```
 
 ```
-nohup python SpeakerEncoder/compute_embeddings.py --output_path preprocessed_data/Spanish/speaker_emb --input_path raw_data/Spanish > embeddings.log 2>&1 &
-1790201
+nohup python SpeakerEncoder/compute_embeddings.py --output_path preprocessed_data/Spanish_new/speaker_emb --input_path raw_data/Spanish_new > embeddings.log 2>&1 &
+11855
 ```
 
 ### Combine two datasets to train on

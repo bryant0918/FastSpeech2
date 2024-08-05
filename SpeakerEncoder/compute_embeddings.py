@@ -62,6 +62,12 @@ def main(args):
         for spk_itr, spk_name in enumerate(spk_list):
             print(f"========== Speaker {spk_itr}/{len(spk_list)}::")
             os.makedirs(os.path.join(args.output_path, spk_name), exist_ok=True)
+
+            # Skip if speaker mean embedding already exists
+            speaker_mean_emb_path = os.path.join(args.output_path, spk_name, f"{spk_name}.pkl")
+            if os.path.exists(speaker_mean_emb_path):
+                continue
+
             if args.input_type == "single_speaker":
                 wav_files = glob.glob(os.path.join(args.input_path, "*.wav"))
                 if not wav_files:
@@ -108,7 +114,7 @@ def main(args):
 
             # Write individual pickle file for speaker mean embedding
             for wav_file, embedd in all_embdds:
-                with open(os.path.join(args.output_path, spk_name, f"{spk_name}.pkl"), "wb") as pkl_file:
+                with open(speaker_mean_emb_path, "wb") as pkl_file:
                     pickle.dump({"mean":embedd_mean}, pkl_file)
 
     # with open(os.path.join(args.output_path, f"{args.output_name}_emb.pkl"), "wb") as pkl_file:

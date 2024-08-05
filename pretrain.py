@@ -52,7 +52,7 @@ def main(args, configs):
     model, optimizer = get_model(args, configs[1:], device, train=True)
     model = nn.DataParallel(model)
     num_param = get_param_num(model)
-    Loss = FastSpeech2Loss(preprocess_config, model_config, train_config).to(device)
+    Loss = FastSpeech2Loss(preprocess_config, model_config, train_config, device).to(device)
     print("Number of FastSpeech2 Parameters:", num_param)
 
     # Prepare discriminator
@@ -103,7 +103,7 @@ def main(args, configs):
         inner_bar = tqdm(total=len(loader), desc="Epoch {}".format(epoch), position=1)
 
         for batches in loader:
-            print("\n\nStep: ", step)
+            # print("\n\nStep: ", step)
             # print("Time to load batch: ", time.time() - start0)
             try:
                 for batch in batches:
@@ -124,7 +124,7 @@ def main(args, configs):
                     losses, output, d_loss = pretrain_loop(preprocess_config, model_config, batch, model, Loss, discriminator, criterion_d,
                                                             vocoder, step, word_step, device, True, d_optimizer, discriminator_step, warm_up_step)
                     forward_times.append(time.time() - start2)
-                    print("time for forward: ", forward_times[-1])
+                    # print("time for forward: ", forward_times[-1])
 
 
                     start2 = time.time()

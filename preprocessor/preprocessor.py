@@ -2,6 +2,7 @@ import os
 import random
 import json
 import pickle
+import bisect
 
 import tgt
 import librosa
@@ -18,6 +19,7 @@ from text.ipadict import db
 from text.tools import split_with_tie_bar
 import audio as Audio
 from text.cmudict import CMUDict
+from g2p_en import G2p
 
 
 class Preprocessor:
@@ -49,6 +51,8 @@ class Preprocessor:
         self.pitch_normalization = config["preprocessing"]["pitch"]["normalization"]
         self.energy_normalization = config["preprocessing"]["energy"]["normalization"]
 
+        self.skipped = 0
+
         self.STFT = Audio.stft.TacotronSTFT(
             config["preprocessing"]["stft"]["filter_length"],
             config["preprocessing"]["stft"]["hop_length"],
@@ -60,7 +64,9 @@ class Preprocessor:
         )
 
         if self.target_lang == "en":
-            self.cmu = CMUDict("lexicon/librispeech-lexicon.txt")
+            self.lexicon_path = "lexicon/librispeech-lexicon.txt"
+            self.cmu = CMUDict(self.lexicon_path)
+            self.g2p = G2p()
         elif self.target_lang == "es":
             self.epi = epitran.Epitran('spa-Latn')
 
@@ -98,7 +104,6 @@ class Preprocessor:
                     elif ret is IndexError:
                         continue
                     else:
-                        # print("Ret: ", ret)
                         info, pitch, energy, n = ret
                     out.append(info)
                 else:
@@ -176,6 +181,7 @@ class Preprocessor:
             for m in out[: self.val_size]:
                 f.write(m + "\n")
 
+        print("Number of skipped files: ", self.skipped)
         return out
 
     def process_utterance(self, speaker, basename):
@@ -185,7 +191,8 @@ class Preprocessor:
         word_alignment_path = os.path.join(self.out_dir, "alignments", "word", "{}-word_alignment-{}.npy".format(speaker, basename))
         tg_path = os.path.join(self.out_dir, "TextGrid", speaker, "{}.TextGrid".format(basename))
         dur_filename = "{}-duration-{}.npy".format(speaker, basename)
-        if os.path.exists(dur_filename):
+        
+        if os.path.exists(os.path.join(self.out_dir, "duration", dur_filename)):
             return None     # duration file already exists so skip.
 
         # Get src time alignments
@@ -193,12 +200,14 @@ class Preprocessor:
 
         src_phones, duration, start, end = self.get_alignment(textgrid)
         if src_phones is None:
+            self.skipped += 1
             return None
 
         # To flatten phones
         flat_phones = list(chain.from_iterable(src_phones))
         text = "{" + " ".join(flat_phones) + "}"
         if start >= end:
+            self.skipped += 1
             return None
 
         # Read raw translation text
@@ -223,8 +232,19 @@ class Preprocessor:
                     tgt_phones.append(self.cmu.lookup(word)[0].split(' '))
                     flat_phones.extend(self.cmu.lookup(word)[0].split())
                 except TypeError:
-                    print("Word", word, self.cmu.lookup(word), translation_path)
-                    continue
+                    phones = self.g2p(word)
+                    tgt_phones.append(phones)
+                    flat_phones.extend(phones)
+
+                    with open(self.lexicon_path, "r") as f:
+                        lexicon = f.readlines()
+
+                    new_line = f"{text.upper()}\t{' '.join(phones)}\n"
+
+                    bisect.insort(lexicon, new_line)
+
+                    with open(self.lexicon_path, "w") as f:
+                        f.writelines(lexicon)
             
         # print("tgt_phones", tgt_phones, len(tgt_phones))
         # print("flat_phones", flat_phones, len(flat_phones))
@@ -236,6 +256,7 @@ class Preprocessor:
             # TODO: Also happens when there is no pronunciation for a word in lexicon.
             # Can use MFA arpabet dictionary
             print(f"{basename} Length of raw translation does not equal length of phonemes! Continuing...")
+            self.skipped += 1
             return None
 
         translation = "{" + " ".join(flat_phones) + "}"
@@ -245,6 +266,7 @@ class Preprocessor:
             word_alignments = np.load(word_alignment_path)
         except:
             print("Unable to load word_alignment: ", word_alignment_path)
+            self.skipped += 1
             return
 
         # Get src tgt phone alignments
@@ -267,6 +289,7 @@ class Preprocessor:
             print("raw translation", raw_translation)  # right here on motorcycle
             # print(self.epi.transliterate(raw_translation).split())
             print("tgt_phones", len(tgt_phones), tgt_phones)
+            self.skipped += 1
             return IndexError
 
         if phone_alignments is "weird error":
@@ -275,6 +298,7 @@ class Preprocessor:
             print("raw translation", raw_translation)  # right here on motorcycle
             # print(self.epi.transliterate(raw_translation).split())
             print("tgt_phones", len(tgt_phones), tgt_phones)
+            self.skipped += 1
             return IndexError
 
         # Compute fundamental frequency
@@ -287,6 +311,7 @@ class Preprocessor:
 
         pitch = pitch[: sum(duration)]
         if np.sum(pitch != 0) <= 1:
+            self.skipped += 1
             return None
 
         # Compute mel-scale spectrogram and energy

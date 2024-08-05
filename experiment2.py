@@ -319,28 +319,133 @@ def test_whisper_STT():
     import whisper
     import librosa
     import time
+    import os
+    import numpy as np
 
-    audio_path = "output/result/LJSpeech/pretrain/hifigan_target9.wav"
-    wav, _ = librosa.load(audio_path)
-    wav = torch.from_numpy(wav)
-    model = whisper.load_model("base").to('cpu')
-    text = model.transcribe(wav)
-    print(text)
+    audio_path = "demo/LJSpeech/LJ001-0012_ground-truth.wav"
+    model = whisper.load_model("small").to('cuda')
 
-    audio_path = "output/result/LJSpeech/pretrain/hifigan_prediction9.wav"
-    wav, _ = librosa.load(audio_path)
-    wav = torch.from_numpy(wav).to('cpu')
-    
-    start = time.time()
-    text = model.transcribe(wav)
-    print("Time taken: ", time.time() - start)
-    print(text)
-    print(text['text'])
+    files = os.listdir("demo/LJSpeech")
+    files.sort()
+    times = []
+    for file in files:
+        if file.endswith(".wav"):
+            audio_path = os.path.join("demo/LJSpeech", file)
+            
+            wav, _ = librosa.load(audio_path)
+            wav = torch.from_numpy(wav).to('cuda')
+            start = time.time()
+            text = model.transcribe(wav)
+            times.append(time.time() - start)
+            # print("\n", file, text['text'])
 
+    print("Average time: ", np.mean(times))
+    print("Total Time: ", np.sum(times))    
     # model = whisper.load_model("base").to('cuda')
     # wav = torch.randn(120000).to(torch.float32).to("cuda")
     # start = time.time()
     # text = model.transcribe(wav)
+
+def test_whisperX():
+    import whisperx
+    import os
+    import numpy as np
+    from utils.tools import pad_1D
+    import torch
+    import time
+
+    device = "cuda" 
+    batch_size = 8 # reduce if low on GPU mem
+    compute_type = "float16" # change to "int8" if low on GPU mem (may reduce accuracy)
+
+    # 1. Transcribe with original whisper (batched)
+    model = whisperx.load_model("small", device, compute_type=compute_type)
+
+    # save model to local path (optional)
+    # model_dir = "/path/"
+    # model = whisperx.load_model("large-v2", device, compute_type=compute_type, download_root=model_dir)
+    files = os.listdir("demo/LJSpeech")
+    files.sort()
+    
+    times = []
+    for file in files:
+        if file.endswith(".wav"):
+            audio_path = os.path.join("demo/LJSpeech", file)
+            audio = whisperx.load_audio(audio_path)
+            print("audio shape: ", np.shape(audio))
+            print("wav dtype:", audio.dtype)
+            start = time.time()
+            result = model.transcribe(audio, batch_size=batch_size)
+            times.append(time.time() - start)
+            # print(result["segments"][0]['text']) # before alignment
+            
+    print("Average time: ", np.mean(times))
+    print("Total Time: ", np.sum(times))
+    
+def test_insanely_fast_whisper():
+    import torch
+    from transformers import pipeline
+    from transformers.utils import is_flash_attn_2_available
+    import time
+
+    print("is_flash_attn_2_available: ", is_flash_attn_2_available())
+
+    pipe = pipeline(
+        "automatic-speech-recognition",
+        model="openai/whisper-large-v3", # select checkpoint from https://huggingface.co/openai/whisper-large-v3#model-details
+        torch_dtype=torch.float16,
+        device="cuda:0", # or mps for Mac devices
+        model_kwargs={"attn_implementation": "flash_attention_2"} if is_flash_attn_2_available() else {"attn_implementation": "sdpa"},
+    )
+
+    start = time.time()
+    outputs = pipe(
+        "demo/LJSpeech/LJ001-0012_ground-truth.wav",
+        chunk_length_s=30,
+        batch_size=24,
+        return_timestamps=False,
+    )
+    print("Time taken: ", time.time() - start)
+    print(outputs)
+
+    # Use Base environment to test since needs torch >= 2.1.1
+    # But slower than whisperx anyway (and regular whisper)
+
+
+
+def test_g2p():
+    import time
+    start = time.time()
+    from g2p_en import G2p
+    import bisect
+    from text.cmudict import CMUDict
+    print("Time taken", time.time() - start)
+
+    lexicon_path = "lexicon/librispeech-lexicon.txt"
+
+    g2p = G2p()
+    text = "pandas"
+    start = time.time()
+    phones = g2p(text)
+    print("Time taken: ", time.time() - start)
+    print(phones)
+
+    start = time.time()
+    with open(lexicon_path, "r") as f:
+        lexicon = f.readlines()
+
+    new_line = f"{text.upper()}\t{' '.join(phones)}\n"
+
+    bisect.insort(lexicon, new_line)
+
+    with open(lexicon_path, "w") as f:
+        f.writelines(lexicon)
+    print("Time taken", time.time() - start)
+
+    text = "pandas"
+    cmu = CMUDict(lexicon_path)
+    phones = cmu.lookup(text)[0].split(' ')
+    print("phones: ", phones)
 
 def new_train_val_file():
     filepaths = ["preprocessed_data/LJSpeech/train.txt",
@@ -1028,6 +1133,7 @@ def profile_data_loading():
 
 
 if __name__ == "__main__":
-    # test_npc()
-    profile_data_loading()
+    test_whisper_STT()
+    test_whisperX()
+    # test_insanely_fast_whisper()
     pass

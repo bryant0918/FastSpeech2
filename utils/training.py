@@ -47,12 +47,15 @@ def loop(preprocess_config, model_config, batch, model, Loss, discriminator, cri
     # For calculating Word Loss
     mel_size = max(batch_size//8, 1)
     if step % word_step == 0:
-        mels = [output_tgt[1][i, :output_tgt[9][i]].transpose(0,1) for i in range(mel_size)]
+        # mels = [output_tgt[1][i, :output_tgt[9][i]].transpose(0,1) for i in range(mel_size)]
+        mels = output_tgt[1][:mel_size].transpose(1,2)
         wav_predictions = vocoder_infer(
             mels,
             vocoder,
             model_config,
             preprocess_config,
+            lengths=output_tgt[9][:mel_size],
+            for_loss = True
         )
         loss_input = (batch[2][:mel_size],) + batch[8:10] + batch[20:22] + (log_duration_targets,)
         loss_predictions = output_tgt + (wav_predictions, pred_generated)
@@ -119,12 +122,16 @@ def loop(preprocess_config, model_config, batch, model, Loss, discriminator, cri
 
     # For calculating Word Loss
     if step % word_step == 0:
-        mels = [output_src[1][i, :output_src[9][i]].transpose(0,1) for i in range(mel_size)]
+        # mels = [output_src[1][i, :output_src[9][i]].transpose(0,1) for i in range(mel_size)]
+        mels = output_src[1][:mel_size].transpose(1,2)
+        
         wav_predictions = vocoder_infer(
             mels,
             vocoder,
             model_config,
             preprocess_config,
+            lengths=output_src[9][:mel_size],
+            for_loss = True
         )
         loss_input = (batch[1][:mel_size],) + batch[8:10] + (re_realigned_p, re_realigned_e, realigned_log_d)
         loss_predictions = output_src[:10] + (output_tgt[10],) + output_src[11:] + (wav_predictions, pred_generated)
@@ -149,7 +156,7 @@ def pretrain_loop(preprocess_config, model_config, batch, model, Loss, discrimin
     start0 = time.time()
     # Generator Forward pass: Src to Src
     output = model(*(input))
-    print("Time for forward function: ", time.time() - start0)
+    # print("Time for forward function: ", time.time() - start0)
 
     d_loss = torch.tensor(0.0, device=device)
     if step % discriminator_step == 0 or step >= warm_up_step:
@@ -181,12 +188,16 @@ def pretrain_loop(preprocess_config, model_config, batch, model, Loss, discrimin
     # For calculating Word Loss
     if step % word_step == 0:
         mel_size = max(batch_size//8, 1)
-        mels = [output[1][i, :output[9][i]].transpose(0,1) for i in range(mel_size)]
+        # mels = [output[1][i, :output[9][i]].transpose(0,1) for i in range(mel_size)]
+        mels = output[1][:mel_size].transpose(1,2)
+        
         wav_predictions = vocoder_infer(
             mels,
             vocoder,
             model_config,
             preprocess_config,
+            lengths=output[9][:mel_size],
+            for_loss = True
         )
         loss_input = (batch[1][:mel_size],) + batch[7:9] + batch[11:13] + (log_duration_targets,)
         loss_predictions = output + (wav_predictions, pred_generated)
@@ -197,6 +208,6 @@ def pretrain_loop(preprocess_config, model_config, batch, model, Loss, discrimin
     start1 = time.time()
     # Calculate loss for Src to Src
     losses = Loss(loss_input, loss_predictions, "to_src", word_step)
-    print("Time for loss function: ", time.time() - start1)
+    # print("Time for loss function: ", time.time() - start1)
     
     return losses, output, d_loss.item()

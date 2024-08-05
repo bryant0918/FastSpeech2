@@ -176,25 +176,44 @@ def get_vocoder(config, device):
     return vocoder
 
 
-def vocoder_infer(mels, vocoder, model_config, preprocess_config, lengths=None):
+def vocoder_infer(mels, vocoder, model_config, preprocess_config, lengths=None, for_loss=False):
     name = model_config["vocoder"]["model"]
 
-    if isinstance(mels, list):
-        wavs = []
-        for mel in mels:
-            if mel.shape[1] == 0:
-                wavs.append(None)
-                continue
-            if name == "MelGAN":
-                wav = vocoder.inverse(mel / np.log(10))
-            elif name == "HiFi-GAN":
-                wav = vocoder(mel).squeeze(1).squeeze(0)
-            elif name == "BigVGAN":
-                wav = vocoder(mel.unsqueeze(0)).squeeze(1).squeeze(0)
-            # wav = wav * preprocess_config["preprocessing"]["audio"]["max_wav_value"]     
-            wavs.append(wav)
-        if len(wavs) == 0:
-            return None
+    # UNUSED with whisperx (would use with whisper which requires tensors as input)
+    # if isinstance(mels, list):
+    #     wavs = []
+    #     for mel in mels:
+    #         if mel.shape[1] == 0:
+    #             wavs.append(None)
+    #             continue
+    #         if name == "MelGAN":
+    #             wav = vocoder.inverse(mel / np.log(10))
+    #         elif name == "HiFi-GAN":
+    #             wav = vocoder(mel).squeeze(1).squeeze(0)
+    #             print("type wav: ", type(wav))
+    #             print("wav shape:" , wav.shape)
+    #         elif name == "BigVGAN":
+    #             wav = vocoder(mel.unsqueeze(0)).squeeze(1).squeeze(0)
+    #         # wav = wav * preprocess_config["preprocessing"]["audio"]["max_wav_value"]     
+    #         wavs.append(wav)
+    #     if len(wavs) == 0:
+    #         return None
+
+    if for_loss:
+        if name == "MelGAN":
+            wavs = vocoder.inverse(mels / np.log(10))
+        elif name == "HiFi-GAN":
+            if mels.shape[2] == 0:
+                return None
+            wavs = vocoder(mels).squeeze(1)
+
+        wavs = wavs.cpu().numpy()
+        
+        wavs = [wav for wav in wavs if np.shape(wav)[0] > 0]
+
+        for i in range(len(mels)):
+            if lengths is not None:
+                wavs[i] = wavs[i][: lengths[i]]
 
     else:
         with torch.no_grad():

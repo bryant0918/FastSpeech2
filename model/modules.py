@@ -511,7 +511,6 @@ class NPC(nn.Module):
                         .format(self.kernel_size+2*self.n_blocks))
         return msg_list
 
-
     def report_ppx(self):
         ''' Returns perplexity of VQ distribution '''
         if self.apply_vq:

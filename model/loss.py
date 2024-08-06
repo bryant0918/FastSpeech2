@@ -58,6 +58,7 @@ class FastSpeech2Loss(nn.Module):
             extracted_e,
             predicted_e,
             prosody_reg_term,
+            npc_loss,
             audio,
             pred_generated,
         ) = predictions
@@ -109,6 +110,7 @@ class FastSpeech2Loss(nn.Module):
             mel_loss = self.mae_loss(mel_predictions, mel_targets)
             postnet_mel_loss = self.mae_loss(postnet_mel_predictions, mel_targets)
 
+
             # Multiply by position weights and sum to get scalar loss
             # mel_loss = torch.sum(mel_loss * position_weights)
             # postnet_mel_loss = torch.sum(postnet_mel_loss * position_weights)
@@ -136,9 +138,8 @@ class FastSpeech2Loss(nn.Module):
         # Calculate discriminator loss for generator with label smoothing
         g_loss = self.bce_loss(pred_generated, torch.ones_like(pred_generated) * self.label_smoothing)
 
-        total_loss = (
-            mel_loss + postnet_mel_loss + duration_loss + pitch_loss + energy_loss 
-            + pros_loss + word_loss + full_duration_loss + g_loss + prosody_reg_term
+        total_loss = (mel_loss + postnet_mel_loss + duration_loss + pitch_loss + energy_loss 
+                      + pros_loss + word_loss + full_duration_loss + g_loss + prosody_reg_term + npc_loss
         )
         
         return (
@@ -153,6 +154,7 @@ class FastSpeech2Loss(nn.Module):
             full_duration_loss,
             g_loss,
             prosody_reg_term,
+            npc_loss,
         )
 
 

@@ -26,6 +26,7 @@ class EmotivBeta(nn.Module):
                                         model_config["prosody_extractor"]["dim_out"])
         self.variance_adaptor = VarianceAdaptor(preprocess_config, model_config)
         self.npc = NPC(model_config)
+        self.l1 = nn.L1Loss()
         self.decoder = Decoder(model_config)
         self.mel_linear = nn.Linear(
             model_config["transformer"]["decoder_hidden"],
@@ -136,9 +137,8 @@ class EmotivBeta(nn.Module):
             self.variance_adaptor(h_sd, tgt_masks, mel_masks, max_mel_len, p_targets, e_targets, d_targets, p_control,
                                   e_control, d_control, )
 
-        print("Output shape: ", output.shape)
         npc_out, _ = self.npc(output)
-        print("NPC out shape: ", npc_out.shape)
+        npc_loss = self.l1(npc_out, output)
 
         output, mel_masks = self.decoder(output, mel_masks)
         output = self.mel_linear(output)
@@ -146,7 +146,7 @@ class EmotivBeta(nn.Module):
 
         e_tgt = (e_tgt[0][:batch_size//2], e_tgt[1][:batch_size//2], e_tgt[2][:batch_size//2])
         return (output, postnet_output, p_predictions, e_predictions, log_d_predictions, d_rounded, tgt_masks,
-                mel_masks, text_lens, mel_lens, agg_extracted_prosody, e_tgt, prosody_reg_term)
+                mel_masks, text_lens, mel_lens, agg_extracted_prosody, e_tgt, prosody_reg_term, npc_loss)
 
 class FastSpeech2Pros(nn.Module):
     """ FastSpeech2 """

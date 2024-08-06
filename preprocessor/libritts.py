@@ -59,6 +59,7 @@ def prepare_align(config):
                     continue
                 base_name = file_name[:-4]
 
+                # Skip already processed files
                 alignments_path = os.path.join(preprocessed_dir, "alignments", "word", "{}-word_alignment-{}.npy".format(speaker, base_name))
                 if os.path.exists(alignments_path):
                         continue

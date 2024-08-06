@@ -3,8 +3,8 @@ dataset: "LibriTTS"
 path:
   corpus_path: "/home/ditto/Datasets/Speech/en/LibriTTS-R/train-other-500"
   lexicon_path: "lexicon/librispeech-lexicon.txt"
-  raw_path: "raw_data/LibriTTS"
-  preprocessed_path: "preprocessed_data/LibriTTS"
+  raw_path: "/home/ditto/Datasets/FastSpeech2/raw_data/LibriTTS"
+  preprocessed_path: "/home/ditto/Datasets/FastSpeech2/preprocessed_data/LibriTTS"
 
 preprocessing:
   val_size: 512

@@ -5,8 +5,8 @@ path:
   # corpus_path: "/home/ditto/Datasets/data/audio/LJSpeech-1.1"
   corpus_path: "/home/ditto/Datasets/LJSpeech-1.1"
   lexicon_path: "lexicon/librispeech-lexicon.txt"
-  raw_path: "raw_data/LJSpeech"
-  preprocessed_path: "preprocessed_data/tiny/LJSpeech"
+  raw_path: "/home/ditto/Datasets/FastSpeech2/raw_data/LJSpeech"
+  preprocessed_path: "/home/ditto/Datasets/FastSpeech2/preprocessed_data/tiny/LJSpeech"
 
 preprocessing:
   val_size: 512

@@ -3,8 +3,8 @@ dataset: "Spanish"
 path:
   corpus_path: "/home/ditto/Datasets/Speech/es"
   lexicon_path: ""  # Only used in synthesize.py
-  raw_path: "raw_data/Spanish_new"
-  preprocessed_path: "preprocessed_data/Spanish_new"
+  raw_path: "/home/ditto/Datasets/FastSpeech2/raw_data/Spanish_new"
+  preprocessed_path: "/home/ditto/Datasets/FastSpeech2/preprocessed_data/Spanish_new"
 
 preprocessing:
   val_size: 512

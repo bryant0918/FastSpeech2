@@ -1,23 +1,29 @@
 deep-translator >= 1.11.4
 epitran >= 1.25
+faster-whisper==1.0.0
 g2p-en >= 2.1.0
 g2pk >= 0.9.4
 inflect >= 4.1.0
 jamo >= 0.4.1
 librosa == 0.10.2.post1
 matplotlib == 3.9.0
+nltk
 numba == 0.59.1
 numpy == 1.26.4
 openai-whisper
+pandas
 pypinyin>=0.39.0
 PyYAML
 scikit-learn
 scipy
+setuptools>=65
 singing-girl == 0.0.5
 simalign >= 0.4
 soundfile>=0.10.3.post1
 tensorboard >= 2.2.2
 tgt >= 1.4.4
 torch
+torchaudio>=2
 tqdm>=4.46.1
+transformers
 unidecode >= 1.1.1

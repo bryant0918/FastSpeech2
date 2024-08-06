@@ -109,8 +109,8 @@ def main(args, configs):
                 for batch in batches:
                     start1 = time.time()
                     batch = to_device(batch, device)
-                    # batch = (ids, raw_texts, speakers, langs, texts, src_lens, max_src_len, mels, mel_lens, max_mel_len, 
-                    #           speaker_embeddings, pitches, energies, durations)
+                    # batch = (ids, raw_texts, speakers, text_langs, texts, src_lens, max_src_len, mels, mel_lens, 
+                    #          max_mel_len, tgt_langs, speaker_embeddings, pitches, energies, durations)
                     # print("time to send to device: ", time.time() - start1)
 
                     if step == 100:
@@ -165,7 +165,7 @@ def main(args, configs):
 
                     start4 = time.time()
                     if step % synth_step == 0:
-                        targets = (batch[0],) +(batch[7],) + batch[11:]
+                        targets = (batch[0],) +(batch[7],) + batch[12:]
                         predictions = (output[1],) + output[8:10]
                         fig, wav_reconstruction, wav_prediction, tag = synth_one_sample_pretrain(
                             targets,

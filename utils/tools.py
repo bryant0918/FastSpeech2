@@ -45,9 +45,9 @@ def to_device(data, device):
                 alignments, pitches, energies, durations, realigned_p, realigned_e, realigned_d)
 
     # For Pros Pretraining
-    if len(data) == 14:
-        (ids, raw_texts, speakers, text_langs, texts, src_lens, max_src_len, mels, mel_lens, max_mel_len, speaker_embeddings,
-        pitches, energies, durations) = data
+    if len(data) == 15:
+        (ids, raw_texts, speakers, text_langs, texts, src_lens, max_src_len, mels, mel_lens, max_mel_len, tgt_langs, 
+         speaker_embeddings, pitches, energies, durations) = data
 
         speakers = torch.from_numpy(speakers).long().to(device)
         text_langs = torch.from_numpy(text_langs).long().to(device)
@@ -56,6 +56,7 @@ def to_device(data, device):
         src_lens = torch.from_numpy(src_lens).to(device)
         mels = torch.from_numpy(mels).float().to(device)
         mel_lens = torch.from_numpy(mel_lens).to(device)
+        tgt_langs = torch.from_numpy(tgt_langs).long().to(device)
 
         speaker_embeddings = torch.from_numpy(np.array(speaker_embeddings)).to(device)
 
@@ -63,8 +64,8 @@ def to_device(data, device):
         energies = torch.from_numpy(energies).to(device)
         durations = torch.from_numpy(durations).long().to(device)
 
-        return (ids, raw_texts, speakers, text_langs, texts, src_lens, max_src_len, mels, mel_lens, max_mel_len, speaker_embeddings,
-                pitches, energies, durations)
+        return (ids, raw_texts, speakers, text_langs, texts, src_lens, max_src_len, mels, mel_lens, max_mel_len, tgt_langs, 
+                speaker_embeddings, pitches, energies, durations)
 
     # For Pros Synth
     if len(data) == 8:

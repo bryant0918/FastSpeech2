@@ -238,7 +238,7 @@ class PreTrainDataset(Dataset):
 
         self.batch_size = train_config["optimizer"]["batch_size"]
 
-        self.src_lang, _, self.basename, self.speaker, self.text, self.raw_text, _, _ = self.process_meta(
+        self.src_lang, self.tgt_lang, self.basename, self.speaker, self.text, self.raw_text = self.process_meta(
             filename
         )
 
@@ -264,6 +264,8 @@ class PreTrainDataset(Dataset):
         raw_text = self.raw_text[idx]
         src_lang = self.src_lang[idx]
         src_lang_id = lang_to_id[src_lang]
+        tgt_lang = self.tgt_lang[idx]
+        tgt_lang_id = lang_to_id[tgt_lang]
 
         phone = np.array(text_to_sequence(self.text[idx], self.cleaners[src_lang], src_lang))
         
@@ -313,6 +315,7 @@ class PreTrainDataset(Dataset):
             "text": phone,
             "raw_text": raw_text,
             "mel": mel,
+            "tgt_lang": tgt_lang_id,
             "pitch": pitch,
             "energy": energy,
             "duration": duration,
@@ -322,21 +325,19 @@ class PreTrainDataset(Dataset):
         return sample
 
     def process_meta(self, filename):
-        src_lang, tgt_lang, name, speaker, text, raw_text, translation, raw_translation = [], [], [], [], [], [], [], []
+        src_lang, tgt_lang, name, speaker, text, raw_text = [], [], [], [], [], []
         with open(os.path.join(self.parent_dir, filename), "r", encoding="utf-8") as f:
 
             for line in f.readlines():
-                sl, tl, n, s, t, r, tr, rtr = line.strip("\n").split("|")
+                sl, tl, n, s, t, r, _, _ = line.strip("\n").split("|")
                 src_lang.append(sl)
                 tgt_lang.append(tl)
                 name.append(n)
                 speaker.append(s)
                 text.append(t)
                 raw_text.append(r)
-                translation.append(tr)
-                raw_translation.append(rtr)
 
-        return src_lang, tgt_lang, name, speaker, text, raw_text, translation, raw_translation
+        return src_lang, tgt_lang, name, speaker, text, raw_text
 
     def reprocess(self, data, idxs):
         ids = [data[idx]["id"] for idx in idxs]
@@ -345,6 +346,7 @@ class PreTrainDataset(Dataset):
         texts = [data[idx]["text"] for idx in idxs]
         raw_texts = [data[idx]["raw_text"] for idx in idxs]
         mels = [data[idx]["mel"] for idx in idxs]
+        tgt_langs = [data[idx]["tgt_lang"] for idx in idxs]
         pitches = [data[idx]["pitch"] for idx in idxs]
         energies = [data[idx]["energy"] for idx in idxs]
         durations = [data[idx]["duration"] for idx in idxs]
@@ -357,6 +359,7 @@ class PreTrainDataset(Dataset):
         text_langs = np.array(text_langs)
         texts = pad_1D(texts)
         mels = pad_2D(mels)
+        tgt_langs = np.array(tgt_langs)
         pitches = pad_1D(pitches)
         energies = pad_1D(energies)
         durations = pad_1D(durations)
@@ -372,6 +375,7 @@ class PreTrainDataset(Dataset):
             mels,
             mel_lens,
             max(mel_lens),
+            tgt_langs,
             speaker_embeddings,
             pitches,
             energies,

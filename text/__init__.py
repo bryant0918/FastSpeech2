@@ -12,6 +12,7 @@ _id_to_symbol = {i: s for i, s in enumerate(symbols)}
 
 # Only for Extractor side (Text side uses _lang id in symbols)
 lang_to_id = {l: i for i, l in enumerate(_langs)}
+id_to_lang = {i: l for i, l in enumerate(_langs)}
 
 _vocab_size = len(symbols)
 

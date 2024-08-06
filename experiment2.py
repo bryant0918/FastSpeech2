@@ -347,7 +347,7 @@ def test_whisper_STT():
     # text = model.transcribe(wav)
 
 def test_whisperX():
-    import whisperx
+    from whisperX import whisperx
     import os
     import numpy as np
     from utils.tools import pad_1D
@@ -372,10 +372,15 @@ def test_whisperX():
         if file.endswith(".wav"):
             audio_path = os.path.join("demo/LJSpeech", file)
             audio = whisperx.load_audio(audio_path)
-            print("audio shape: ", np.shape(audio))
+            print("\naudio shape: ", np.shape(audio))
             print("wav dtype:", audio.dtype)
+
+            audio = torch.from_numpy(audio).to(device)
+            print("Audio shape: ", audio.shape)
+            print("audio dtype:", audio.dtype)
+
             start = time.time()
-            result = model.transcribe(audio, batch_size=batch_size)
+            result = model.transcribe(audio, batch_size=batch_size, language='en')
             times.append(time.time() - start)
             # print(result["segments"][0]['text']) # before alignment
             
@@ -841,40 +846,21 @@ def test_realign_ped():
     
 def test_npc():
     from model.modules import NPC
+    import yaml
     
-    # Test My NPC Module
-    # npc = NPCModule(256, 128, 512, 128)
-    # x = torch.randn(4, 87, 256)
-    # mask = torch.ones(4, 87)
-    # mask[:, 50:] = 0
-    # y = npc(x, mask.unsqueeze(-1))
-    # print(y.shape)
+    model_config = "config/Tiny/model.yaml"
+    model_config = yaml.load(open(model_config, "r"), Loader=yaml.FullLoader)
 
     # Test Alexander-H-Liu's NPC Module
-    x = torch.randn(4, 87, 256).transpose(1, 2)
+    x = torch.randn(4, 87, 256)
 
-    kernel_size = 15     # Receptive field size (R) = kernel_size + 2*(n_blocks)
-    mask_size = 5     # Desired input mask size (M_in) as described in NPC paper
-    n_blocks = 4                     # Number of ConvBlocks stacked in NPC model
-    hidden_size = 512                       # Dimension of feature of all layers
-    dropout = 0.1                                         # Dropout in ConvBlock
-    residual = True                           # Residual connection in ConvBlock
-    batch_norm = True                             # Apply BatchNorm in ConvBlock
-    activate = 'relu'                         # Activation function of ConvBlock
-    disable_cross_layer = False      # Apply Masked ConvBlock at last layer only
-    vq = {
-      'codebook_size': [64,64,64,64],    # Codebook size of each group in VQ-layer
-      'code_dim': [128,128,128,128], # Dim of each group summing up to hidden_size
-      'gumbel_temperature': 1.0        # Temperature of Gumbel Softmax in VQ-layer
-    }
+    print("x shape", x.shape)
     
-    npc = NPC(87, hidden_size, n_blocks, dropout, residual,
-              kernel_size, mask_size, vq=vq, batch_norm=batch_norm, 
-              activate=activate, disable_cross_layer=disable_cross_layer, dim_bottleneck=None)
+    npc = NPC(model_config)
 
     print(sum(param.numel() for param in npc.parameters()))
 
-    pred, _ = npc(x, testing=True)
+    pred, _ = npc(x)
 
     print(pred.shape)
     loss = torch.nn.functional.l1_loss(pred, x)
@@ -1186,6 +1172,6 @@ def custom_cyclic_lr():
 
 if __name__ == "__main__":
     # test_whisper_STT()
-    # test_whisperX()
-    custom_cyclic_lr()
+    test_whisperX()
+    # test_npc()
     pass

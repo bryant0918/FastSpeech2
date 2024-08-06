@@ -40,6 +40,21 @@ npc:
   hidden_channels: 256
   num_embeddings: 256
   embedding_dim: 256
+  input_size: 256
+  hidden_size: 512
+  n_blocks: 4
+  dropout: 0.1
+  residual: True
+  kernel_size: 15 
+  mask_size: 5
+  vq: 
+    codebook_size: [64,64,64,64]    # Codebook size of each group in VQ-layer
+    code_dim: [128,128,128,128] # Dim of each group summing up to hidden_size
+    gumbel_temperature: 1.0 
+  batch_norm: True
+  activate: 'relu'
+  disable_cross_layer: False
+  dim_bottleneck: null
 
 multi_speaker: False
 
@@ -50,7 +65,7 @@ vocoder:
   speaker: "universal" # support  'LJSpeech', 'universal'
 
 synthesizer:
-  model: "FastSpeech2Pros" # support 'FastSpeech2', 'FastSpeech2Pros'"
+  model: "EmotivBeta" # support 'FastSpeech2Pros', 'EmotivBeta' "
 
 transcriber:  # Whisper
   model: "base"  # support 'tiny', 'base', 'small', 'medium', 'large'

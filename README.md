@@ -224,8 +224,8 @@ python3 prepare_align.py config/LJSpeech/preprocess.yaml
 ```
 nohup python3 prepare_align.py config/LJSpeech/preprocess.yaml &
 ps -ef | grep 2014664
-nohup python3 prepare_align.py config/LibriTTS/preprocess_es.yaml > align.log 2>&1 &
-2886708
+nohup python3 prepare_align.py config/LibriTTS/preprocess.yaml > align.log 2>&1 &
+56283
 ```
 
 ### Clean Audio

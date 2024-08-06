@@ -159,7 +159,6 @@ class VarianceAdaptor(nn.Module):
             mel_mask,
         )
 
-
 class LengthRegulator(nn.Module):
     """Length Regulator"""
 
@@ -195,7 +194,6 @@ class LengthRegulator(nn.Module):
     def forward(self, x, duration, max_len):
         output, mel_len = self.LR(x, duration, max_len)
         return output, mel_len
-
 
 class VariancePredictor(nn.Module):
     """Duration, Pitch and Energy Predictor"""
@@ -252,7 +250,6 @@ class VariancePredictor(nn.Module):
 
         return out
 
-
 class Conv(nn.Module):
     """
     Convolution Module
@@ -298,7 +295,6 @@ class Conv(nn.Module):
 
         return x
 
-
 EPS = 1e-10
 
 class VQLayer(nn.Module):
@@ -334,7 +330,7 @@ class VQLayer(nn.Module):
             onehot_BxLxC.scatter_(1, ind.view(-1, 1), 1)
             onehot_BxLxC = onehot_BxLxC.view(*shape)
         else:
-            onehot_BxLxC = gumbel_softmax(logits_BxLxC, tau=self.gumbel_temperature, 
+            onehot_BxLxC = F.gumbel_softmax(logits_BxLxC, tau=self.gumbel_temperature, 
                                           hard=True, eps=EPS, dim=-1)
             self.token_usg += onehot_BxLxC.detach().cpu()\
                         .reshape(-1,self.codebook_size).sum(dim=0).numpy()
@@ -430,11 +426,21 @@ class ConvBlock(nn.Module):
 
 class NPC(nn.Module):
     """ NPC model with stacked ConvBlocks & Masked ConvBlocks """
-    def __init__(self, input_size, hidden_size, n_blocks, dropout, residual,
-                 kernel_size, mask_size, vq=None, batch_norm=True, 
-                 activate='relu', disable_cross_layer=False,
-                 dim_bottleneck=None):
+    def __init__(self, config):
         super(NPC, self).__init__()
+
+        kernel_size = config['npc']['kernel_size']
+        mask_size = config['npc']['mask_size']
+        n_blocks = config['npc']['n_blocks']
+        hidden_size = config['npc']['hidden_size']
+        input_size = config['npc']['input_size']
+        dropout = config['npc']['dropout']
+        batch_norm = config['npc']['batch_norm']
+        activate = config['npc']['activate']
+        residual = config['npc']['residual']
+        disable_cross_layer = config['npc']['disable_cross_layer']
+        vq = config['npc']['vq']
+        dim_bottleneck = config['npc']['dim_bottleneck']
 
         # Setup
         assert kernel_size%2==1,'Kernel size can only be odd numbers'
@@ -567,62 +573,6 @@ class NPC(nn.Module):
         else:
             pred = self.postnet(feat)
         return pred, feat
-
-
-# class ConvBlock(nn.Module):
-#     def __init__(self, in_channels, out_channels, kernel_size=3, stride=1, padding=1):
-#         super(ConvBlock, self).__init__()
-#         self.conv = nn.Conv1d(in_channels, out_channels, kernel_size, stride, padding)
-#         self.bn = nn.BatchNorm1d(out_channels)
-#         self.relu = nn.ReLU()
-
-#     def forward(self, x):
-#         return self.relu(self.bn(self.conv(x)))
-    
-# class MaskedConvBlock(ConvBlock):
-#     def forward(self, x, mask):
-#         print("x shape: ", x.shape)
-#         x = x.transpose(1, 2) * mask
-#         return super().forward(x.transpose(1, 2))
-
-# class VectorQuantization(nn.Module):
-#     def __init__(self, num_embeddings, embedding_dim):
-#         super(VectorQuantization, self).__init__()
-#         self.embedding = nn.Embedding(num_embeddings, embedding_dim)
-#         self.embedding.weight.data.uniform_(-1.0 / num_embeddings, 1.0 / num_embeddings)
-
-#     def forward(self, x):
-#         # Flatten x to (batch_size*sequence_length, embedding_dim)
-#         flat_x = x.reshape(-1, x.size(2))
-#         # Compute L2 distance between x and each embedding
-#         distances = (torch.sum(flat_x**2, dim=1, keepdim=True) 
-#                      + torch.sum(self.embedding.weight**2, dim=1)
-#                      - 2 * torch.matmul(flat_x, self.embedding.weight.t()))
-#         # Choose the closest embedding
-#         indices = torch.argmin(distances, dim=1).unsqueeze(1)
-#         return self.embedding(indices).view_as(x)
-
-# class NPCModule(nn.Module):
-    # def __init__(self, in_channels, hidden_channels, num_embeddings, embedding_dim):
-    #     super(NPCModule, self).__init__()
-
-    #     self.conv1 = ConvBlock(in_channels, hidden_channels)
-    #     self.masked_conv1 = MaskedConvBlock(hidden_channels, hidden_channels)
-    #     self.conv2 = ConvBlock(hidden_channels, hidden_channels)
-    #     self.masked_conv2 = MaskedConvBlock(hidden_channels, hidden_channels)
-    #     self.vq = VectorQuantization(num_embeddings, embedding_dim)
-    #     self.projection = nn.Linear(embedding_dim, in_channels)
-
-    # def forward(self, x, mask):
-    #     x = x.transpose(1, 2)
-    #     x1 = self.conv1(x)
-    #     x1_masked = self.masked_conv1(x1, mask)
-    #     x2 = self.conv2(x1_masked)
-    #     x2_masked = self.masked_conv2(x2, mask)
-    #     ht = x1_masked + x2_masked
-    #     vq_ht = self.vq(ht.transpose(1, 2))
-    #     yt = self.projection(vq_ht)
-    #     return yt
 
 def batch_norm(X, gamma, beta, moving_mean, moving_var, eps, momentum):
     # Use is_grad_enabled to determine whether we are in training mode

@@ -166,7 +166,7 @@ def evaluate_pretrain(model, discriminator, step, configs, logger=None, vocoder=
     )
 
     if logger is not None:
-        targets = (batch[0],) +(batch[7],) + batch[11:]
+        targets = (batch[0],) +(batch[7],) + batch[12:]
         predictions = (output[1],) + output[8:10]
         
         fig, wav_reconstruction, wav_prediction, tag = synth_one_sample_pretrain(

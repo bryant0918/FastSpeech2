@@ -6,7 +6,7 @@ import numpy as np
 
 import hifigan
 # import bigvgan
-from model import ScheduledOptim, CyclicDecayLR, FastSpeech2Pros, ProsLearner, Discriminator
+from model import ScheduledOptim, CyclicDecayLR, FastSpeech2Pros, EmotivBeta, Discriminator
 
 
 def get_model(args, configs, device, train=False):
@@ -15,8 +15,8 @@ def get_model(args, configs, device, train=False):
     pretrain = train_config['pretrain']
 
     if "synthesizer" in model_config:
-        if model_config["synthesizer"]["model"] == "FastSpeech2":
-            model = FastSpeech2(preprocess_config, model_config).to(device)
+        if model_config["synthesizer"]["model"] == "EmotivBeta":
+            model = EmotivBeta(preprocess_config, model_config).to(device)
         elif model_config["synthesizer"]["model"] == "FastSpeech2Pros":
             model = FastSpeech2Pros(preprocess_config, model_config, pretrain).to(device)
     elif "pros_learner" in model_config:
@@ -264,10 +264,8 @@ def vocoder_infer(mels, vocoder, model_config, preprocess_config, lengths=None, 
             if mels.shape[2] == 0:
                 return None
             wavs = vocoder(mels).squeeze(1)
-
-        wavs = wavs.cpu().numpy()
         
-        wavs = [wav for wav in wavs if np.shape(wav)[0] > 0]
+        wavs = [wav for wav in wavs if wav.shape[0] > 0]
 
         for i in range(len(mels)):
             if lengths is not None:

@@ -2,9 +2,10 @@ import torch
 import torch.nn as nn
 import torch.distributions as dist
 from transformers import BertModel, BertTokenizer
-import whisper
-import whisperx
-    
+# import whisper
+from whisperX import whisperx
+from text import id_to_lang
+
 
 class FastSpeech2Loss(nn.Module):
     """ FastSpeech2 Loss """
@@ -38,6 +39,7 @@ class FastSpeech2Loss(nn.Module):
         (   text,
             mel_targets, 
             mel_lens_targets,
+            lang_targets,
             pitch_targets, 
             energy_targets, 
             log_duration_targets,
@@ -124,7 +126,7 @@ class FastSpeech2Loss(nn.Module):
         
         # word_loss  (Requires extracting predicted phonemes from mel Spectrogram) whisper
         if audio is not None:
-            word_loss = self.word_loss(audio, text)
+            word_loss = self.word_loss(audio, text, lang_targets)
         else:
             word_loss = torch.tensor([0]).to(device)
 
@@ -262,27 +264,27 @@ class WordLoss(nn.Module):
         self.bert_model = BertModel.from_pretrained(bert)
         self.cosine_loss = nn.CosineEmbeddingLoss()
     
-    def forward(self, audio, text):
+    def forward(self, audio, text, lang_ids):
         """
         Calculate the word loss.
         Input:
             audio: Audio waveform
             text (str): Raw Text
+            lang_ids: Language ids
         Performs Speech to Text on audio and compares to text.
         Uses 
-        
         Output: Loss
-        
         """
         pred_texts = []
 
         import time
         start = time.time()
-        for aud in audio:
+        for i, aud in enumerate(audio):
             if aud is None:
                 pred_texts.append("")
             else:
-                predicted_text = self.transcriber.transcribe(aud)
+                # Language here is id not string
+                predicted_text = self.transcriber.transcribe(aud, language=id_to_lang[lang_ids[i].item()])
                 if len(predicted_text["segments"]) == 0:
                     pred_texts.append("")
                 else:

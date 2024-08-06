@@ -151,7 +151,7 @@ def pretrain_loop(preprocess_config, model_config, batch, model, Loss, discrimin
 
     # Custom feature selection to not over-rely on input audio
     mels = batch[7][:batch_size//2]
-    input = (training,) + batch[3:7] + (mels,) + batch[8:11] + (None,) + batch[11:]
+    input = (training,) + batch[3:7] + (mels,) + batch[8:10] + (batch[11], None) + batch[12:]
   
     start0 = time.time()
     # Generator Forward pass: Src to Src
@@ -199,10 +199,10 @@ def pretrain_loop(preprocess_config, model_config, batch, model, Loss, discrimin
             lengths=output[9][:mel_size],
             for_loss = True
         )
-        loss_input = (batch[1][:mel_size],) + batch[7:9] + batch[11:13] + (log_duration_targets,)
+        loss_input = (batch[1][:mel_size],) + batch[7:9] + (batch[10],) + batch[12:14] + (log_duration_targets,)
         loss_predictions = output + (wav_predictions, pred_generated)
     else:
-        loss_input = (None,) + batch[7:9] + batch[11:13] + (log_duration_targets,)
+        loss_input = (None,) + batch[7:9] + (batch[10],) + batch[12:14] + (log_duration_targets,)
         loss_predictions = output + (None, pred_generated)
     
     start1 = time.time()

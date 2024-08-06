@@ -1,4 +1,5 @@
 import os
+import subprocess
 
 import librosa
 import numpy as np
@@ -10,7 +11,18 @@ from text.cleaners import spanish_cleaners
 
 from deep_translator import GoogleTranslator
 from simalign import SentenceAligner
+from transformers import MarianMTModel, MarianTokenizer
+from api_keys import my_proxy
 
+
+def translate(text, tokenizer, model):
+    # Tokenize the input text
+    inputs = tokenizer(text, return_tensors="pt", padding=True, truncation=True)
+    # Generate translation using the model
+    translated = model.generate(**inputs)
+    # Decode the translated text
+    translated_text = tokenizer.decode(translated[0], skip_special_tokens=True)
+    return translated_text
 
 def prepare_align(config):
     in_dir = config["path"]["corpus_path"]
@@ -22,7 +34,17 @@ def prepare_align(config):
 
     os.makedirs((os.path.join(preprocessed_dir, "alignments", "word")), exist_ok=True)
     word_aligner = SentenceAligner(model="bert", token_type="bpe", matching_methods="m")
-    translator  = GoogleTranslator(source='en', target='es')
+    translator  = GoogleTranslator(source='en', target='es', proxies=my_proxy)
+    google_translate = True
+
+    # Start vpn for proxy
+    script_path = "/home/ditto/Datasets/vpn/cyberghost/start_vpn.sh"
+    subprocess.run([script_path], check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    
+    # Load the tokenizer and model
+    model_name = 'Helsinki-NLP/opus-mt-es-en'
+    tokenizer = MarianTokenizer.from_pretrained(model_name)
+    model = MarianMTModel.from_pretrained(model_name)
 
     # Get list of files of failed speech restoration
     dataset_path = os.path.dirname(in_dir)
@@ -40,8 +62,6 @@ def prepare_align(config):
                 alignments_path = os.path.join(preprocessed_dir, "alignments", "word", "{}-word_alignment-{}.npy".format(speaker, base_name))
                 if os.path.exists(alignments_path):
                         continue
-                else:
-                    print(f"Processing {base_name}")
 
                 text_path = os.path.join(in_dir, speaker, chapter, "{}.normalized.txt".format(base_name))
                 if not os.path.exists(text_path):
@@ -64,8 +84,21 @@ def prepare_align(config):
                 with open(text_path) as f:
                     text = f.readline().strip("\n")
                 text = _clean_text(text, cleaners)
-
-                translation = translator.translate(text)
+                
+                # Use google translate then restart container.
+                if google_translate:
+                    try:
+                        translation = translator.translate(text)
+                    except:
+                        subprocess.run([script_path], check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                        try:
+                            translation = translator.translate(text)
+                        except:
+                            google_translate = False
+                            translation = translate(text, tokenizer, model)
+                else:
+                    translation = translate(text, tokenizer, model)
+                
                 translation = spanish_cleaners(translation)
 
                 os.makedirs(os.path.join(out_dir, speaker), exist_ok=True)

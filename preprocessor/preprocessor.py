@@ -94,8 +94,6 @@ class Preprocessor:
                 if ".wav" not in wav_name:
                     continue
 
-                # print(wav_name)
-
                 basename = wav_name.split(".")[0]
                 tg_path = os.path.join(self.out_dir, "TextGrid", speaker, "{}.TextGrid".format(basename))
                 if os.path.exists(tg_path):
@@ -122,47 +120,50 @@ class Preprocessor:
         # Perform normalization if necessary
         if self.pitch_normalization:
             print("Pitch_scaler", pitch_scaler)
-            print(pitch_scaler.mean_)
-            pitch_mean = pitch_scaler.mean_[0]
-            pitch_std = pitch_scaler.scale_[0]
+            if hasattr(pitch_scaler, 'mean_'):
+                print(pitch_scaler.mean_)
+                pitch_mean = pitch_scaler.mean_[0]
+                pitch_std = pitch_scaler.scale_[0]
         else:
             # A numerical trick to avoid normalization...
             pitch_mean = 0
             pitch_std = 1
         if self.energy_normalization:
-            energy_mean = energy_scaler.mean_[0]
-            energy_std = energy_scaler.scale_[0]
+            if hasattr(energy_scaler, 'mean_'):
+                energy_mean = energy_scaler.mean_[0]
+                energy_std = energy_scaler.scale_[0]
         else:
             energy_mean = 0
             energy_std = 1
 
-        pitch_min, pitch_max = self.normalize(
-            os.path.join(self.out_dir, "pitch"), pitch_mean, pitch_std
-        )
-        energy_min, energy_max = self.normalize(
-            os.path.join(self.out_dir, "energy"), energy_mean, energy_std
-        )
+        if hasattr(pitch_scaler, 'mean_'):
+            pitch_min, pitch_max = self.normalize(
+                os.path.join(self.out_dir, "pitch"), pitch_mean, pitch_std
+            )
+            energy_min, energy_max = self.normalize(
+                os.path.join(self.out_dir, "energy"), energy_mean, energy_std
+            )
 
-        # Save files
-        with open(os.path.join(self.out_dir, "speakers.json"), "w") as f:
-            f.write(json.dumps(speakers))
+            # Save files
+            with open(os.path.join(self.out_dir, "speakers.json"), "w") as f:
+                f.write(json.dumps(speakers))
 
-        with open(os.path.join(self.out_dir, "stats.json"), "w") as f:
-            stats = {
-                "pitch": [
-                    float(pitch_min),
-                    float(pitch_max),
-                    float(pitch_mean),
-                    float(pitch_std),
-                ],
-                "energy": [
-                    float(energy_min),
-                    float(energy_max),
-                    float(energy_mean),
-                    float(energy_std),
-                ],
-            }
-            f.write(json.dumps(stats))
+            with open(os.path.join(self.out_dir, "stats.json"), "w") as f:
+                stats = {
+                    "pitch": [
+                        float(pitch_min),
+                        float(pitch_max),
+                        float(pitch_mean),
+                        float(pitch_std),
+                    ],
+                    "energy": [
+                        float(energy_min),
+                        float(energy_max),
+                        float(energy_mean),
+                        float(energy_std),
+                    ],
+                }
+                f.write(json.dumps(stats))
 
         print(
             "Total time: {} hours".format(

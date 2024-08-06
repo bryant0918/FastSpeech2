@@ -25,12 +25,32 @@ def combine_datasets(dir1, dir2):
 
     print("Done.")
 
+def get_directory_duration(directory):
+
+    seconds = 0
+    for speaker in os.listdir(os.path.join(directory, 'TextGrid')):
+        if os.path.isdir(os.path.join(directory, 'TextGrid', speaker)):
+            for file in os.listdir(os.path.join(directory, 'TextGrid', speaker)):
+                with open(os.path.join(directory, 'TextGrid', speaker, file), 'r') as f:
+                    lines = f.readlines()
+                    for line in lines:
+                        if 'xmax' in line:
+                            seconds += float(line.strip().split(' ')[-1])
+                            break
+    
+    print(f"Total duration is : ", seconds/3600, " hours")
+
+    
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--dir1", type=str, default="preprocessed_data/LJSpeech")
     parser.add_argument("--dir2", type=str, default="preprocessed_data/old")
     args = parser.parse_args()
 
-    combine_datasets(args.dir1, args.dir2)
+    # combine_datasets(args.dir1, args.dir2)
+
+    get_directory_duration(args.dir1)
+    get_directory_duration(args.dir2)
 
     pass

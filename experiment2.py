@@ -347,7 +347,7 @@ def test_whisper_STT():
     # text = model.transcribe(wav)
 
 def test_whisperX():
-    from whisperX2 import whisperx
+    from whisperX import whisperx
     import os
     import numpy as np
     from utils.tools import pad_1D

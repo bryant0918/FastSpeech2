@@ -57,10 +57,10 @@ def loop(preprocess_config, model_config, batch, model, Loss, discriminator, cri
             lengths=output_tgt[9][:mel_size],
             for_loss = True
         )
-        loss_input = (batch[2][:mel_size],) + batch[8:10] + batch[20:22] + (log_duration_targets,)
+        loss_input = (batch[2][:mel_size],) + (None, batch[9], batch[11]) + batch[20:22] + (log_duration_targets,)
         loss_predictions = output_tgt + (wav_predictions, pred_generated)
     else:
-        loss_input = (None,) + batch[8:10] + batch[20:22] + (log_duration_targets,)
+        loss_input = (None, None, batch[9], None) + batch[20:22] + (log_duration_targets,)
         loss_predictions = output_tgt + (None, pred_generated)
     
     # Calculate loss for Src to Tgt
@@ -133,10 +133,10 @@ def loop(preprocess_config, model_config, batch, model, Loss, discriminator, cri
             lengths=output_src[9][:mel_size],
             for_loss = True
         )
-        loss_input = (batch[1][:mel_size],) + batch[8:10] + (re_realigned_p, re_realigned_e, realigned_log_d)
+        loss_input = (batch[1][:mel_size],) + batch[8:10] + (batch[4], re_realigned_p, re_realigned_e, realigned_log_d)
         loss_predictions = output_src[:10] + (output_tgt[10],) + output_src[11:] + (wav_predictions, pred_generated)
     else:
-        loss_input = (None,) + batch[8:10]+ (re_realigned_p, re_realigned_e, realigned_log_d)
+        loss_input = (None,) + batch[8:10]+ (None, re_realigned_p, re_realigned_e, realigned_log_d)
         loss_predictions = output_src[:10] + (output_tgt[10],) + output_src[11:] + (None, pred_generated)
 
     # Calculate loss for Tgt to Src
@@ -202,7 +202,7 @@ def pretrain_loop(preprocess_config, model_config, batch, model, Loss, discrimin
         loss_input = (batch[1][:mel_size],) + batch[7:9] + (batch[10],) + batch[12:14] + (log_duration_targets,)
         loss_predictions = output + (wav_predictions, pred_generated)
     else:
-        loss_input = (None,) + batch[7:9] + (batch[10],) + batch[12:14] + (log_duration_targets,)
+        loss_input = (None,) + batch[7:9] + (None,) + batch[12:14] + (log_duration_targets,)
         loss_predictions = output + (None, pred_generated)
     
     start1 = time.time()

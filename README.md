@@ -348,7 +348,7 @@ python SpeakerEncoder/compute_embeddings.py --output_path preprocessed_data/LJSp
 
 ```
 nohup python SpeakerEncoder/compute_embeddings.py --output_path preprocessed_data/Spanish_new/speaker_emb --input_path raw_data/Spanish_new > embeddings.log 2>&1 &
-11855
+31547
 ```
 
 ### Combine two datasets to train on

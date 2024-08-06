@@ -411,8 +411,6 @@ def test_insanely_fast_whisper():
     # Use Base environment to test since needs torch >= 2.1.1
     # But slower than whisperx anyway (and regular whisper)
 
-
-
 def test_g2p():
     import time
     start = time.time()
@@ -1131,9 +1129,63 @@ def profile_data_loading():
     print(f"Read bytes: {read_bytes}")
     print(f"Write bytes: {write_bytes}")
 
+def custom_cyclic_lr():
+    import torch
+    from torch.optim.lr_scheduler import _LRScheduler
+    import matplotlib.pyplot as plt
+    import numpy as np
+
+    class CyclicDecayLR(_LRScheduler):
+        def __init__(self, optimizer, A, gamma, freq, lambd, max_lr, min_lr, last_epoch=-1):
+            self.A = A
+            self.gamma = gamma
+            self.freq = freq
+            self.lambd = lambd
+            self.max_lr = max_lr
+            self.min_lr = min_lr
+            self.last_epoch = last_epoch
+            super(CyclicDecayLR, self).__init__(optimizer, last_epoch)
+
+        def get_lr(self):
+            lr = self.A * np.exp(-self.gamma * self.last_epoch) * np.sin(self.last_epoch * self.freq) + \
+                np.exp(-self.lambd * self.last_epoch) * self.max_lr + self.min_lr
+            return [lr for _ in self.optimizer.param_groups]
+            # return self.A*np.exp(-self.gamma*self.last_epoch) * np.cos(self.freq*self.last_epoch) + np.exp(-self.lambd*self.last_epoch)*self.max_lr + self.min_lr
+
+    # # Example usage:
+    # model = torch.nn.Linear(10, 2)
+    # optimizer = torch.optim.SGD(model.parameters(), lr=0.002)
+    # scheduler = CyclicDecayLR(optimizer, .0002, .0001, .002, .00005, .002, .00002)
+
+    # domain = 900000
+    # lrs = []
+    # for epoch in range(0,domain,10):
+    #     optimizer.step()
+    #     scheduler.step()
+    #     lrs.append(scheduler.get_lr())
+
+    # plt.plot(lrs)
+    # plt.savefig("output/result/cyclic_lr_steps.png")
+
+    # Example
+    model = torch.nn.Linear(10, 2)
+    optimizer = torch.optim.SGD(model.parameters(), lr=0.002)
+    scheduler = CyclicDecayLR(optimizer, .0002, .02, 2, .03, .002, .00002)
+
+    domain = 100
+    lrs = []
+    for epoch in range(0,domain):
+        optimizer.step()
+        scheduler.step()
+        lrs.append(scheduler.get_lr())
+
+    plt.plot(lrs)
+    plt.savefig("output/result/cyclic_lr_epochs.png")
+
+
 
 if __name__ == "__main__":
-    test_whisper_STT()
-    test_whisperX()
-    # test_insanely_fast_whisper()
+    # test_whisper_STT()
+    # test_whisperX()
+    custom_cyclic_lr()
     pass

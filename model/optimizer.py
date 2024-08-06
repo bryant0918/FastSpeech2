@@ -1,6 +1,6 @@
 import torch
 import numpy as np
-
+from torch.optim.lr_scheduler import _LRScheduler
 
 class ScheduledOptim:
     """ A simple wrapper class for learning rate scheduling """
@@ -57,3 +57,20 @@ class ScheduledOptim:
     @property
     def param_groups(self):
         return self._optimizer.param_groups
+
+
+class CyclicDecayLR(_LRScheduler):
+        def __init__(self, optimizer, config, last_epoch=-1):
+            self.A = config['cyclic_optimizer']['A']
+            self.gamma = config['cyclic_optimizer']['gamma']
+            self.freq = config['cyclic_optimizer']['freq']
+            self.lambd = config['cyclic_optimizer']['lambd']
+            self.max_lr = config['cyclic_optimizer']['max_lr']
+            self.min_lr = config['cyclic_optimizer']['min_lr']
+            self.last_epoch = last_epoch
+            super(CyclicDecayLR, self).__init__(optimizer, last_epoch)
+
+        def get_lr(self):
+            lr = self.A * np.exp(-self.gamma * self.last_epoch) * np.sin(self.last_epoch * self.freq) + \
+                np.exp(-self.lambd * self.last_epoch) * self.max_lr + self.min_lr
+            return [lr for _ in self.optimizer.param_groups]

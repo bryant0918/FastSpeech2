@@ -16,6 +16,13 @@ d_optimizer:
   d_initial_lr: 0.000001
   d_max_lr: 0.001
   betas: [0.6, 0.998]
+cyclic_optimizer:
+  A: 2e-4
+  gamma: 1e-4
+  freq: 2e-3
+  lambd: 5e-5
+  max_lr: 2e-3
+  min_lr: 2e-5
 step:
   total_step: 900000
   log_step: 200     # 200

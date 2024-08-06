@@ -85,6 +85,7 @@ class Preprocessor:
 
         # Compute pitch, energy, duration, and mel-spectrogram
         speakers = {}
+        # for i, speaker in enumerate(tqdm(os.listdir(self.in_dir), smoothing=0.1)):
         for i, speaker in enumerate(tqdm(os.listdir(self.in_dir))):
             if speakers_list is not None and speaker not in speakers_list:
                 continue

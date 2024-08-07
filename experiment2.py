@@ -629,7 +629,7 @@ def test_vocoder2():
     audio = hifigan44100.convert_spectrogram_to_audio(spec=mel)
     print("Time taken: ", time.time() - start)
     audio = (audio.squeeze().detach().to('cpu').numpy()* 32767).astype('int16')
-    wav_write("output/result/LJ001-0001.wav", 44100, audio)
+    wav_write("output/result/sample1_trim.wav", 44100, audio)
 
     from utils.model import vocoder_infer
     import hifigan
@@ -650,6 +650,14 @@ def test_vocoder2():
     preprocess_config = "config/LJSpeech/preprocess.yaml"
     preprocess_config = yaml.load(open(preprocess_config, "r"), Loader=yaml.FullLoader)
     
+    sample_trim = vocoder_infer(
+            mel,
+            hifi,
+            model_config,
+            preprocess_config,
+        )[0]
+    wav_write("output/result/sample1_trim_hifi.wav", 22050, sample_trim)
+
     hifi_times, hifi44100_times = [], []
     for i in range(10):
         mel_target_path = f'/home/ditto/Documents/output/output/result/LJSpeech/pretrain/mel_target{i}.npy'
@@ -710,9 +718,9 @@ def test_get_mel():
     config = yaml.load(open(preprocess_config, "r"), Loader=yaml.FullLoader)
 
     STFT = Audio.stft.TacotronSTFT(
-        config["preprocessing"]["stft"]["filter_length"],
-        config["preprocessing"]["stft"]["hop_length"],
-        config["preprocessing"]["stft"]["win_length"],
+        2048,
+        512,
+        2048,
         config["preprocessing"]["mel"]["n_mel_channels"],
         44100,
         config["preprocessing"]["mel"]["mel_fmin"],
@@ -1329,6 +1337,6 @@ if __name__ == "__main__":
     # test_whisperX()
     # test_npc()
     # custom_cyclic_lr()
-    # test_vocoder2()
     test_get_mel()
+    test_vocoder2()
     pass

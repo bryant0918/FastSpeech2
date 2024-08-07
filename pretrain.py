@@ -8,12 +8,11 @@ import torch.nn as nn
 from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm
-import multiprocessing as mp
 
-from utils.model import get_model, get_vocoder, get_param_num, vocoder_infer, get_discriminator
+from utils.model import get_model2, get_vocoder, get_param_num, get_discriminator
 from utils.tools import to_device, log, synth_one_sample_pretrain
 from utils.training import pretrain_loop
-from model import FastSpeech2Loss, Discriminator
+from model import FastSpeech2Loss
 from dataset import PreTrainDataset
 
 from evaluate import evaluate_pretrain
@@ -49,11 +48,11 @@ def main(args, configs):
     )
 
     # Prepare model
-    model, optimizer = get_model(args, configs[1:], device, train=True)
+    model, optimizer, scheduler = get_model2(args, configs[1:], device, train=True)
     model = nn.DataParallel(model)
     num_param = get_param_num(model)
     Loss = FastSpeech2Loss(preprocess_config, model_config, train_config, device).to(device)
-    print("Number of FastSpeech2 Parameters:", num_param)
+    print("\nNumber of FastSpeech2 Parameters:", num_param)
 
     # Prepare discriminator
     discriminator, d_optimizer, d_scheduler = get_discriminator(args, configs[1:], device, train=True)
@@ -61,7 +60,7 @@ def main(args, configs):
     criterion_d = nn.BCEWithLogitsLoss()
     discriminator_params = get_param_num(discriminator)
     print("Number of Discriminator Parameters:", discriminator_params)
-    print("Total Parameters:", num_param + discriminator_params)
+    print("Total Parameters:", int((num_param + discriminator_params)//1e6), "M\n")
     
     # Load vocoder
     vocoder = get_vocoder(model_config, device)
@@ -97,7 +96,7 @@ def main(args, configs):
     # torch.autograd.set_detect_anomaly(True)
     import time
     start = time.time()
-    start0 = time.time()
+    # start0 = time.time()
     backward_times, forward_times = [], []
     while True:
         inner_bar = tqdm(total=len(loader), desc="Epoch {}".format(epoch), position=1)
@@ -107,7 +106,7 @@ def main(args, configs):
             # print("Time to load batch: ", time.time() - start0)
             try:
                 for batch in batches:
-                    start1 = time.time()
+                    # start1 = time.time()
                     batch = to_device(batch, device)
                     # batch = (ids, raw_texts, speakers, text_langs, texts, src_lens, max_src_len, mels, mel_lens, 
                     #          max_mel_len, tgt_langs, speaker_embeddings, pitches, energies, durations)
@@ -140,13 +139,14 @@ def main(args, configs):
                         nn.utils.clip_grad_norm_(model.parameters(), grad_clip_thresh)
 
                         # Update weights
-                        optimizer.step_and_update_lr()
+                        optimizer.step()
                         optimizer.zero_grad()
+                        scheduler.step()
 
                     backward_times.append(time.time() - start2)
                     # print("time for backward: ", backward_times[-1])
 
-                    start3 = time.time()
+                    # start3 = time.time()
                     if step % log_step == 0:
                         losses = [l.item() for l in losses]
                         losses.append(d_loss)
@@ -162,10 +162,10 @@ def main(args, configs):
 
                         outer_bar.write(message1 + message2)
 
-                        log(train_logger, step, losses=losses, lr=optimizer.get_lr())
+                        log(train_logger, step, losses=losses, lr=scheduler.get_lr()[0])
                     # print("Time to log: ", time.time() - start3)
 
-                    start4 = time.time()
+                    # start4 = time.time()
                     if step % synth_step == 0:
                         targets = (batch[0],) +(batch[7],) + batch[12:]
                         predictions = (output[1],) + output[8:10]
@@ -202,7 +202,7 @@ def main(args, configs):
 
                     # print("Time to synth: ", time.time() - start4)
 
-                    start5 = time.time()
+                    # start5 = time.time()
                     if step % val_step == 0:
                         model.eval()
                         discriminator.eval()
@@ -216,13 +216,13 @@ def main(args, configs):
 
                     # print("Time to evaluate: ", time.time() - start5)
 
-                    start6 = time.time()
+                    # start6 = time.time()
                     if step % save_step == 0:
                         print("Saving checkpoints")
                         torch.save(
                             {
                                 "model": model.module.state_dict(),
-                                "optimizer": optimizer._optimizer.state_dict(),
+                                "optimizer": optimizer.state_dict(),
                             },
                             os.path.join(
                                 train_config["path"]["ckpt_path"],
@@ -253,7 +253,7 @@ def main(args, configs):
                     torch.save(
                         {
                             "model": model.module.state_dict(),
-                            "optimizer": optimizer._optimizer.state_dict(),
+                            "optimizer": optimizer.state_dict(),
                         },
                         os.path.join(
                             train_config["path"]["ckpt_path"],
@@ -278,7 +278,7 @@ def main(args, configs):
                 raise e
 
             inner_bar.update(1)
-            start0 = time.time()
+            # start0 = time.time()
         epoch += 1
 
 

@@ -19,8 +19,6 @@ def get_model(args, configs, device, train=False):
             model = EmotivBeta(preprocess_config, model_config).to(device)
         elif model_config["synthesizer"]["model"] == "FastSpeech2Pros":
             model = FastSpeech2Pros(preprocess_config, model_config, pretrain).to(device)
-    elif "pros_learner" in model_config:
-        model = ProsLearner(preprocess_config, model_config).to(device)
     else:
         raise ValueError("Model type not supported. Check model config.")
 
@@ -45,8 +43,6 @@ def get_model(args, configs, device, train=False):
         scheduled_optim = ScheduledOptim(
             model, train_config, model_config, args.restore_step
         )
-        # Define the learning rate scheduler
-        # scheduler = torch.optim.lr_scheduler.CyclicLR(optimizer, lr_lambda)
         if not pretrain:
             if args.from_pretrained_ckpt:
                 scheduled_optim.load_state_dict(ckpt["optimizer"])
@@ -65,12 +61,10 @@ def get_model2(args, configs, device, train=False):
     pretrain = train_config['pretrain']
 
     if "synthesizer" in model_config:
-        if model_config["synthesizer"]["model"] == "FastSpeech2":
-            model = FastSpeech2(preprocess_config, model_config).to(device)
+        if model_config["synthesizer"]["model"] == "EmotivBeta":
+            model = EmotivBeta(preprocess_config, model_config).to(device)
         elif model_config["synthesizer"]["model"] == "FastSpeech2Pros":
             model = FastSpeech2Pros(preprocess_config, model_config, pretrain).to(device)
-    elif "pros_learner" in model_config:
-        model = ProsLearner(preprocess_config, model_config).to(device)
     else:
         raise ValueError("Model type not supported. Check model config.")
 
@@ -98,15 +92,14 @@ def get_model2(args, configs, device, train=False):
             eps=train_config["optimizer"]["eps"],
             weight_decay=train_config["optimizer"]["weight_decay"],
         )
-        # TODO: Add last_epoch (meaning last step if continue training) 
-        # ScheduledOptim just does args.restore_step which is 0 if fresh start but may not work with CyclicDecayLR.
-        scheduler = CyclicDecayLR(optimizer, train_config)
         
         if not pretrain:
             if args.from_pretrained_ckpt:
                 optimizer.load_state_dict(ckpt["optimizer"])
         if args.restore_step:
             optimizer.load_state_dict(ckpt["optimizer"])
+        print("restore step: ", args.restore_step, type(args.restore_step))
+        scheduler = CyclicDecayLR(optimizer, train_config, args.restore_step)
         model.train()
         return model, optimizer, scheduler
 

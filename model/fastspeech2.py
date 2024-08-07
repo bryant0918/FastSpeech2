@@ -93,9 +93,11 @@ class EmotivBeta(nn.Module):
         
         e_src = self.prosody_extractor(enhanced_mels)   # e is [batch_size, melspec H, melspec W, 128]
 
-        # Normalize prosody embeddings
-        prosody_reg_term = self.lambda_reg * torch.norm(e_src, p=2)
-                
+        # Normalize and Regularize prosody embeddings
+        norm = torch.norm(e_src, p=2, dim=(1, 3), keepdim=True)
+        prosody_reg_term = self.lambda_reg * torch.norm(norm, p=2)
+        e_src = e_src / norm
+        
         # Split phone pros embeddings by phone duration
         # [batch_size (list), phoneme_sequence_length (list), melspec H (tensor), melspec W (tensor), 128 (tensor)]        
         e_k_src = self.prosody_extractor.split_phones(e_src, d_src, device=device)  

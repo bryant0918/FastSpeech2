@@ -471,6 +471,8 @@ class NPC(nn.Module):
             if self.disable_cross_layer and (i!=(n_blocks-1)):
                 self.masked_convs.append(None)
             else:
+                # print("kernel_size: ", kernel_size)
+                # print("mask_size: ", cur_mask_size)
                 self.masked_convs.append(MaskConvBlock(hidden_size, 
                                                        hidden_size, 
                                                        kernel_size, 

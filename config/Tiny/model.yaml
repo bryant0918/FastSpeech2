@@ -1,8 +1,8 @@
 transformer:
-  encoder_layer: 4
+  encoder_layer: 6 # 4
   encoder_head: 2
   encoder_hidden: 256
-  decoder_layer: 6
+  decoder_layer: 8  # 6
   decoder_head: 2
   decoder_hidden: 256
   conv_filter_size: 1024
@@ -23,15 +23,15 @@ variance_embedding:
 prosody_extractor:
   dim_in: 2        # Second channel is language embedding
   dim_out: 256
-  hidden_dim: 8
+  hidden_dim: 16  # 8
   prosody_reg_penalty: 0.001  # Can't be too large, otherwise embedding norms too small and get floating point errors
 
 prosody_predictor:
   sd_dim_in: 512
   si_dim_in: 256
   dim_out: 256
-  n_components: 8
-  conv_hidden_dim: 8
+  n_components: 16 # 8
+  conv_hidden_dim: 16  # 8
   gru_hidden_dim: 512
   bigru_hidden_dim: 32
 
@@ -42,10 +42,10 @@ npc:
   embedding_dim: 256
   input_size: 256
   hidden_size: 512
-  n_blocks: 4
+  n_blocks: 4   # 4
   dropout: 0.1
   residual: True
-  kernel_size: 15 
+  kernel_size: 15 # 15
   mask_size: 5
   vq: 
     codebook_size: [64,64,64,64]    # Codebook size of each group in VQ-layer

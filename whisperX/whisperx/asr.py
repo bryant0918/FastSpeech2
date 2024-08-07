@@ -297,7 +297,7 @@ def load_model(whisper_arch,
     if language is not None:
         tokenizer = faster_whisper.tokenizer.Tokenizer(model.hf_tokenizer, model.model.is_multilingual, task=task, language=language)
     else:
-        print("No language specified, language will be first be detected for each audio file (increases inference time).")
+        # print("No language specified, language will be first be detected for each audio file (increases inference time).")
         tokenizer = None
 
     default_asr_options =  {

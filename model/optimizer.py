@@ -60,17 +60,23 @@ class ScheduledOptim:
 
 
 class CyclicDecayLR(_LRScheduler):
-        def __init__(self, optimizer, config, last_epoch=-1):
-            self.A = config['cyclic_optimizer']['A']
-            self.gamma = config['cyclic_optimizer']['gamma']
-            self.freq = config['cyclic_optimizer']['freq']
-            self.lambd = config['cyclic_optimizer']['lambd']
-            self.max_lr = config['cyclic_optimizer']['max_lr']
-            self.min_lr = config['cyclic_optimizer']['min_lr']
-            self.last_epoch = last_epoch
-            super(CyclicDecayLR, self).__init__(optimizer, last_epoch)
+    def __init__(self, optimizer, config, last_epoch=-1):
+        self.A = config['cyclic_optimizer']['A']
+        self.gamma = config['cyclic_optimizer']['gamma']
+        self.freq = config['cyclic_optimizer']['freq']
+        self.lambd = config['cyclic_optimizer']['lambd']
+        self.max_lr = config['cyclic_optimizer']['max_lr']
+        self.min_lr = config['cyclic_optimizer']['min_lr']
+        self.last_epoch = last_epoch
 
-        def get_lr(self):
-            lr = self.A * np.exp(-self.gamma * self.last_epoch) * np.sin(self.last_epoch * self.freq) + \
-                np.exp(-self.lambd * self.last_epoch) * self.max_lr + self.min_lr
-            return [lr for _ in self.optimizer.param_groups]
+        # Set initial_lr for each param group
+        for group in optimizer.param_groups:
+            if 'initial_lr' not in group:
+                group['initial_lr'] = group['lr']
+                
+        super(CyclicDecayLR, self).__init__(optimizer, last_epoch)
+
+    def get_lr(self):
+        lr = self.A * np.exp(-self.gamma * self.last_epoch) * np.sin(self.last_epoch * self.freq) + \
+            np.exp(-self.lambd * self.last_epoch) * self.max_lr + self.min_lr
+        return [lr for _ in self.optimizer.param_groups]

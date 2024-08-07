@@ -260,7 +260,6 @@ class WordLoss(nn.Module):
         super(WordLoss, self).__init__()
         bert = config['sentence_embedder']['model']
         # self.transcriber = whisper.load_model(config['transcriber']['model'])
-        print("DEVICE: ", device)
         self.transcriber = whisperx.load_model(config['transcriber']['model'], device=str(device), compute_type='float16')
         self.tokenizer = BertTokenizer.from_pretrained(bert)
         self.bert_model = BertModel.from_pretrained(bert)
@@ -279,8 +278,6 @@ class WordLoss(nn.Module):
         """
         pred_texts = []
 
-        import time
-        start = time.time()
         for i, aud in enumerate(audio):
             if aud is None:
                 pred_texts.append("")
@@ -291,28 +288,20 @@ class WordLoss(nn.Module):
                     pred_texts.append("")
                 else:
                     pred_texts.append(predicted_text["segments"][0]['text'])
-        print("Time taken to transcribe: ", time.time() - start)
 
-        start = time.time()
         # Tokenize both predicted and reference text
         predicted_tokens = self.tokenizer(pred_texts, return_tensors='pt', padding=True, truncation=True, max_length=512)
         reference_tokens = self.tokenizer(text, return_tensors='pt', padding=True, truncation=True, max_length=512)
-        print("Time taken to tokenize: ", time.time() - start)
 
-        start = time.time()
         # Move tokens to the specified device (CUDA if available)
         predicted_tokens = {k: v.to(self.bert_model.device) for k, v in predicted_tokens.items()}
         reference_tokens = {k: v.to(self.bert_model.device) for k, v in reference_tokens.items()}
-        print("Time taken to move to device: ", time.time() - start)
 
-        start = time.time()
         # Get BERT embeddings
         with torch.no_grad():  # No need to calculate gradients here
             predicted_embeddings = self.bert_model(**predicted_tokens).last_hidden_state
             reference_embeddings = self.bert_model(**reference_tokens).last_hidden_state
-        print("Time taken to get embeddings: ", time.time() - start)
               
-        start = time.time()
         # Average the embeddings across the sequence length dimension
         predicted_embeddings_avg = predicted_embeddings.mean(dim=1)
         reference_embeddings_avg = reference_embeddings.mean(dim=1)
@@ -320,7 +309,6 @@ class WordLoss(nn.Module):
         target_tensor = torch.tensor([1]).to(predicted_embeddings.device).expand_as(predicted_embeddings_avg[:, 0])
 
         loss = self.cosine_loss(predicted_embeddings_avg, reference_embeddings_avg, target_tensor)
-        print("Time taken to calculate loss: ", time.time() - start)
         return loss
 
 

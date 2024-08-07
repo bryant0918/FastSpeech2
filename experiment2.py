@@ -1130,6 +1130,12 @@ def custom_cyclic_lr():
             self.max_lr = max_lr
             self.min_lr = min_lr
             self.last_epoch = last_epoch
+
+            # Set initial_lr for each param group
+            for group in optimizer.param_groups:
+                if 'initial_lr' not in group:
+                    group['initial_lr'] = group['lr']
+
             super(CyclicDecayLR, self).__init__(optimizer, last_epoch)
 
         def get_lr(self):
@@ -1138,40 +1144,42 @@ def custom_cyclic_lr():
             return [lr for _ in self.optimizer.param_groups]
             # return self.A*np.exp(-self.gamma*self.last_epoch) * np.cos(self.freq*self.last_epoch) + np.exp(-self.lambd*self.last_epoch)*self.max_lr + self.min_lr
 
-    # # Example usage:
-    # model = torch.nn.Linear(10, 2)
-    # optimizer = torch.optim.SGD(model.parameters(), lr=0.002)
-    # scheduler = CyclicDecayLR(optimizer, .0002, .0001, .002, .00005, .002, .00002)
-
-    # domain = 900000
-    # lrs = []
-    # for epoch in range(0,domain,10):
-    #     optimizer.step()
-    #     scheduler.step()
-    #     lrs.append(scheduler.get_lr())
-
-    # plt.plot(lrs)
-    # plt.savefig("output/result/cyclic_lr_steps.png")
-
-    # Example
+    # Example usage Steps:
     model = torch.nn.Linear(10, 2)
-    optimizer = torch.optim.SGD(model.parameters(), lr=0.002)
-    scheduler = CyclicDecayLR(optimizer, .0002, .02, 2, .03, .002, .00002)
+    optimizer = torch.optim.Adam(model.parameters())
+    # scheduler = CyclicDecayLR(optimizer, .0002, .0001, .002, .00005, .002, .00002)
+    scheduler = CyclicDecayLR(optimizer, .0008, .0001, .001, .00005, .002, .00002, -1)
 
-    domain = 100
+    domain = 900000
     lrs = []
-    for epoch in range(0,domain):
+    for epoch in range(0,domain,10):
         optimizer.step()
         scheduler.step()
         lrs.append(scheduler.get_lr())
 
     plt.plot(lrs)
-    plt.savefig("output/result/cyclic_lr_epochs.png")
+    plt.savefig("output/result/cyclic_lr_steps2.png")
+
+    # Example
+    # model = torch.nn.Linear(10, 2)
+    # optimizer = torch.optim.SGD(model.parameters(), lr=0.002)
+    # scheduler = CyclicDecayLR(optimizer, .0002, .02, 2, .03, .002, .00002)
+
+    # domain = 100
+    # lrs = []
+    # for epoch in range(0,domain):
+    #     optimizer.step()
+    #     scheduler.step()
+    #     lrs.append(scheduler.get_lr())
+
+    # plt.plot(lrs)
+    # plt.savefig("output/result/cyclic_lr_epochs.png")
 
 
 
 if __name__ == "__main__":
     # test_whisper_STT()
-    test_whisperX()
+    # test_whisperX()
     # test_npc()
+    custom_cyclic_lr()
     pass

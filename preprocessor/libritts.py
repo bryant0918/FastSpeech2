@@ -95,6 +95,7 @@ def prepare_align(config):
                         try:
                             translation = translator.translate(text)
                         except:
+                            print("Switching from Google Translate to MarianMT")
                             google_translate = False
                             translation = translate(text, tokenizer, model)
                 else:

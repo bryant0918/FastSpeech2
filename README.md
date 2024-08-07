@@ -374,10 +374,12 @@ nohup python3 pretrain.py -p config/LJSpeech/preprocess.yaml -p2 config/LJSpeech
 ```
 
 ```
-nohup python3 pretrain.py --restore_step 281751 -p config/LJSpeech/preprocess.yaml -p2 config/LJSpeech/preprocess_es.yaml -m config/LJSpeech/model.yaml -t config/LJSpeech/pretrain.yaml -w 16 &
+nohup python3 pretrain.py --restore_step 575000 -p config/LJSpeech/preprocess.yaml -p2 config/LJSpeech/preprocess_es.yaml -m config/LJSpeech/model.yaml -t config/LJSpeech/pretrain.yaml -w 16 &
 
 861748
 ```
+
+/home/ditto/Documents/output/output/ckpt/LJSpeech/pretrain/575000.pth.tar
 
 ```
 python3 pretrain.py -p config/Tiny/preprocess.yaml -p2 config/Tiny/preprocess_es.yaml -m config/Tiny/model.yaml -t config/Tiny/pretrain.yaml -w 16

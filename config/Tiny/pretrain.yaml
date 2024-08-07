@@ -25,8 +25,8 @@ cyclic_optimizer:
   min_lr: 0.00002
 step:
   total_step: 900000
-  log_step: 20     # 200
-  synth_step: 20  # 2000
+  log_step: 2     # 200
+  synth_step: 2  # 2000
   val_step: 10    # 1000
   save_step: 40 # 5000
   word_step: 5   # 5

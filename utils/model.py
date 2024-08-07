@@ -212,6 +212,9 @@ def get_vocoder(config, device):
         vocoder.remove_weight_norm()
         vocoder.to(device)
 
+    elif name == "HiFi-GAN_44100":
+        from nemo.collections.tts.models import HifiGanModel
+
     # elif name == "BigVGAN":
     #     with open("bigvgan/config.json", "r") as f:
     #         config = json.load(f)

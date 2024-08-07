@@ -7,6 +7,7 @@ inflect >= 4.1.0
 jamo >= 0.4.1
 librosa == 0.10.2.post1
 matplotlib == 3.9.0
+nemo_toolkit[tts]
 nltk
 numba == 0.59.1
 numpy == 1.26.4

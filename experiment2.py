@@ -581,6 +581,153 @@ def test_vocoder():
     
     print("Done")
 
+def test_vocoder2():
+    import torch
+    from nemo.collections.tts.models import FastPitchModel, HifiGanModel
+    import json, yaml, time
+
+    # Load the FastPitch model
+    fastpitch = FastPitchModel.from_pretrained(model_name="tts_en_fastpitch_multispeaker")
+                                                        # tts_es_fastpitch_multispeaker
+
+    # Load the HiFi-GAN vocoder
+    hifigan44100 = HifiGanModel.from_pretrained(model_name="tts_en_hifitts_hifigan_ft_fastpitch")
+                                                    # "tts_en_hifitts_hifigan_ft_fastpitch"
+                                                    # "tts_es_hifigan_ft_fastpitch_multispeaker",
+    hifigan44100.eval()
+    # Generate mel-spectrogram from text
+    text = "Hello, how are you?"
+    parsed = fastpitch.parse(text)
+    spectrogram = fastpitch.generate_spectrogram(tokens=parsed, speaker=0)
+    print(spectrogram.shape, type(spectrogram), torch.min(spectrogram).item(), torch.max(spectrogram).item(), torch.mean(spectrogram).item())
+
+    # Convert spectrogram to audio using HiFi-GAN
+    start = time.time()
+    audio = hifigan44100.convert_spectrogram_to_audio(spec=spectrogram)
+    print("Time taken: ", time.time() - start)
+
+    print(audio.shape, torch.min(audio).item(), torch.max(audio).item())
+    # Save the audio to disk
+    from scipy.io.wavfile import write as wav_write
+    import numpy as np
+    audio = (audio.squeeze().detach().to('cpu').numpy()* 32767).astype('int16')
+    print(np.shape(audio))
+    wav_write("output/result/output.wav", 44100, audio)
+
+    # Load my own mel-spectrogram and convert to audio
+    mel_path = "/home/ditto/Datasets/FastSpeech2/preprocessed_data/LJSpeech/mel/LJSpeech-mel-LJ001-0001.npy"
+    mel_path = 'output/mel-sample1_trim.npy'
+
+    mel = torch.from_numpy(np.load(mel_path)).unsqueeze(0).permute(0,2,1)
+    mel = mel.to(hifigan44100.device)
+    print("hifigan device: ", hifigan44100.device)
+    print("my mel:" , mel.shape, torch.min(mel).item(), torch.max(mel).item(), torch.mean(mel).item())
+    # from torchaudio.transforms import InverseMelScale
+    # mel = InverseMelScale(n_stft=1025, n_mels=80)(mel)
+    # print("my mel:" , mel.shape, torch.min(mel).item(), torch.max(mel).item(), torch.mean(mel).item())
+    start = time.time()
+    audio = hifigan44100.convert_spectrogram_to_audio(spec=mel)
+    print("Time taken: ", time.time() - start)
+    audio = (audio.squeeze().detach().to('cpu').numpy()* 32767).astype('int16')
+    wav_write("output/result/LJ001-0001.wav", 44100, audio)
+
+    from utils.model import vocoder_infer
+    import hifigan
+
+    device = torch.device("cuda")
+    with open("hifigan/config.json", "r") as f:
+        config = json.load(f)
+    config = hifigan.AttrDict(config)
+    hifi = hifigan.Generator(config)
+    ckpt = torch.load("hifigan/generator_universal.pth.tar", map_location=device)
+    hifi.load_state_dict(ckpt["generator"])
+    hifi.eval()
+    hifi.remove_weight_norm()
+    hifi.to(device)
+
+    model_config = "config/LJSpeech/model.yaml"
+    model_config = yaml.load(open(model_config, "r"), Loader=yaml.FullLoader)
+    preprocess_config = "config/LJSpeech/preprocess.yaml"
+    preprocess_config = yaml.load(open(preprocess_config, "r"), Loader=yaml.FullLoader)
+    
+    hifi_times, hifi44100_times = [], []
+    for i in range(10):
+        mel_target_path = f'/home/ditto/Documents/output/output/result/LJSpeech/pretrain/mel_target{i}.npy'
+        mel_prediction_path = f'/home/ditto/Documents/output/output/result/LJSpeech/pretrain/mel_prediction{i}.npy'
+        hifigan_target_path = f'output/result/LJSpeech/pretrain/hifigan_target{i}.wav'
+        hifigan_prediction_path = f'output/result/LJSpeech/pretrain/hifigan_prediction{i}.wav'
+        hifigan44100_target_path = f'output/result/LJSpeech/pretrain/hifigan44100_target{i}.wav'
+        hifigan44100_prediction_path = f'output/result/LJSpeech/pretrain/hifigan44100_prediction{i}.wav'
+
+        mel_target = torch.from_numpy(np.load(mel_target_path)).to(device)
+        mel_prediction = torch.from_numpy(np.load(mel_prediction_path)).to(device)
+
+        start = time.time()
+        hifi_target = vocoder_infer(
+            mel_target.unsqueeze(0),
+            hifi,
+            model_config,
+            preprocess_config,
+        )[0]
+        hifi_times.append(time.time() - start)
+        wav_write(hifigan_target_path, 22050, hifi_target)
+
+        start = time.time()
+        hifi_prediction = vocoder_infer(
+            mel_prediction.unsqueeze(0),
+            hifi,
+            model_config,
+            preprocess_config,
+        )[0]
+        hifi_times.append(time.time() - start)
+        wav_write(hifigan_prediction_path, 22050, hifi_prediction)
+
+        with torch.no_grad():
+            # * 32767).astype('int16') unneccesary
+            start = time.time()
+            audio = hifigan44100.convert_spectrogram_to_audio(spec=mel_target.unsqueeze(0))
+            audio = audio.squeeze().to('cpu').numpy()
+            hifi44100_times.append(time.time() - start)
+            wav_write(hifigan44100_target_path, 44100, audio)
+
+            start = time.time()
+            audio = hifigan44100.convert_spectrogram_to_audio(spec=mel_prediction.unsqueeze(0))
+            audio = audio.squeeze().to('cpu').numpy()
+            hifi44100_times.append(time.time() - start)
+            wav_write(hifigan44100_prediction_path, 44100, audio)
+
+    print("22050 hifi mean time: ", np.mean(hifi_times), "\n44100 hifi mean time: ", np.mean(hifi44100_times))
+    print("Done.")
+
+def test_get_mel():
+    import audio as Audio
+    import librosa
+    import numpy as np
+    import os
+    import yaml
+
+    preprocess_config = "config/LJSpeech/preprocess.yaml"
+    config = yaml.load(open(preprocess_config, "r"), Loader=yaml.FullLoader)
+
+    STFT = Audio.stft.TacotronSTFT(
+        config["preprocessing"]["stft"]["filter_length"],
+        config["preprocessing"]["stft"]["hop_length"],
+        config["preprocessing"]["stft"]["win_length"],
+        config["preprocessing"]["mel"]["n_mel_channels"],
+        44100,
+        config["preprocessing"]["mel"]["mel_fmin"],
+        config["preprocessing"]["mel"]["mel_fmax"],
+    )
+
+    wav_path = "output/sample1_trim.wav"
+    wav, sr = librosa.load(wav_path, sr=44100)
+    print("Sampling rate: ", sr)
+    mel_spectrogram, energy = Audio.tools.get_mel_from_wav(wav, STFT)
+    
+    mel_filename = "output/mel-sample1_trim.npy"
+    np.save(mel_filename, mel_spectrogram.T)
+
+
 def test_miipher():
     from miipher.dataset.preprocess_for_infer import PreprocessForInfer
     from miipher.lightning_module import MiipherLightningModule
@@ -1181,5 +1328,7 @@ if __name__ == "__main__":
     # test_whisper_STT()
     # test_whisperX()
     # test_npc()
-    custom_cyclic_lr()
+    # custom_cyclic_lr()
+    # test_vocoder2()
+    test_get_mel()
     pass

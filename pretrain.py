@@ -112,7 +112,7 @@ def main(args, configs):
                     #          max_mel_len, tgt_langs, speaker_embeddings, pitches, energies, durations)
                     # print("time to send to device: ", time.time() - start1)
 
-                    if step == 100:
+                    if step == 575005:
                         print("Time taken for 100 steps: ", time.time() - start)
                         print("average backward time: ", np.mean(backward_times))
                         print("average forward time: ", np.mean(forward_times))

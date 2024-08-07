@@ -3,7 +3,7 @@ import torch.nn as nn
 import torch.distributions as dist
 from transformers import BertModel, BertTokenizer
 import whisper
-import whisperx
+from whisperX import whisperx
     
 
 class FastSpeech2Loss(nn.Module):

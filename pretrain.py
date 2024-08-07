@@ -10,7 +10,7 @@ from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm
 import multiprocessing as mp
 
-from utils.model import get_model, get_vocoder, get_param_num, vocoder_infer, get_discriminator
+from utils.model import get_model, get_vocoder, get_param_num, vocoder_infer
 from utils.tools import to_device, log, synth_one_sample_pretrain
 from utils.training import pretrain_loop
 from model import FastSpeech2Loss, Discriminator
@@ -44,7 +44,6 @@ def main(args, configs):
         shuffle=True,
         collate_fn=dataset.collate_fn,
         num_workers=args.num_workers,
-        pin_memory=True,
         # sampler=sampler,
     )
 
@@ -52,19 +51,19 @@ def main(args, configs):
     model, optimizer = get_model(args, configs[1:], device, train=True)
     model = nn.DataParallel(model)
     num_param = get_param_num(model)
-    Loss = FastSpeech2Loss(preprocess_config, model_config, train_config, device).to(device)
+    Loss = FastSpeech2Loss(preprocess_config, model_config).to(device)
     print("Number of FastSpeech2 Parameters:", num_param)
 
-    # Prepare discriminator
-    discriminator, d_optimizer, d_scheduler = get_discriminator(args, configs[1:], device, train=True)
-    discriminator = nn.DataParallel(discriminator)
-    criterion_d = nn.BCEWithLogitsLoss()
+    discriminator = Discriminator(preprocess_config).to(device)
+    criterion_d = nn.BCELoss()
+    optimizer_d = torch.optim.Adam(discriminator.parameters(), lr=0.0002, betas=(0.5, 0.999))
     discriminator_params = get_param_num(discriminator)
     print("Number of Discriminator Parameters:", discriminator_params)
     print("Total Parameters:", num_param + discriminator_params)
-    
+
     # Load vocoder
     vocoder = get_vocoder(model_config, device)
+    print("Vocoder Loaded")
 
     # Init loggerc
     for p in train_config["path"].values():
@@ -87,167 +86,102 @@ def main(args, configs):
     synth_step = train_config["step"]["synth_step"]
     val_step = train_config["step"]["val_step"]
     word_step = train_config["step"]["word_step"]
-    discriminator_step = train_config["step"]["discriminator_step"]
-    warm_up_step = train_config['optimizer']['warm_up_step']
 
     outer_bar = tqdm(total=total_step, desc="Training", position=0)
     outer_bar.n = args.restore_step
     outer_bar.update()
 
-    # torch.autograd.set_detect_anomaly(True)
-    import time
-    start = time.time()
-    start0 = time.time()
-    backward_times, forward_times = [], []
+    torch.autograd.set_detect_anomaly(True)
+
     while True:
         inner_bar = tqdm(total=len(loader), desc="Epoch {}".format(epoch), position=1)
 
         for batches in loader:
-            # print("\n\nStep: ", step)
-            # print("Time to load batch: ", time.time() - start0)
-            try:
-                for batch in batches:
-                    start1 = time.time()
-                    batch = to_device(batch, device)
-                    # batch = (ids, raw_texts, speakers, langs, texts, src_lens, max_src_len, mels, mel_lens, max_mel_len, 
-                    #           speaker_embeddings, pitches, energies, durations)
-                    # print("time to send to device: ", time.time() - start1)
+            for batch in batches:
+                batch = to_device(batch, device)
+                # batch = (ids, raw_texts, speakers, langs, texts, src_lens, max_src_len, mels, mel_lens, max_mel_len, 
+                #           speaker_embeddings, pitches, energies, durations)
+                
 
-                    if step == 100:
-                        print("Time taken for 100 steps: ", time.time() - start)
-                        print("average backward time: ", np.mean(backward_times))
-                        print("average forward time: ", np.mean(forward_times))
-                        raise Exception("Stop")
+                # if step == 560020:
+                #     raise Exception("Stop")
 
-                    start2 = time.time()
-                    # Forward
-                    losses, output, d_loss = pretrain_loop(preprocess_config, model_config, batch, model, Loss, discriminator, criterion_d,
-                                                            vocoder, step, word_step, device, True, d_optimizer, discriminator_step, warm_up_step)
-                    forward_times.append(time.time() - start2)
-                    # print("time for forward: ", forward_times[-1])
+                # Forward
+                losses, output, d_loss = pretrain_loop(preprocess_config, model_config, batch, model, Loss, discriminator, 
+                                               criterion_d, optimizer_d, vocoder, step, word_step, device, training=True)
 
+                # Backward
+                total_loss = losses[0] / grad_acc_step
+                total_loss.backward()
 
-                    start2 = time.time()
-                    # Backward
-                    total_loss = losses[0] / grad_acc_step
-                    total_loss = total_loss.mean()
-                    total_loss.backward()
+                if step % grad_acc_step == 0:
+                    # Clipping gradients to avoid gradient explosion
+                    nn.utils.clip_grad_norm_(model.parameters(), grad_clip_thresh)
 
-                    d_scheduler.step()
+                    # Update weights
+                    optimizer.step_and_update_lr()
+                    optimizer.zero_grad()
 
-                    if step % grad_acc_step == 0:
-                        # Clipping gradients to avoid gradient explosion
-                        nn.utils.clip_grad_norm_(model.parameters(), grad_clip_thresh)
+                if step % log_step == 0:
+                    losses = [l.item() for l in losses]
+                    losses.append(d_loss)
+                    message1 = "Step {}/{}, ".format(step, total_step)
+                    message2 = "Total Loss: {:.4f}, Mel Loss: {:.4f}, Mel PostNet Loss: {:.4f}, Pitch Loss: {:.4f}, Energy Loss: {:.4f}, Duration Loss: {:.4f}, Prosody Loss: {:.4f}, Word Loss: {:.4f}, Full Duration Loss: {:.4f}, G Loss: {:.4f}, D Loss: {:.4f}".format(
+                        *losses
+                    )
 
-                        # Update weights
-                        optimizer.step_and_update_lr()
-                        optimizer.zero_grad()
+                    with open(os.path.join(train_log_path, "log.txt"), "a") as f:
+                        f.write(message1 + message2 + "\n")
 
-                    backward_times.append(time.time() - start2)
-                    # print("time for backward: ", backward_times[-1])
+                    outer_bar.write(message1 + message2)
 
-                    start3 = time.time()
-                    if step % log_step == 0:
-                        losses = [l.item() for l in losses]
-                        losses.append(d_loss)
-                        message1 = "Step {}/{}, ".format(step, total_step)
-                        message2 = "Total Loss: {:.4f}, Mel Loss: {:.4f}, Mel PostNet Loss: {:.4f}, Pitch Loss: {:.4f}, Energy Loss: {:.4f}, Duration Loss: {:.4f}, Prosody Loss: {:.4f}, Word Loss: {:.4f}, Full Duration Loss: {:.4f}, G Loss: {:.4f}, Prosody Reg: {:.4f}, D Loss: {:.4f}".format(
-                            *losses
-                        )
+                    log(train_logger, step, losses=losses, lr=optimizer.get_lr())
 
-                        with open(os.path.join(train_log_path, "log.txt"), "a") as f:
-                            f.write(message1 + message2 + "\n")
+                if step % synth_step == 0:
+                    targets = (batch[0],) +(batch[7],) + batch[11:]
+                    predictions = (output[1],) + output[8:10]
+                    fig, wav_reconstruction, wav_prediction, tag = synth_one_sample_pretrain(
+                        targets,
+                        predictions,
+                        vocoder,
+                        model_config,
+                        preprocess_config,
+                    )
+                    log(
+                        train_logger,
+                        step,
+                        fig=fig,
+                        tag="Training/step_{}_{}".format(step, tag),
+                    )
+                    sampling_rate = preprocess_config["preprocessing"]["audio"][
+                        "sampling_rate"
+                    ]
+                    log(
+                        train_logger,
+                        step,
+                        audio=wav_reconstruction,
+                        sampling_rate=sampling_rate,
+                        tag="Training/step_{}_{}_reconstructed".format(step, tag),
+                    )
+                    log(
+                        train_logger,
+                        step,
+                        audio=wav_prediction,
+                        sampling_rate=sampling_rate,
+                        tag="Training/step_{}_{}_synthesized".format(step, tag),
+                    )
 
-                        outer_bar.write(message1 + message2)
+                if step % val_step == 0:
+                    model.eval()
+                    message = evaluate_pretrain(model, step, configs, val_logger, vocoder)
+                    with open(os.path.join(val_log_path, "log.txt"), "a") as f:
+                        f.write(message + "\n")
+                    outer_bar.write(message)
 
-                        log(train_logger, step, losses=losses, lr=optimizer.get_lr())
-                    # print("Time to log: ", time.time() - start3)
+                    model.train()
 
-                    start4 = time.time()
-                    if step % synth_step == 0:
-                        targets = (batch[0],) +(batch[7],) + batch[11:]
-                        predictions = (output[1],) + output[8:10]
-                        fig, wav_reconstruction, wav_prediction, tag = synth_one_sample_pretrain(
-                            targets,
-                            predictions,
-                            vocoder,
-                            model_config,
-                            preprocess_config,
-                        )
-                        log(
-                            train_logger,
-                            step,
-                            fig=fig,
-                            tag="Training/step_{}_{}".format(step, tag),
-                        )
-                        sampling_rate = preprocess_config["preprocessing"]["audio"][
-                            "sampling_rate"
-                        ]
-                        log(
-                            train_logger,
-                            step,
-                            audio=wav_reconstruction,
-                            sampling_rate=sampling_rate,
-                            tag="Training/step_{}_{}_reconstructed".format(step, tag),
-                        )
-                        log(
-                            train_logger,
-                            step,
-                            audio=wav_prediction,
-                            sampling_rate=sampling_rate,
-                            tag="Training/step_{}_{}_synthesized".format(step, tag),
-                        )
-
-                    # print("Time to synth: ", time.time() - start4)
-
-                    start5 = time.time()
-                    if step % val_step == 0:
-                        model.eval()
-                        discriminator.eval()
-                        message = evaluate_pretrain(model, discriminator, step, configs, val_logger, vocoder, device)
-                        with open(os.path.join(val_log_path, "log.txt"), "a") as f:
-                            f.write(message + "\n")
-                        outer_bar.write(message)
-
-                        model.train()
-                        discriminator.train()
-
-                    # print("Time to evaluate: ", time.time() - start5)
-
-                    start6 = time.time()
-                    if step % save_step == 0:
-                        print("Saving checkpoints")
-                        torch.save(
-                            {
-                                "model": model.module.state_dict(),
-                                "optimizer": optimizer._optimizer.state_dict(),
-                            },
-                            os.path.join(
-                                train_config["path"]["ckpt_path"],
-                                "{}.pth.tar".format(step),
-                            ),
-                        )
-
-                        torch.save(
-                            {
-                                "discriminator": discriminator.state_dict(),
-                                "optimizer": d_optimizer.state_dict(),
-                            },
-                            os.path.join(
-                                train_config["path"]["ckpt_path"],
-                                "disc_{}.pth.tar".format(step),
-                            ),
-                        )
-                    # print("Time to save: ", time.time() - start6)
-
-                    if step == total_step:
-                        quit()
-                    step += 1
-                    outer_bar.update(1)
-
-            except KeyboardInterrupt:
-                if step > 20:
-                    print("Training interrupted -- Saving checkpoints")
+                if step % save_step == 0:
+                    print("Saving checkpoint")
                     torch.save(
                         {
                             "model": model.module.state_dict(),
@@ -259,24 +193,12 @@ def main(args, configs):
                         ),
                     )
 
-                    torch.save(
-                        {
-                            "discriminator": discriminator.state_dict(),
-                            "optimizer": d_optimizer.state_dict(),
-                        },
-                        os.path.join(
-                            train_config["path"]["ckpt_path"],
-                            "disc_{}.pth.tar".format(step),
-                        ),
-                    )
-                raise
-            except Exception as e:
-                print("Training interrupted by other exception.")
-                print(e)
-                raise e
+                if step == total_step:
+                    quit()
+                step += 1
+                outer_bar.update(1)
 
             inner_bar.update(1)
-            start0 = time.time()
         epoch += 1
 
 
@@ -300,3 +222,6 @@ if __name__ == "__main__":
     configs = (preprocess_config, preprocess2_config, model_config, train_config)
 
     main(args, configs)
+
+    # sed -i '/# assert batch_size \* group_size < len(dataset)/a \    sampler = torch.utils.data.distributed.DistributedSampler(dataset)' pretrain.py
+    # sed -i '/num_workers=args.num_workers,/a \        sampler=sampler,' pretrain.py

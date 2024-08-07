@@ -11,6 +11,13 @@ from matplotlib import pyplot as plt
 
 matplotlib.use("Agg")
 
+if torch.cuda.is_available():
+    device = torch.device("cuda")
+elif torch.backends.mps.is_available():
+    device = torch.device("mps")
+else:
+    device = torch.device("cpu")
+
 
 def to_device(data, device):
     # For Pros Full training
@@ -96,6 +103,7 @@ def to_device(data, device):
         return ids, raw_texts, speakers, texts, src_lens, max_src_len
 
 
+
 def log(
     logger, step=None, losses=None, fig=None, lr=None, audio=None, sampling_rate=22050, tag=""
 ):
@@ -109,9 +117,6 @@ def log(
         logger.add_scalar("Loss/prosody_loss", losses[6], step)
         logger.add_scalar("Loss/word_loss", losses[7], step)
         logger.add_scalar("Loss/full_duration_loss", losses[8], step)
-        logger.add_scalar("Loss/g_loss", losses[9], step)
-        logger.add_scalar("Loss/prosody_reg", losses[10], step)
-        logger.add_scalar("Loss/d_loss", losses[11], step)
 
     if lr is not None:
         logger.add_scalar("Learning_rate", lr, step)
@@ -130,7 +135,6 @@ def log(
 
 def get_mask_from_lengths(lengths, max_len=None):
     batch_size = lengths.shape[0]
-    device = lengths.device
     if max_len is None:
         max_len = torch.max(lengths).item()
 
@@ -144,11 +148,11 @@ def get_mask_from_lengths(lengths, max_len=None):
 def expand(values, durations):
     out = list()
     for value, d in zip(values, durations):
-        out = out + [value] * max(0, int(d))
+        out += [value] * max(0, int(d))
     return np.array(out)
 
 
-def synth_one_sample(src_gt, tgt_targets, predicted_tgt, predicted_src, vocoder, model_config, preprocess_config):    
+def synth_one_sample(src_gt, tgt_targets, src_targets, predicted_tgt, predicted_src, vocoder, model_config, preprocess_config):    
     (   basename, 
         src_gt_len,
         src_gt_mel,
@@ -158,12 +162,20 @@ def synth_one_sample(src_gt, tgt_targets, predicted_tgt, predicted_src, vocoder,
         src_gt_duration,
     ) = src_gt
     
-    (   tgt_mel_target, 
+    (   
+        tgt_mel_target, 
         tgt_len,
         tgt_pitch_target, 
         tgt_energy_target, 
         tgt_duration_target,
     ) = tgt_targets
+
+    (   
+        src_mel_target, 
+        src_pitch_target, 
+        src_energy_target, 
+        src_duration_target,
+    ) = src_targets
 
     (   tgt_mel_prediction,
         tgt_src_len,
@@ -513,7 +525,6 @@ def pad(input_ele, mel_max_length=None):
 
 
 def flip_mapping(tgt_to_src_mappings, src_seq_len):
-        device = tgt_to_src_mappings.device
 
         batch = []
         for tgt_to_src_mapping in tgt_to_src_mappings:
@@ -535,17 +546,11 @@ def flip_mapping(tgt_to_src_mappings, src_seq_len):
 
 
 def realign_p_e_d(alignments, p_e_d):
-    new_ped = torch.zeros(p_e_d.size(0), len(alignments[0])+1, device=p_e_d.device)
-    for b, alignment in enumerate(alignments):
-        for j, src_indices in enumerate(alignment):
-            # Use torch operations to maintain the computation graph
-            non_zero_p_e_d = p_e_d[b, src_indices][p_e_d[b, src_indices] != 0]
-            if non_zero_p_e_d.nelement() > 0:
-                average_p_e_d = non_zero_p_e_d.float().mean()
-            else:
-                average_p_e_d = torch.tensor(0, device=p_e_d.device, dtype=p_e_d.dtype)
-            new_ped[b, j] = average_p_e_d
-    return new_ped
+        new_ped = torch.zeros(p_e_d.size(0), len(alignments[0])+1, device=p_e_d.device)
+        for b, alignment in enumerate(alignments):
+            for j, src_indices in enumerate(alignment):
+                new_ped[b][j+1] = torch.mean(torch.tensor([p_e_d[b][i] for i in src_indices], dtype=torch.float32))
+        return new_ped
 
 
 def custom_round(x):
